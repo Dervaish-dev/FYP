@@ -31,17 +31,22 @@ const VoiceAssistant = () => {
     const apiKey = "AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0";
     
     // Enhanced therapeutic prompt
-    const therapeuticPrompt = `You are a compassionate, professional mental health therapist and doctor. The user has shared: "${userMessage}"
+    const therapeuticPrompt = `You are Dr. Sarah, a compassionate and experienced mental health therapist and doctor. The user has shared: "${userMessage}"
 
-Respond with empathy, understanding, and professional guidance. Your response should:
-1. Acknowledge their feelings with empathy
-2. Provide gentle, supportive guidance
-3. Offer practical coping strategies
-4. Encourage professional help if needed
-5. Use warm, non-judgmental language
-6. Keep response concise but meaningful (2-3 sentences)
+As Dr. Sarah, respond with:
+1. Empathetic acknowledgment of their feelings
+2. Professional guidance and coping strategies
+3. Practical steps they can take right now
+4. Gentle encouragement and support
+5. Only recommend professional help if the situation is severe or dangerous
 
-Remember: You are NOT replacing professional therapy, but providing supportive guidance.`;
+Your response should be:
+- Warm and understanding (2-3 sentences)
+- Actionable and helpful
+- Professional but not clinical
+- Focused on immediate support and guidance
+
+Remember: You ARE the doctor/therapist they're talking to. Provide direct help and guidance, don't just refer them elsewhere unless absolutely necessary.`;
 
     try {
       const response = await fetch(
@@ -279,33 +284,9 @@ Remember: You are NOT replacing professional therapy, but providing supportive g
               }
             </p>
 
-            {/* Text Input Alternative */}
-            <div className="flex space-x-2 max-w-md mx-auto">
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Share how you're feeling or what's on your mind..."
-                className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                style={{ 
-                  backgroundColor: 'var(--theme-card)',
-                  borderColor: 'var(--theme-border)',
-                  color: 'var(--theme-text)'
-                }}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                disabled={isTyping}
-              />
-              <motion.button
-                onClick={handleSendMessage}
-                disabled={!inputText.trim() || isTyping}
-                className="px-4 py-2 rounded-lg text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: 'var(--theme-primary)' }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Send size={18} />
-              </motion.button>
-            </div>
+            <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
+              Use the text input below to chat with your AI companion
+            </p>
           </div>
 
           {/* Chat Container */}
@@ -385,6 +366,36 @@ Remember: You are NOT replacing professional therapy, but providing supportive g
                 </motion.div>
               )}
               <div ref={messagesEndRef} />
+            </div>
+
+            {/* Fixed Input Area at Bottom */}
+            <div className="border-t p-4" style={{ borderColor: 'var(--theme-border)' }}>
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="Share how you're feeling or what's on your mind..."
+                  className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  style={{ 
+                    backgroundColor: 'var(--theme-card)',
+                    borderColor: 'var(--theme-border)',
+                    color: 'var(--theme-text)'
+                  }}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                  disabled={isTyping}
+                />
+                <motion.button
+                  onClick={handleSendMessage}
+                  disabled={!inputText.trim() || isTyping}
+                  className="px-4 py-2 rounded-lg text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: 'var(--theme-primary)' }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Send size={18} />
+                </motion.button>
+              </div>
             </div>
           </div>
 

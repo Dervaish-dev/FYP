@@ -33,7 +33,11 @@ import {
   Bell,
   BellOff,
   Target,
-  Zap
+  Zap,
+  BarChart3,
+  TrendingUp,
+  Activity,
+  Award
 } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -265,6 +269,16 @@ const Tasks = () => {
     dueTime: '',
     repeat: 'once'
   });
+  const [taskHistory, setTaskHistory] = useState(() => {
+    const saved = localStorage.getItem('neurocompanion-task-history');
+    return saved ? JSON.parse(saved) : [
+      { id: 1, title: 'Morning Medication', completedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), duration: 5 },
+      { id: 2, title: 'Exercise Routine', completedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), duration: 30 },
+      { id: 3, title: 'Read for 30 minutes', completedAt: new Date(Date.now() - 6 * 60 * 60 * 1000), duration: 30 },
+      { id: 4, title: 'Call Mom', completedAt: new Date(Date.now() - 3 * 60 * 60 * 1000), duration: 15 },
+      { id: 5, title: 'Prepare Presentation', completedAt: new Date(Date.now() - 1 * 60 * 60 * 1000), duration: 45 }
+    ];
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -402,6 +416,22 @@ const Tasks = () => {
         setTasks(prev => prev.map(task => 
           task._id === taskId ? { ...task, ...updateData } : task
         ));
+        
+        // If task is marked as done, add to history
+        if (updateData.status === 'done') {
+          const task = tasks.find(t => t._id === taskId);
+          if (task) {
+            const newHistoryEntry = {
+              id: Date.now(),
+              title: task.title,
+              completedAt: new Date(),
+              duration: Math.floor(Math.random() * 60) + 5 // Mock duration 5-65 minutes
+            };
+            setTaskHistory(prev => [newHistoryEntry, ...prev]);
+            localStorage.setItem('neurocompanion-task-history', JSON.stringify([newHistoryEntry, ...taskHistory]));
+          }
+        }
+        
         toast.success('Task updated successfully!');
       }
     } catch (error) {
@@ -664,6 +694,156 @@ const Tasks = () => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Task History & Analytics */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="mt-8"
+        >
+          <div 
+            className="rounded-2xl p-6 shadow-lg border"
+            style={{ 
+              backgroundColor: 'var(--theme-card)',
+              borderColor: 'var(--theme-border)'
+            }}
+          >
+            <h3 className="text-xl font-bold mb-6 flex items-center space-x-2" style={{ color: 'var(--theme-text)' }}>
+              <BarChart3 className="h-6 w-6" style={{ color: 'var(--theme-primary)' }} />
+              <span>Task History & Analytics</span>
+            </h3>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Task Completion Stats */}
+              <div>
+                <h4 className="text-lg font-semibold mb-4 flex items-center space-x-2" style={{ color: 'var(--theme-text)' }}>
+                  <TrendingUp className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
+                  <span>Completion Stats</span>
+                </h4>
+                
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-background)' }}>
+                    <div className="flex items-center space-x-2">
+                      <Award className="h-5 w-5 text-green-500" />
+                      <span style={{ color: 'var(--theme-text)' }}>Tasks Completed Today</span>
+                    </div>
+                    <span className="text-2xl font-bold text-green-500">
+                      {taskHistory.filter(task => 
+                        new Date(task.completedAt).toDateString() === new Date().toDateString()
+                      ).length}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-background)' }}>
+                    <div className="flex items-center space-x-2">
+                      <Activity className="h-5 w-5 text-blue-500" />
+                      <span style={{ color: 'var(--theme-text)' }}>Average Completion Time</span>
+                    </div>
+                    <span className="text-2xl font-bold text-blue-500">
+                      {Math.round(taskHistory.reduce((sum, task) => sum + task.duration, 0) / taskHistory.length)}m
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-background)' }}>
+                    <div className="flex items-center space-x-2">
+                      <Target className="h-5 w-5 text-purple-500" />
+                      <span style={{ color: 'var(--theme-text)' }}>Total Tasks Completed</span>
+                    </div>
+                    <span className="text-2xl font-bold text-purple-500">
+                      {taskHistory.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Completed Tasks */}
+              <div>
+                <h4 className="text-lg font-semibold mb-4 flex items-center space-x-2" style={{ color: 'var(--theme-text)' }}>
+                  <CheckCircle2 className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
+                  <span>Recent Completed Tasks</span>
+                </h4>
+                
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {taskHistory.slice(0, 5).map((task, index) => (
+                    <motion.div
+                      key={task.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.1 }}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                      style={{ borderColor: 'var(--theme-border)' }}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        <div>
+                          <p className="font-medium" style={{ color: 'var(--theme-text)' }}>
+                            {task.title}
+                          </p>
+                          <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
+                            Completed in {task.duration} minutes
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-sm opacity-60" style={{ color: 'var(--theme-text)' }}>
+                        {new Date(task.completedAt).toLocaleDateString()}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Weekly Task Completion Chart */}
+            <div className="mt-6">
+              <h4 className="text-lg font-semibold mb-4 flex items-center space-x-2" style={{ color: 'var(--theme-text)' }}>
+                <BarChart3 className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
+                <span>Weekly Completion Trend</span>
+              </h4>
+              
+              <div className="grid grid-cols-7 gap-2">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => {
+                  const dayTasks = taskHistory.filter(task => {
+                    const taskDate = new Date(task.completedAt);
+                    const dayOfWeek = taskDate.getDay();
+                    return dayOfWeek === (index + 1) % 7;
+                  }).length;
+                  
+                  const maxTasks = Math.max(...Array.from({length: 7}, (_, i) => 
+                    taskHistory.filter(task => {
+                      const taskDate = new Date(task.completedAt);
+                      const dayOfWeek = taskDate.getDay();
+                      return dayOfWeek === (i + 1) % 7;
+                    }).length
+                  ));
+                  
+                  const height = maxTasks > 0 ? (dayTasks / maxTasks) * 100 : 0;
+                  
+                  return (
+                    <div key={day} className="text-center">
+                      <div className="text-xs mb-1" style={{ color: 'var(--theme-text)' }}>
+                        {day}
+                      </div>
+                      <div className="relative h-20 flex items-end justify-center">
+                        <div
+                          className="w-6 rounded-t transition-all duration-500"
+                          style={{
+                            backgroundColor: 'var(--theme-primary)',
+                            height: `${height}%`,
+                            minHeight: dayTasks > 0 ? '8px' : '0px'
+                          }}
+                        />
+                      </div>
+                      <div className="text-xs mt-1 font-medium" style={{ color: 'var(--theme-text)' }}>
+                        {dayTasks}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </motion.div>
       </div>
       
       <ToastContainer
