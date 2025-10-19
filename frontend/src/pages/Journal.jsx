@@ -734,7 +734,7 @@ Respond in ${userLanguage} language only. Be a caring friend.`;
                 </ResponsiveContainer>
               </div>
 
-              {/* Mood Distribution */}
+              {/* Mood Distribution - Fixed Pie Chart */}
               <div 
                 className="rounded-2xl p-6 shadow-lg border"
                 style={{ 
@@ -746,28 +746,33 @@ Respond in ${userLanguage} language only. Be a caring friend.`;
                   <BarChart3 className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
                   <span>Mood Distribution</span>
                 </h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 bg-green-500 rounded"></div>
-                      <span style={{ color: 'var(--theme-text)' }}>Positive</span>
-                    </div>
-                    <span className="font-bold text-green-500">{moodStats.positive}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 bg-gray-500 rounded"></div>
-                      <span style={{ color: 'var(--theme-text)' }}>Neutral</span>
-                    </div>
-                    <span className="font-bold text-gray-500">{moodStats.neutral}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 bg-red-500 rounded"></div>
-                      <span style={{ color: 'var(--theme-text)' }}>Negative</span>
-                    </div>
-                    <span className="font-bold text-red-500">{moodStats.negative}%</span>
-                  </div>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Positive', value: parseFloat(moodStats.positive), color: '#10B981' },
+                          { name: 'Neutral', value: parseFloat(moodStats.neutral), color: '#6B7280' },
+                          { name: 'Negative', value: parseFloat(moodStats.negative), color: '#EF4444' }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {[
+                          { name: 'Positive', value: parseFloat(moodStats.positive), color: '#10B981' },
+                          { name: 'Neutral', value: parseFloat(moodStats.neutral), color: '#6B7280' },
+                          { name: 'Negative', value: parseFloat(moodStats.negative), color: '#EF4444' }
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
             </div>
