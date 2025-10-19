@@ -51,15 +51,17 @@ const Journal = () => {
     setJournalEntries(entries);
   };
 
-  // AI Emotion Analysis using Gemini API
+  // AI Emotion Analysis using Gemini API with language detection
   const analyzeEmotion = async (text) => {
     const apiKey = "AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0";
     
-    const prompt = `Analyze the emotional tone of this journal entry and respond with ONLY one emotion word from this list: Happy, Sad, Angry, Stressed, Anxious, Depressed, Calm, Excited, Worried, Confused, Lonely, Grateful, Hopeful, Frustrated, Peaceful, Overwhelmed, Content, Nervous, Optimistic, Pessimistic.
+    const prompt = `Analyze this text and respond with ONLY a JSON object containing:
+1. "language": the detected language (e.g., "urdu", "arabic", "english", "spanish", "french", etc.)
+2. "emotion": one emotion from this list: happy, sad, angry, stressed, anxious, depressed, calm, excited, worried, confused, lonely, grateful, hopeful, frustrated, peaceful, overwhelmed, content, nervous, optimistic, pessimistic, neutral
 
-Journal entry: "${text}"
+Text: "${text}"
 
-Respond with just the emotion word that best describes the overall emotional tone.`;
+Respond with ONLY the JSON object, no other text.`;
 
     try {
       const response = await fetch(
@@ -78,20 +80,28 @@ Respond with just the emotion word that best describes the overall emotional ton
               temperature: 0.3,
               topK: 1,
               topP: 0.8,
-              maxOutputTokens: 10,
+              maxOutputTokens: 50,
             },
           }),
         }
       );
 
       const data = await response.json();
-      const emotion = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Neutral';
+      const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '{"language":"english","emotion":"neutral"}';
       
-      // Normalize emotion to lowercase
-      return emotion.toLowerCase();
+      try {
+        const parsed = JSON.parse(responseText);
+        return {
+          emotion: parsed.emotion?.toLowerCase() || 'neutral',
+          language: parsed.language?.toLowerCase() || 'english'
+        };
+      } catch (parseError) {
+        console.error('Error parsing emotion response:', parseError);
+        return { emotion: 'neutral', language: 'english' };
+      }
     } catch (error) {
       console.error('Error analyzing emotion:', error);
-      return 'neutral';
+      return { emotion: 'neutral', language: 'english' };
     }
   };
 
@@ -101,15 +111,15 @@ Respond with just the emotion word that best describes the overall emotional ton
     return negativeEmotions.includes(emotion.toLowerCase());
   };
 
-  // Get chatbot response
-  const getChatbotResponse = async (userMessage) => {
+  // Get multilingual chatbot response
+  const getChatbotResponse = async (userMessage, userLanguage = 'english') => {
     const apiKey = "AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0";
     
-    const prompt = `You are a caring friend chatbot. The user has written a journal entry that shows they're feeling down, and now they're chatting with you. Be supportive, empathetic, and helpful. Keep responses short (1-2 sentences) and friendly.
+    const prompt = `You are a caring friend chatbot. The user is chatting with you in ${userLanguage}. Respond in the SAME language they are using. Be supportive, empathetic, and helpful. Keep responses short (1-2 sentences) and friendly.
 
 User message: "${userMessage}"
 
-Respond as a caring friend would.`;
+IMPORTANT: Respond in ${userLanguage} language only. Be a caring friend.`;
 
     try {
       const response = await fetch(
@@ -147,14 +157,15 @@ Respond as a caring friend would.`;
       setIsAnalyzing(true);
       
       try {
-        // Analyze emotion using AI
-        const detectedEmotion = await analyzeEmotion(newEntry);
+        // Analyze emotion and language using AI
+        const analysis = await analyzeEmotion(newEntry);
         
         const entry = {
           id: Date.now(),
           content: newEntry.trim(),
           timestamp: new Date().toISOString(),
-          mood: detectedEmotion,
+          mood: analysis.emotion,
+          language: analysis.language,
           wordCount: newEntry.trim().split(' ').length,
           emotionConfidence: Math.random() * 0.3 + 0.7 // Mock confidence score
         };
@@ -165,9 +176,11 @@ Respond as a caring friend would.`;
         setIsWriting(false);
         
         // Show chatbot button if emotion is negative
-        if (needsSupport(detectedEmotion)) {
+        if (needsSupport(analysis.emotion)) {
           setTimeout(() => {
             setShowChatbotButton(true);
+            // Store the detected language for chatbot responses
+            localStorage.setItem('neurocompanion-user-language', analysis.language);
           }, 2000);
         }
       } catch (error) {
@@ -196,7 +209,7 @@ Respond as a caring friend would.`;
       setIsAnalyzing(true);
       
       try {
-        const detectedEmotion = await analyzeEmotion(newEntry);
+        const analysis = await analyzeEmotion(newEntry);
         
         const updatedEntries = journalEntries.map(entry => 
           entry.id === editingEntry.id 
@@ -204,7 +217,8 @@ Respond as a caring friend would.`;
                 ...entry, 
                 content: newEntry.trim(), 
                 wordCount: newEntry.trim().split(' ').length,
-                mood: detectedEmotion,
+                mood: analysis.emotion,
+                language: analysis.language,
                 emotionConfidence: Math.random() * 0.3 + 0.7
               }
             : entry
@@ -215,9 +229,10 @@ Respond as a caring friend would.`;
         setEditingEntry(null);
         
         // Show chatbot button if emotion is negative
-        if (needsSupport(detectedEmotion)) {
+        if (needsSupport(analysis.emotion)) {
           setTimeout(() => {
             setShowChatbotButton(true);
+            localStorage.setItem('neurocompanion-user-language', analysis.language);
           }, 2000);
         }
       } catch (error) {
@@ -257,7 +272,9 @@ Respond as a caring friend would.`;
     setIsTyping(true);
 
     try {
-      const response = await getChatbotResponse(chatbotInput);
+      // Get user's language from localStorage or detect from current message
+      const storedLanguage = localStorage.getItem('neurocompanion-user-language') || 'english';
+      const response = await getChatbotResponse(chatbotInput, storedLanguage);
       
       const botMessage = {
         id: Date.now() + 1,
@@ -276,13 +293,27 @@ Respond as a caring friend would.`;
     }
   };
 
-  const openChatbot = () => {
+  const openChatbot = async () => {
     setShowChatbot(true);
     setShowChatbotButton(false);
+    
+    // Get user's language for personalized greeting
+    const userLanguage = localStorage.getItem('neurocompanion-user-language') || 'english';
+    
+    const greetings = {
+      'urdu': 'آپ کیسے ہیں؟ میں یہاں ہوں اگر آپ بات کرنا چاہتے ہیں۔ 😊',
+      'arabic': 'كيف حالك؟ أنا هنا إذا كنت تريد التحدث. 😊',
+      'english': "Hey! I noticed you might be feeling down. I'm here if you want to talk about it. How are you doing? 😊",
+      'spanish': '¡Hola! Noté que podrías estar sintiéndote mal. Estoy aquí si quieres hablar. ¿Cómo estás? 😊',
+      'french': 'Salut! J\'ai remarqué que tu pourrais te sentir mal. Je suis là si tu veux parler. Comment vas-tu? 😊'
+    };
+    
+    const greeting = greetings[userLanguage] || greetings['english'];
+    
     setChatbotMessages([
       {
         id: 1,
-        text: "Hey! I noticed you might be feeling down. I'm here if you want to talk about it. How are you doing? 😊",
+        text: greeting,
         sender: 'bot',
         timestamp: new Date()
       }
@@ -768,7 +799,18 @@ Respond as a caring friend would.`;
                   </div>
                   <p className="opacity-90 leading-relaxed mb-3" style={{ color: 'var(--theme-text)' }}>{entry.content}</p>
                   <div className="flex items-center justify-between text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
-                    <span>{entry.wordCount} words</span>
+                    <div className="flex items-center space-x-3">
+                      <span>{entry.wordCount} words</span>
+                      {/* Language indicator */}
+                      {entry.language && entry.language !== 'english' && (
+                        <div className="text-xs px-2 py-1 rounded-full" style={{ 
+                          backgroundColor: 'var(--theme-secondary)', 
+                          color: 'var(--theme-text)' 
+                        }}>
+                          {entry.language.charAt(0).toUpperCase() + entry.language.slice(1)}
+                        </div>
+                      )}
+                    </div>
                     <div className="flex items-center space-x-2">
                       {getMoodIcon(entry.mood)}
                       <span className={`font-medium ${getMoodColor(entry.mood)}`}>
@@ -803,9 +845,20 @@ Respond as a caring friend would.`;
             whileTap={{ scale: 0.9 }}
           >
             <Bot className="h-8 w-8 text-white" />
-            <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-xs text-white font-bold">!</span>
-            </div>
+            {/* Gentle pulsing animation instead of red dot */}
+            <motion.div
+              className="absolute inset-0 rounded-full"
+              style={{ backgroundColor: 'var(--theme-primary)' }}
+              animate={{ 
+                scale: [1, 1.2, 1],
+                opacity: [0.7, 0.3, 0.7]
+              }}
+              transition={{ 
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+            />
           </motion.button>
         )}
       </AnimatePresence>
