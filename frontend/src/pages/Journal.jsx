@@ -59,12 +59,20 @@ const Journal = () => {
     
     // First check for critical negative keywords - bypass AI if found
     const lowerText = text.toLowerCase();
-    const criticalKeywords = ['kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 'useless', 'worthless', 'alone', 'lonely', 'hopeless'];
+    const criticalKeywords = [
+      'kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 
+      'useless', 'worthless', 'alone', 'lonely', 'hopeless',
+      // Roman Urdu keywords
+      'main mar jaon', 'khudkushi', 'zindagi se tang', 'bekar', 'akela', 'udaas', 'pareshan'
+    ];
     const hasCriticalKeywords = criticalKeywords.some(keyword => lowerText.includes(keyword));
     
     if (hasCriticalKeywords) {
       console.log('🚨 CRITICAL KEYWORDS DETECTED - Bypassing AI, returning depressed');
-      return { emotion: 'depressed', language: 'english' };
+      // Detect if it's Roman Urdu
+      const romanUrduKeywords = ['main', 'app', 'kia', 'merai', 'sath', 'hua', 'hun', 'hai'];
+      const isRomanUrdu = romanUrduKeywords.some(keyword => lowerText.includes(keyword));
+      return { emotion: 'depressed', language: isRomanUrdu ? 'urdu' : 'english' };
     }
     
     const prompt = `You are an expert emotion detection AI. Analyze the following text and determine the primary emotion and language.
@@ -73,14 +81,16 @@ Text: "${text}"
 
 Instructions:
 1. Detect the language (english, urdu, arabic, spanish, french, etc.)
+   - If text uses English alphabet but contains Urdu words like "mien", "app", "kia", "merai", "sath", "hua" → language: urdu
+   - If text contains Arabic script → language: arabic
+   - If text is pure English → language: english
 2. Identify the primary emotion from: happy, sad, angry, stressed, anxious, depressed, calm, excited, worried, confused, lonely, grateful, hopeful, frustrated, peaceful, overwhelmed, content, nervous, optimistic, pessimistic, neutral
 
 Examples:
-- "I am depressed" → emotion: depressed
-- "I have anxiety" → emotion: anxious  
-- "I feel sharp pain in my heart due to anxiety" → emotion: anxious
-- "I am happy today" → emotion: happy
-- "I feel lonely" → emotion: lonely
+- "I am depressed" → {"language": "english", "emotion": "depressed"}
+- "mien app ko kia batao merai sath ajj kia hua" → {"language": "urdu", "emotion": "neutral"}
+- "I have anxiety" → {"language": "english", "emotion": "anxious"}
+- "main bahut pareshan hun" → {"language": "urdu", "emotion": "worried"}
 
 Respond with ONLY this JSON format:
 {"language": "detected_language", "emotion": "detected_emotion"}`;
@@ -129,9 +139,9 @@ Respond with ONLY this JSON format:
         
         // Aggressive fallback check for clearly negative text
         const lowerText = text.toLowerCase();
-        const suicidalKeywords = ['kill myself', 'kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living'];
-        const depressionKeywords = ['depressed', 'depression', 'alone', 'lonely', 'useless', 'worthless', 'hopeless', 'empty'];
-        const anxietyKeywords = ['anxiety', 'anxious', 'panic', 'worried', 'stressed', 'overwhelmed', 'scared'];
+        const suicidalKeywords = ['kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 'main mar jaon', 'khudkushi'];
+        const depressionKeywords = ['depressed', 'depression', 'alone', 'lonely', 'useless', 'worthless', 'hopeless', 'empty', 'udaas', 'bekar', 'akela'];
+        const anxietyKeywords = ['anxiety', 'anxious', 'panic', 'worried', 'stressed', 'overwhelmed', 'scared', 'pareshan', 'tension'];
         
         const hasSuicidalKeywords = suicidalKeywords.some(keyword => lowerText.includes(keyword));
         const hasDepressionKeywords = depressionKeywords.some(keyword => lowerText.includes(keyword));
@@ -168,15 +178,19 @@ Respond with ONLY this JSON format:
       
       // Fallback to keyword detection if API fails
       const lowerText = text.toLowerCase();
-      const criticalKeywords = ['kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 'useless', 'worthless', 'alone', 'lonely', 'hopeless'];
-      const depressionKeywords = ['depressed', 'depression', 'anxiety', 'anxious', 'panic', 'worried', 'stressed', 'overwhelmed', 'scared'];
+      const criticalKeywords = ['kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 'useless', 'worthless', 'alone', 'lonely', 'hopeless', 'main mar jaon', 'khudkushi', 'udaas', 'bekar'];
+      const depressionKeywords = ['depressed', 'depression', 'anxiety', 'anxious', 'panic', 'worried', 'stressed', 'overwhelmed', 'scared', 'pareshan', 'tension'];
+      
+      // Detect Roman Urdu
+      const romanUrduKeywords = ['main', 'app', 'kia', 'merai', 'sath', 'hua', 'hun', 'hai'];
+      const isRomanUrdu = romanUrduKeywords.some(keyword => lowerText.includes(keyword));
       
       if (criticalKeywords.some(keyword => lowerText.includes(keyword))) {
         console.log('🚨 API failed but critical keywords detected - returning depressed');
-        return { emotion: 'depressed', language: 'english' };
+        return { emotion: 'depressed', language: isRomanUrdu ? 'urdu' : 'english' };
       } else if (depressionKeywords.some(keyword => lowerText.includes(keyword))) {
         console.log('😢 API failed but depression keywords detected - returning depressed');
-        return { emotion: 'depressed', language: 'english' };
+        return { emotion: 'depressed', language: isRomanUrdu ? 'urdu' : 'english' };
       }
       
       return { emotion: 'neutral', language: 'english' };
@@ -197,9 +211,15 @@ Respond with ONLY this JSON format:
     
     const prompt = `You are a caring friend chatbot. The user is chatting with you in ${userLanguage}. Respond in the SAME language they are using. Be supportive, empathetic, and helpful. Keep responses short (1-2 sentences) and friendly.
 
+IMPORTANT: 
+- If userLanguage is "urdu", respond in Roman Urdu (using English alphabet)
+- If userLanguage is "arabic", respond in Arabic
+- If userLanguage is "english", respond in English
+- Be a caring friend who listens and helps
+
 User message: "${userMessage}"
 
-IMPORTANT: Respond in ${userLanguage} language only. Be a caring friend.`;
+Respond in ${userLanguage} language only. Be a caring friend.`;
 
     try {
       const response = await fetch(
