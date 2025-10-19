@@ -1,0 +1,87 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@300;400;500;600;700&family=Kalam:wght@300;400;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: var(--theme-border, #e5e7eb);
+  }
+  
+  body {
+    background-color: var(--theme-background, #f8fafc);
+    color: var(--theme-text, #111827);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    transition: background-color 1.5s ease, color 1.5s ease;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Smooth theme transitions */
+  .theme-transition * {
+    transition: background-color 1.5s ease, color 1.5s ease, border-color 1.5s ease !important;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    background-color: var(--theme-primary, #3b82f6);
+    color: white;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .btn-primary:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+  
+  .btn-secondary {
+    background-color: var(--theme-card, #ffffff);
+    color: var(--theme-text, #374151);
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--theme-border, #d1d5db);
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  
+  .btn-secondary:hover {
+    background-color: var(--theme-background, #f0f9ff);
+  }
+  
+  .input-field {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--theme-border, #d1d5db);
+    border-radius: 0.5rem;
+    background-color: var(--theme-card, #ffffff);
+    color: var(--theme-text, #111827);
+    transition: all 0.2s;
+  }
+  
+  .input-field:focus {
+    outline: none;
+    border-color: var(--theme-primary, #3b82f6);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  .card {
+    background-color: var(--theme-card, #ffffff);
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--theme-border, #e5e7eb);
+    transition: all 0.3s ease;
+  }
+}
