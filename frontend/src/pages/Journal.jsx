@@ -35,6 +35,7 @@ const Journal = () => {
   const [chatbotMessages, setChatbotMessages] = useState([]);
   const [chatbotInput, setChatbotInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [showChatbotButton, setShowChatbotButton] = useState(false);
 
   // Load journal entries from localStorage
   useEffect(() => {
@@ -163,18 +164,10 @@ Respond as a caring friend would.`;
         setNewEntry('');
         setIsWriting(false);
         
-        // Show chatbot if emotion is negative
+        // Show chatbot button if emotion is negative
         if (needsSupport(detectedEmotion)) {
           setTimeout(() => {
-            setShowChatbot(true);
-            setChatbotMessages([
-              {
-                id: 1,
-                text: "Hey! I noticed you might be feeling down. I'm here if you want to talk about it. How are you doing? 😊",
-                sender: 'bot',
-                timestamp: new Date()
-              }
-            ]);
+            setShowChatbotButton(true);
           }, 2000);
         }
       } catch (error) {
@@ -221,18 +214,10 @@ Respond as a caring friend would.`;
         setIsWriting(false);
         setEditingEntry(null);
         
-        // Show chatbot if emotion is negative
+        // Show chatbot button if emotion is negative
         if (needsSupport(detectedEmotion)) {
           setTimeout(() => {
-            setShowChatbot(true);
-            setChatbotMessages([
-              {
-                id: 1,
-                text: "I see you updated your entry. How are you feeling now? I'm here to listen. 💙",
-                sender: 'bot',
-                timestamp: new Date()
-              }
-            ]);
+            setShowChatbotButton(true);
           }, 2000);
         }
       } catch (error) {
@@ -289,6 +274,19 @@ Respond as a caring friend would.`;
       console.error('Error getting chatbot response:', error);
       setIsTyping(false);
     }
+  };
+
+  const openChatbot = () => {
+    setShowChatbot(true);
+    setShowChatbotButton(false);
+    setChatbotMessages([
+      {
+        id: 1,
+        text: "Hey! I noticed you might be feeling down. I'm here if you want to talk about it. How are you doing? 😊",
+        sender: 'bot',
+        timestamp: new Date()
+      }
+    ]);
   };
 
   const formatDate = (date) => {
@@ -788,6 +786,30 @@ Respond as a caring friend would.`;
         </motion.div>
       </div>
 
+      {/* Floating Chatbot Button */}
+      <AnimatePresence>
+        {showChatbotButton && !showChatbot && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0 }}
+            onClick={openChatbot}
+            className="fixed bottom-24 right-6 w-16 h-16 rounded-full shadow-2xl border z-50 flex items-center justify-center"
+            style={{ 
+              backgroundColor: 'var(--theme-primary)',
+              borderColor: 'var(--theme-border)'
+            }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+          >
+            <Bot className="h-8 w-8 text-white" />
+            <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+              <span className="text-xs text-white font-bold">!</span>
+            </div>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       {/* Small Chatbot Assistant */}
       <AnimatePresence>
         {showChatbot && (
@@ -795,7 +817,7 @@ Respond as a caring friend would.`;
             initial={{ opacity: 0, scale: 0.8, y: 100 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 100 }}
-            className="fixed bottom-6 right-6 w-80 h-96 rounded-2xl shadow-2xl border z-50 flex flex-col"
+            className="fixed bottom-24 right-6 w-80 h-80 rounded-2xl shadow-2xl border z-50 flex flex-col"
             style={{ 
               backgroundColor: 'var(--theme-card)',
               borderColor: 'var(--theme-border)'
@@ -813,7 +835,10 @@ Respond as a caring friend would.`;
                 </div>
               </div>
               <button
-                onClick={() => setShowChatbot(false)}
+                onClick={() => {
+                  setShowChatbot(false);
+                  setShowChatbotButton(false);
+                }}
                 className="p-1 opacity-70 hover:opacity-100 transition-colors"
                 style={{ color: 'var(--theme-text)' }}
               >
