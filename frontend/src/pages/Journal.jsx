@@ -24,8 +24,10 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { useTheme } from '../context/ThemeContext';
 
 const Journal = () => {
+  const { applyAdaptiveTheme } = useTheme();
   const [journalEntries, setJournalEntries] = useState([]);
   const [isWriting, setIsWriting] = useState(false);
   const [newEntry, setNewEntry] = useState('');
@@ -85,7 +87,7 @@ Respond with ONLY this JSON format:
 
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-lite:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -259,6 +261,10 @@ IMPORTANT: Respond in ${userLanguage} language only. Be a caring friend.`;
         // Show chatbot button if emotion is negative
         if (needsSupport(analysis.emotion)) {
           console.log('Negative emotion detected, showing chatbot button');
+          
+          // Apply adaptive theme based on emotion
+          applyAdaptiveTheme(analysis.emotion);
+          
           setTimeout(() => {
             setShowChatbotButton(true);
             // Store the detected language for chatbot responses
@@ -315,6 +321,10 @@ IMPORTANT: Respond in ${userLanguage} language only. Be a caring friend.`;
         // Show chatbot button if emotion is negative
         if (needsSupport(analysis.emotion)) {
           console.log('Negative emotion detected, showing chatbot button');
+          
+          // Apply adaptive theme based on emotion
+          applyAdaptiveTheme(analysis.emotion);
+          
           setTimeout(() => {
             setShowChatbotButton(true);
             localStorage.setItem('neurocompanion-user-language', analysis.language);
@@ -388,11 +398,11 @@ IMPORTANT: Respond in ${userLanguage} language only. Be a caring friend.`;
     const userLanguage = localStorage.getItem('neurocompanion-user-language') || 'english';
     
     const greetings = {
-      'urdu': 'کیا سب کچھ ٹھیک ہے؟ آپ کیسے محسوس کر رہے ہیں؟ میں یہاں ہوں اگر آپ بات کرنا چاہتے ہیں۔ 💙',
-      'arabic': 'هل كل شيء على ما يرام؟ كيف تشعر؟ أنا هنا إذا كنت تريد التحدث. 💙',
-      'english': "Is everything okay? I noticed you might be feeling down. Do you want to talk about it? I'm here for you. 💙",
-      'spanish': '¿Está todo bien? Noté que podrías estar sintiéndote mal. ¿Quieres hablar de ello? Estoy aquí para ti. 💙',
-      'french': 'Est-ce que tout va bien? J\'ai remarqué que tu pourrais te sentir mal. Veux-tu en parler? Je suis là pour toi. 💙'
+      'urdu': 'کیا سب کچھ ٹھیک ہے؟ آپ کیسے محسوس کر رہے ہیں؟ کیا آپ اس بارے میں بات کرنا چاہتے ہیں؟ میں یہاں ہوں۔ 💙',
+      'arabic': 'هل كل شيء على ما يرام؟ كيف تشعر؟ هل تريد التحدث عن ذلك؟ أنا هنا. 💙',
+      'english': "Is everything okay? How are you feeling? Do you want to talk about it? I'm here for you. 💙",
+      'spanish': '¿Está todo bien? ¿Cómo te sientes? ¿Quieres hablar de ello? Estoy aquí para ti. 💙',
+      'french': 'Est-ce que tout va bien? Comment te sens-tu? Veux-tu en parler? Je suis là pour toi. 💙'
     };
     
     const greeting = greetings[userLanguage] || greetings['english'];
