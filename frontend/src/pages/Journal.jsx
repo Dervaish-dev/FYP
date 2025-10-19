@@ -263,6 +263,7 @@ IMPORTANT: Respond in ${userLanguage} language only. Be a caring friend.`;
           console.log('Negative emotion detected, showing chatbot button');
           
           // Apply adaptive theme based on emotion
+          console.log('🎨 Applying adaptive theme for emotion:', analysis.emotion);
           applyAdaptiveTheme(analysis.emotion);
           
           setTimeout(() => {
@@ -323,6 +324,7 @@ IMPORTANT: Respond in ${userLanguage} language only. Be a caring friend.`;
           console.log('Negative emotion detected, showing chatbot button');
           
           // Apply adaptive theme based on emotion
+          console.log('🎨 Applying adaptive theme for emotion:', analysis.emotion);
           applyAdaptiveTheme(analysis.emotion);
           
           setTimeout(() => {
@@ -925,38 +927,62 @@ IMPORTANT: Respond in ${userLanguage} language only. Be a caring friend.`;
         </motion.div>
       </div>
 
-      {/* Floating Chatbot Button */}
+      {/* Floating Chatbot Button with Message */}
       <AnimatePresence>
         {showChatbotButton && !showChatbot && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0 }}
-            onClick={openChatbot}
-            className="fixed bottom-24 right-6 w-16 h-16 rounded-full shadow-2xl border z-50 flex items-center justify-center"
-            style={{ 
-              backgroundColor: 'var(--theme-primary)',
-              borderColor: 'var(--theme-border)'
-            }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+          <motion.div
+            initial={{ opacity: 0, scale: 0, y: 100 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0, y: 100 }}
+            className="fixed bottom-24 right-6 z-50"
           >
-            <Bot className="h-8 w-8 text-white" />
-            {/* Gentle pulsing animation instead of red dot */}
+            {/* Message Bubble */}
             <motion.div
-              className="absolute inset-0 rounded-full"
-              style={{ backgroundColor: 'var(--theme-primary)' }}
-              animate={{ 
-                scale: [1, 1.2, 1],
-                opacity: [0.7, 0.3, 0.7]
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5 }}
+              className="mb-2 px-4 py-2 rounded-2xl shadow-lg border max-w-xs"
+              style={{ 
+                backgroundColor: 'var(--theme-card)',
+                borderColor: 'var(--theme-border)'
               }}
-              transition={{ 
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut"
+            >
+              <p className="text-sm font-medium" style={{ color: 'var(--theme-text)' }}>
+                Is everything okay? 💙
+              </p>
+              <p className="text-xs opacity-70 mt-1" style={{ color: 'var(--theme-text)' }}>
+                I'm here if you want to talk
+              </p>
+            </motion.div>
+            
+            {/* Chatbot Button */}
+            <motion.button
+              onClick={openChatbot}
+              className="w-16 h-16 rounded-full shadow-2xl border flex items-center justify-center"
+              style={{ 
+                backgroundColor: 'var(--theme-primary)',
+                borderColor: 'var(--theme-border)'
               }}
-            />
-          </motion.button>
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+            >
+              <Bot className="h-8 w-8 text-white" />
+              {/* Gentle pulsing animation */}
+              <motion.div
+                className="absolute inset-0 rounded-full"
+                style={{ backgroundColor: 'var(--theme-primary)' }}
+                animate={{ 
+                  scale: [1, 1.2, 1],
+                  opacity: [0.7, 0.3, 0.7]
+                }}
+                transition={{ 
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
+            </motion.button>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -987,7 +1013,7 @@ IMPORTANT: Respond in ${userLanguage} language only. Be a caring friend.`;
               <button
                 onClick={() => {
                   setShowChatbot(false);
-                  setShowChatbotButton(false);
+                  // Don't hide the button, let it stay visible
                 }}
                 className="p-1 opacity-70 hover:opacity-100 transition-colors"
                 style={{ color: 'var(--theme-text)' }}
