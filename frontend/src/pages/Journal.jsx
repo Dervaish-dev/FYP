@@ -55,6 +55,16 @@ const Journal = () => {
   const analyzeEmotion = async (text) => {
     const apiKey = "AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0";
     
+    // First check for critical negative keywords - bypass AI if found
+    const lowerText = text.toLowerCase();
+    const criticalKeywords = ['kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 'useless', 'worthless', 'alone', 'lonely', 'hopeless'];
+    const hasCriticalKeywords = criticalKeywords.some(keyword => lowerText.includes(keyword));
+    
+    if (hasCriticalKeywords) {
+      console.log('🚨 CRITICAL KEYWORDS DETECTED - Bypassing AI, returning depressed');
+      return { emotion: 'depressed', language: 'english' };
+    }
+    
     const prompt = `Analyze this text for emotional content and respond with ONLY a JSON object containing:
 1. "language": the detected language (e.g., "urdu", "arabic", "english", "spanish", "french", etc.)
 2. "emotion": one emotion from this list: happy, sad, angry, stressed, anxious, depressed, calm, excited, worried, confused, lonely, grateful, hopeful, frustrated, peaceful, overwhelmed, content, nervous, optimistic, pessimistic, neutral
@@ -101,15 +111,31 @@ Respond with ONLY the JSON object, no other text.`;
         const parsed = JSON.parse(responseText);
         console.log('Parsed emotion:', parsed.emotion, 'Language:', parsed.language);
         
-        // Fallback check for clearly negative text
+        // Aggressive fallback check for clearly negative text
         const lowerText = text.toLowerCase();
-        const negativeKeywords = ['depressed', 'anxiety', 'kill myself', 'suicidal', 'sad', 'worried', 'stressed', 'overwhelmed'];
-        const hasNegativeKeywords = negativeKeywords.some(keyword => lowerText.includes(keyword));
+        const suicidalKeywords = ['kill myself', 'kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living'];
+        const depressionKeywords = ['depressed', 'depression', 'alone', 'lonely', 'useless', 'worthless', 'hopeless', 'empty'];
+        const anxietyKeywords = ['anxiety', 'anxious', 'panic', 'worried', 'stressed', 'overwhelmed', 'scared'];
+        
+        const hasSuicidalKeywords = suicidalKeywords.some(keyword => lowerText.includes(keyword));
+        const hasDepressionKeywords = depressionKeywords.some(keyword => lowerText.includes(keyword));
+        const hasAnxietyKeywords = anxietyKeywords.some(keyword => lowerText.includes(keyword));
         
         let finalEmotion = parsed.emotion?.toLowerCase() || 'neutral';
-        if (hasNegativeKeywords && finalEmotion === 'neutral') {
-          console.log('Detected negative keywords, overriding neutral to depressed');
+        
+        // Override AI decision if negative keywords are detected
+        if (hasSuicidalKeywords) {
+          console.log('🚨 SUICIDAL KEYWORDS DETECTED - Overriding to depressed');
           finalEmotion = 'depressed';
+        } else if (hasDepressionKeywords) {
+          console.log('😢 DEPRESSION KEYWORDS DETECTED - Overriding to depressed');
+          finalEmotion = 'depressed';
+        } else if (hasAnxietyKeywords) {
+          console.log('😰 ANXIETY KEYWORDS DETECTED - Overriding to anxious');
+          finalEmotion = 'anxious';
+        } else if (finalEmotion === 'neutral' && (lowerText.includes('sad') || lowerText.includes('bad') || lowerText.includes('terrible'))) {
+          console.log('😔 GENERAL NEGATIVE KEYWORDS DETECTED - Overriding to sad');
+          finalEmotion = 'sad';
         }
         
         return {
@@ -179,9 +205,12 @@ IMPORTANT: Respond in ${userLanguage} language only. Be a caring friend.`;
     if (newEntry.trim()) {
       setIsAnalyzing(true);
       
+      console.log('🔍 Analyzing text:', newEntry);
+      
       try {
         // Analyze emotion and language using AI
         const analysis = await analyzeEmotion(newEntry);
+        console.log('📊 Final analysis result:', analysis);
         
         const entry = {
           id: Date.now(),
