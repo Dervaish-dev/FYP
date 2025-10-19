@@ -65,23 +65,27 @@ const Journal = () => {
       return { emotion: 'depressed', language: 'english' };
     }
     
-    const prompt = `Analyze this text for emotional content and respond with ONLY a JSON object containing:
-1. "language": the detected language (e.g., "urdu", "arabic", "english", "spanish", "french", etc.)
-2. "emotion": one emotion from this list: happy, sad, angry, stressed, anxious, depressed, calm, excited, worried, confused, lonely, grateful, hopeful, frustrated, peaceful, overwhelmed, content, nervous, optimistic, pessimistic, neutral
-
-IMPORTANT: Look for emotional keywords and context:
-- Words like "depressed", "anxiety", "kill myself", "suicidal" = depressed or sad
-- Words like "worried", "stressed", "overwhelmed" = stressed or anxious
-- Words like "happy", "excited", "grateful" = happy or excited
-- If no clear emotion, use "neutral"
+    const prompt = `You are an expert emotion detection AI. Analyze the following text and determine the primary emotion and language.
 
 Text: "${text}"
 
-Respond with ONLY the JSON object, no other text.`;
+Instructions:
+1. Detect the language (english, urdu, arabic, spanish, french, etc.)
+2. Identify the primary emotion from: happy, sad, angry, stressed, anxious, depressed, calm, excited, worried, confused, lonely, grateful, hopeful, frustrated, peaceful, overwhelmed, content, nervous, optimistic, pessimistic, neutral
+
+Examples:
+- "I am depressed" → emotion: depressed
+- "I have anxiety" → emotion: anxious  
+- "I feel sharp pain in my heart due to anxiety" → emotion: anxious
+- "I am happy today" → emotion: happy
+- "I feel lonely" → emotion: lonely
+
+Respond with ONLY this JSON format:
+{"language": "detected_language", "emotion": "detected_emotion"}`;
 
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -93,22 +97,32 @@ Respond with ONLY the JSON object, no other text.`;
               }
             ],
             generationConfig: {
-              temperature: 0.3,
+              temperature: 0.1,
               topK: 1,
               topP: 0.8,
-              maxOutputTokens: 50,
+              maxOutputTokens: 100,
             },
           }),
         }
       );
 
       const data = await response.json();
+      console.log('Full API Response:', data);
+      
       const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '{"language":"english","emotion":"neutral"}';
       
-      console.log('AI Response:', responseText);
+      console.log('AI Response Text:', responseText);
       
       try {
-        const parsed = JSON.parse(responseText);
+        // Try to extract JSON from response if it's wrapped in other text
+        let jsonText = responseText;
+        if (responseText.includes('{') && responseText.includes('}')) {
+          const jsonStart = responseText.indexOf('{');
+          const jsonEnd = responseText.lastIndexOf('}') + 1;
+          jsonText = responseText.substring(jsonStart, jsonEnd);
+        }
+        
+        const parsed = JSON.parse(jsonText);
         console.log('Parsed emotion:', parsed.emotion, 'Language:', parsed.language);
         
         // Aggressive fallback check for clearly negative text
@@ -148,6 +162,21 @@ Respond with ONLY the JSON object, no other text.`;
       }
     } catch (error) {
       console.error('Error analyzing emotion:', error);
+      console.error('Error details:', error.message);
+      
+      // Fallback to keyword detection if API fails
+      const lowerText = text.toLowerCase();
+      const criticalKeywords = ['kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 'useless', 'worthless', 'alone', 'lonely', 'hopeless'];
+      const depressionKeywords = ['depressed', 'depression', 'anxiety', 'anxious', 'panic', 'worried', 'stressed', 'overwhelmed', 'scared'];
+      
+      if (criticalKeywords.some(keyword => lowerText.includes(keyword))) {
+        console.log('🚨 API failed but critical keywords detected - returning depressed');
+        return { emotion: 'depressed', language: 'english' };
+      } else if (depressionKeywords.some(keyword => lowerText.includes(keyword))) {
+        console.log('😢 API failed but depression keywords detected - returning depressed');
+        return { emotion: 'depressed', language: 'english' };
+      }
+      
       return { emotion: 'neutral', language: 'english' };
     }
   };
