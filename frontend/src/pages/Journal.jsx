@@ -55,9 +55,15 @@ const Journal = () => {
   const analyzeEmotion = async (text) => {
     const apiKey = "AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0";
     
-    const prompt = `Analyze this text and respond with ONLY a JSON object containing:
+    const prompt = `Analyze this text for emotional content and respond with ONLY a JSON object containing:
 1. "language": the detected language (e.g., "urdu", "arabic", "english", "spanish", "french", etc.)
 2. "emotion": one emotion from this list: happy, sad, angry, stressed, anxious, depressed, calm, excited, worried, confused, lonely, grateful, hopeful, frustrated, peaceful, overwhelmed, content, nervous, optimistic, pessimistic, neutral
+
+IMPORTANT: Look for emotional keywords and context:
+- Words like "depressed", "anxiety", "kill myself", "suicidal" = depressed or sad
+- Words like "worried", "stressed", "overwhelmed" = stressed or anxious
+- Words like "happy", "excited", "grateful" = happy or excited
+- If no clear emotion, use "neutral"
 
 Text: "${text}"
 
@@ -89,10 +95,25 @@ Respond with ONLY the JSON object, no other text.`;
       const data = await response.json();
       const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '{"language":"english","emotion":"neutral"}';
       
+      console.log('AI Response:', responseText);
+      
       try {
         const parsed = JSON.parse(responseText);
+        console.log('Parsed emotion:', parsed.emotion, 'Language:', parsed.language);
+        
+        // Fallback check for clearly negative text
+        const lowerText = text.toLowerCase();
+        const negativeKeywords = ['depressed', 'anxiety', 'kill myself', 'suicidal', 'sad', 'worried', 'stressed', 'overwhelmed'];
+        const hasNegativeKeywords = negativeKeywords.some(keyword => lowerText.includes(keyword));
+        
+        let finalEmotion = parsed.emotion?.toLowerCase() || 'neutral';
+        if (hasNegativeKeywords && finalEmotion === 'neutral') {
+          console.log('Detected negative keywords, overriding neutral to depressed');
+          finalEmotion = 'depressed';
+        }
+        
         return {
-          emotion: parsed.emotion?.toLowerCase() || 'neutral',
+          emotion: finalEmotion,
           language: parsed.language?.toLowerCase() || 'english'
         };
       } catch (parseError) {
@@ -108,7 +129,9 @@ Respond with ONLY the JSON object, no other text.`;
   // Check if emotion needs chatbot intervention
   const needsSupport = (emotion) => {
     const negativeEmotions = ['sad', 'angry', 'stressed', 'anxious', 'depressed', 'worried', 'confused', 'lonely', 'frustrated', 'overwhelmed', 'nervous', 'pessimistic'];
-    return negativeEmotions.includes(emotion.toLowerCase());
+    const needsHelp = negativeEmotions.includes(emotion.toLowerCase());
+    console.log(`Emotion: ${emotion}, Needs support: ${needsHelp}`);
+    return needsHelp;
   };
 
   // Get multilingual chatbot response
@@ -177,11 +200,14 @@ IMPORTANT: Respond in ${userLanguage} language only. Be a caring friend.`;
         
         // Show chatbot button if emotion is negative
         if (needsSupport(analysis.emotion)) {
+          console.log('Negative emotion detected, showing chatbot button');
           setTimeout(() => {
             setShowChatbotButton(true);
             // Store the detected language for chatbot responses
             localStorage.setItem('neurocompanion-user-language', analysis.language);
           }, 2000);
+        } else {
+          console.log('Positive/neutral emotion, no chatbot needed');
         }
       } catch (error) {
         console.error('Error analyzing emotion:', error);
@@ -230,10 +256,13 @@ IMPORTANT: Respond in ${userLanguage} language only. Be a caring friend.`;
         
         // Show chatbot button if emotion is negative
         if (needsSupport(analysis.emotion)) {
+          console.log('Negative emotion detected, showing chatbot button');
           setTimeout(() => {
             setShowChatbotButton(true);
             localStorage.setItem('neurocompanion-user-language', analysis.language);
           }, 2000);
+        } else {
+          console.log('Positive/neutral emotion, no chatbot needed');
         }
       } catch (error) {
         console.error('Error analyzing emotion:', error);
@@ -301,11 +330,11 @@ IMPORTANT: Respond in ${userLanguage} language only. Be a caring friend.`;
     const userLanguage = localStorage.getItem('neurocompanion-user-language') || 'english';
     
     const greetings = {
-      'urdu': 'آپ کیسے ہیں؟ میں یہاں ہوں اگر آپ بات کرنا چاہتے ہیں۔ 😊',
-      'arabic': 'كيف حالك؟ أنا هنا إذا كنت تريد التحدث. 😊',
-      'english': "Hey! I noticed you might be feeling down. I'm here if you want to talk about it. How are you doing? 😊",
-      'spanish': '¡Hola! Noté que podrías estar sintiéndote mal. Estoy aquí si quieres hablar. ¿Cómo estás? 😊',
-      'french': 'Salut! J\'ai remarqué que tu pourrais te sentir mal. Je suis là si tu veux parler. Comment vas-tu? 😊'
+      'urdu': 'کیا سب کچھ ٹھیک ہے؟ آپ کیسے محسوس کر رہے ہیں؟ میں یہاں ہوں اگر آپ بات کرنا چاہتے ہیں۔ 💙',
+      'arabic': 'هل كل شيء على ما يرام؟ كيف تشعر؟ أنا هنا إذا كنت تريد التحدث. 💙',
+      'english': "Is everything okay? I noticed you might be feeling down. Do you want to talk about it? I'm here for you. 💙",
+      'spanish': '¿Está todo bien? Noté que podrías estar sintiéndote mal. ¿Quieres hablar de ello? Estoy aquí para ti. 💙',
+      'french': 'Est-ce que tout va bien? J\'ai remarqué que tu pourrais te sentir mal. Veux-tu en parler? Je suis là pour toi. 💙'
     };
     
     const greeting = greetings[userLanguage] || greetings['english'];
