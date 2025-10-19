@@ -555,10 +555,13 @@ const Emotions = () => {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      outerRadius={80}
+                      outerRadius={60}
                       fill="#8884d8"
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) => {
+                        // Only show label if percentage is > 5% to avoid clutter
+                        return percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : '';
+                      }}
                     >
                       {getEmotionData().map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -575,6 +578,21 @@ const Emotions = () => {
                     />
                   </PieChart>
                 </ResponsiveContainer>
+                
+                {/* Legend below chart to avoid overlap */}
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {getEmotionData().map((entry, index) => (
+                    <div key={index} className="flex items-center space-x-2 text-sm">
+                      <div 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: entry.color }}
+                      ></div>
+                      <span style={{ color: 'var(--theme-text)' }}>
+                        {entry.name} ({entry.value})
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </motion.div>
           </div>
