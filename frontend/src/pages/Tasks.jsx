@@ -43,6 +43,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useTheme } from '../context/ThemeContext';
 import api from '../utils/api';
+import { getNotificationsEnabled } from '../utils/userPreferences';
 
 // Task Card Component
 const TaskCard = ({ task, onUpdate, onDelete, onNudge }) => {
@@ -262,6 +263,7 @@ const Tasks = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [recentlyDroppedId, setRecentlyDroppedId] = useState(null);
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -363,6 +365,7 @@ const Tasks = () => {
   };
 
   const showNudgeNotification = (task) => {
+    if (!getNotificationsEnabled()) return;
     toast.info(
       <div>
         <div className="font-semibold">⏰ Task Reminder</div>
@@ -392,7 +395,17 @@ const Tasks = () => {
     if (over.id === 'todo' || over.id === 'in-progress' || over.id === 'done') {
       const newStatus = over.id;
       if (newStatus !== activeTask.status) {
-        await handleTaskUpdate(active.id, { status: newStatus });
+        // Optimistic update with temporary glow feedback
+        const previous = tasks;
+        setTasks(prev => prev.map(t => t._id === active.id ? { ...t, status: newStatus } : t));
+        setRecentlyDroppedId(active.id);
+        setTimeout(() => setRecentlyDroppedId(null), 700);
+        try {
+          await handleTaskUpdate(active.id, { status: newStatus }, { optimistic: true });
+        } catch (e) {
+          // Rollback on failure
+          setTasks(previous);
+        }
       }
       return;
     }
@@ -409,13 +422,15 @@ const Tasks = () => {
     }
   };
 
-  const handleTaskUpdate = async (taskId, updateData) => {
+  const handleTaskUpdate = async (taskId, updateData, options = {}) => {
     try {
       const response = await api.put(`/tasks/${taskId}`, updateData);
       if (response.data.success) {
-        setTasks(prev => prev.map(task => 
-          task._id === taskId ? { ...task, ...updateData } : task
-        ));
+        if (!options.optimistic) {
+          setTasks(prev => prev.map(task => 
+            task._id === taskId ? { ...task, ...updateData } : task
+          ));
+        }
         
         // If task is marked as done, add to history
         if (updateData.status === 'done') {
@@ -437,6 +452,7 @@ const Tasks = () => {
     } catch (error) {
       console.error('Error updating task:', error);
       toast.error('Failed to update task');
+      throw error;
     }
   };
 
@@ -509,6 +525,22 @@ const Tasks = () => {
     done: tasks.filter(task => task.status === 'done')
   };
 
+  // Progress widget data
+  const today = new Date().toDateString();
+  const todayCompleted = taskHistory.filter(t => new Date(t.completedAt).toDateString() === today).length;
+  const totalToday = tasks.filter(t => new Date(t.dueTime).toDateString() === today).length;
+  const completionRateToday = totalToday > 0 ? Math.round((todayCompleted / totalToday) * 100) : 0;
+  const weeklyAvg = Math.round(
+    Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const ds = d.toDateString();
+      const comp = taskHistory.filter(t => new Date(t.completedAt).toDateString() === ds).length;
+      const due = tasks.filter(t => new Date(t.dueTime).toDateString() === ds).length;
+      return due > 0 ? comp / due : 0;
+    }).reduce((a,b)=>a+b,0) / 7 * 100
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen p-6 flex items-center justify-center" style={{ backgroundColor: 'var(--theme-background)' }}>
@@ -551,6 +583,36 @@ const Tasks = () => {
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
+          {/* Progress Widget */}
+          <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-xl border" style={{ backgroundColor:'var(--theme-card)', borderColor:'var(--theme-border)' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-70" style={{ color:'var(--theme-text)' }}>Today completion</p>
+                  <p className="text-2xl font-bold" style={{ color:'var(--theme-text)' }}>{completionRateToday}%</p>
+                </div>
+                <TrendingUp className="h-6 w-6" style={{ color:'var(--theme-primary)' }} />
+              </div>
+            </div>
+            <div className="p-4 rounded-xl border" style={{ backgroundColor:'var(--theme-card)', borderColor:'var(--theme-border)' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-70" style={{ color:'var(--theme-text)' }}>Weekly average</p>
+                  <p className="text-2xl font-bold" style={{ color:'var(--theme-text)' }}>{isNaN(weeklyAvg) ? 0 : weeklyAvg}%</p>
+                </div>
+                <BarChart3 className="h-6 w-6" style={{ color:'var(--theme-primary)' }} />
+              </div>
+            </div>
+            <div className="p-4 rounded-xl border" style={{ backgroundColor:'var(--theme-card)', borderColor:'var(--theme-border)' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-70" style={{ color:'var(--theme-text)' }}>Completed today</p>
+                  <p className="text-2xl font-bold text-green-500">{todayCompleted}</p>
+                </div>
+                <CheckCircle2 className="h-6 w-6 text-green-500" />
+              </div>
+            </div>
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <TaskColumn
               title="To Do"
