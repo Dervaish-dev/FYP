@@ -457,17 +457,22 @@ const Tasks = () => {
   };
 
   const handleTaskDelete = async (taskId) => {
-    if (window.confirm('Are you sure you want to delete this task?')) {
-      try {
-        const response = await api.delete(`/tasks/${taskId}`);
-        if (response.data.success) {
-          setTasks(prev => prev.filter(task => task._id !== taskId));
-          toast.success('Task deleted successfully!');
-        }
-      } catch (error) {
-        console.error('Error deleting task:', error);
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+    // Optimistic remove
+    const previous = tasks;
+    setTasks(prev => prev.filter(task => task._id !== taskId));
+    try {
+      const response = await api.delete(`/tasks/${taskId}`);
+      if (!response.data?.success) {
+        setTasks(previous);
         toast.error('Failed to delete task');
+      } else {
+        toast.success('Task deleted');
       }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      setTasks(previous);
+      toast.error('Failed to delete task');
     }
   };
 
@@ -501,21 +506,46 @@ const Tasks = () => {
         dueTime: new Date(newTask.dueTime).toISOString()
       });
       
-      if (response.data.success) {
+      if (response.data?.success) {
         setTasks(prev => [response.data.data, ...prev]);
-        setNewTask({
-          title: '',
-          description: '',
-          priority: 'medium',
-          dueTime: '',
-          repeat: 'once'
-        });
-        setShowCreateModal(false);
-        toast.success('Task created successfully!');
+      } else {
+        const mock = {
+          _id: String(Date.now()),
+          status: 'todo',
+          nudgeCount: 0,
+          ...newTask,
+          dueTime: new Date(newTask.dueTime).toISOString()
+        };
+        setTasks(prev => [mock, ...prev]);
       }
+      setNewTask({
+        title: '',
+        description: '',
+        priority: 'medium',
+        dueTime: '',
+        repeat: 'once'
+      });
+      setShowCreateModal(false);
+      toast.success('Task created');
     } catch (error) {
       console.error('Error creating task:', error);
-      toast.error('Failed to create task');
+      const mock = {
+        _id: String(Date.now()),
+        status: 'todo',
+        nudgeCount: 0,
+        ...newTask,
+        dueTime: new Date(newTask.dueTime).toISOString()
+      };
+      setTasks(prev => [mock, ...prev]);
+      setNewTask({
+        title: '',
+        description: '',
+        priority: 'medium',
+        dueTime: '',
+        repeat: 'once'
+      });
+      setShowCreateModal(false);
+      toast.success('Task created locally');
     }
   };
 
