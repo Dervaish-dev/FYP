@@ -265,7 +265,8 @@ const TaskColumn = ({ title, tasks, status, onTaskUpdate, onTaskDelete, onTaskNu
 const Tasks = () => {
   const { currentTheme } = useTheme();
   const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // initial page load only
+  const [isSubmitting, setIsSubmitting] = useState(false); // creating task guard
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [recentlyDroppedId, setRecentlyDroppedId] = useState(null);
   const [newTask, setNewTask] = useState({
@@ -305,12 +306,22 @@ const Tasks = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Failsafe: never stay in loading more than 4s
+  useEffect(() => {
+    if (!loading) return;
+    const t = setTimeout(() => setLoading(false), 4000);
+    return () => clearTimeout(t);
+  }, [loading]);
+
   const loadTasks = async () => {
     try {
       setLoading(true);
       const response = await api.get(`/tasks/${userId}`);
-      if (response.data.success) {
+      if (response.data?.success && Array.isArray(response.data.data?.tasks)) {
         setTasks(response.data.data.tasks);
+      } else {
+        // Render mock if backend returns unexpected shape
+        setTasks([]);
       }
     } catch (error) {
       console.error('Error loading tasks:', error);
@@ -508,8 +519,8 @@ const Tasks = () => {
     }
 
     // Disable duplicate clicks
-    if (loading) return;
-    setLoading(true);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     try {
       const response = await api.post('/tasks/create', {
@@ -559,7 +570,7 @@ const Tasks = () => {
       setShowCreateModal(false);
       toast.success('Task created locally');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
