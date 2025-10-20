@@ -46,7 +46,7 @@ import api from '../utils/api';
 import { getNotificationsEnabled } from '../utils/userPreferences';
 
 // Task Card Component
-const TaskCard = ({ task, onUpdate, onDelete, onNudge }) => {
+const TaskCard = ({ task, onUpdate, onDelete, onNudge, isRecentlyDropped }) => {
   const {
     attributes,
     listeners,
@@ -58,7 +58,7 @@ const TaskCard = ({ task, onUpdate, onDelete, onNudge }) => {
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition: transition || 'transform 220ms cubic-bezier(0.2, 0.6, 0.4, 1)',
     opacity: isDragging ? 0.5 : 1,
   };
 
@@ -95,8 +95,11 @@ const TaskCard = ({ task, onUpdate, onDelete, onNudge }) => {
       {...attributes}
       {...listeners}
       className="card p-4 mb-3 cursor-grab active:cursor-grabbing"
+      layout
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
+      animate={isRecentlyDropped ? { boxShadow: '0 0 0 4px rgba(59,130,246,0.25)', scale: 1.01 } : { boxShadow: '0 0 0 0 rgba(0,0,0,0)', scale: 1 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
@@ -235,6 +238,7 @@ const TaskColumn = ({ title, tasks, status, onTaskUpdate, onTaskDelete, onTaskNu
                   onUpdate={onTaskUpdate}
                   onDelete={onTaskDelete}
                   onNudge={onTaskNudge}
+                  isRecentlyDropped={recentlyDroppedId === task._id}
                 />
               </motion.div>
             ))}
@@ -425,7 +429,7 @@ const Tasks = () => {
   const handleTaskUpdate = async (taskId, updateData, options = {}) => {
     try {
       const response = await api.put(`/tasks/${taskId}`, updateData);
-      if (response.data.success) {
+      if (response.data?.success) {
         if (!options.optimistic) {
           setTasks(prev => prev.map(task => 
             task._id === taskId ? { ...task, ...updateData } : task
@@ -451,7 +455,11 @@ const Tasks = () => {
       }
     } catch (error) {
       console.error('Error updating task:', error);
-      toast.error('Failed to update task');
+      if (!options.optimistic) {
+        toast.error('Failed to update task');
+      } else {
+        throw error;
+      }
       throw error;
     }
   };
@@ -498,6 +506,10 @@ const Tasks = () => {
       toast.error('Please enter a task title');
       return;
     }
+
+    // Disable duplicate clicks
+    if (loading) return;
+    setLoading(true);
 
     try {
       const response = await api.post('/tasks/create', {
@@ -546,6 +558,8 @@ const Tasks = () => {
       });
       setShowCreateModal(false);
       toast.success('Task created locally');
+    } finally {
+      setLoading(false);
     }
   };
 
