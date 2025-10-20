@@ -13,6 +13,9 @@ import CaregiverPortal from './pages/CaregiverPortal';
 import Settings from './pages/Settings';
 import Wellness from './pages/Wellness';
 import Layout from './components/Layout';
+import NotificationCenter from './components/NotificationCenter';
+import EmojiMascot from './components/EmojiMascot';
+import WellnessNotificationCenter from './components/WellnessNotificationCenter';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -158,6 +161,13 @@ const AppRoutes = () => {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+      
+      {/* Global Components - Only show on authenticated pages */}
+        <ProtectedRoute>
+          <NotificationCenter />
+          <EmojiMascot />
+          <WellnessNotificationCenter />
+        </ProtectedRoute>
     </>
   );
 };

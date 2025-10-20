@@ -24,9 +24,11 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useTheme } from '../context/ThemeContext';
 import api from '../utils/api';
 import { buildUserContextString } from '../utils/userPreferences';
+import { useNotifications, NOTIFICATION_TYPES } from '../components/NotificationCenter';
 
 const Emotions = () => {
   const { adaptiveMode, applyAdaptiveTheme } = useTheme();
+  const { addNotification } = useNotifications();
   const [currentEmotion, setCurrentEmotion] = useState('neutral');
   const [emotionIntensity, setEmotionIntensity] = useState(5);
   const [selectedEmotion, setSelectedEmotion] = useState('');
@@ -197,6 +199,33 @@ const Emotions = () => {
       };
       setEmotionHistory(prev => [newEntry, ...prev.slice(0, 9)]); // Keep last 10 entries
 
+      // Trigger emotion-based notifications
+      if (detectedEmotionResult.toLowerCase() === 'sad' || detectedEmotionResult.toLowerCase() === 'depressed') {
+        addNotification(
+          '🌿 You seem a little down. Take a deep breath and remember you\'re stronger than you know! 💙',
+          NOTIFICATION_TYPES.SUPPORT,
+          '🌿'
+        );
+      } else if (detectedEmotionResult.toLowerCase() === 'stressed' || detectedEmotionResult.toLowerCase() === 'anxious') {
+        addNotification(
+          '🌸 Feeling overwhelmed? Try taking a short break or doing some deep breathing! 💫',
+          NOTIFICATION_TYPES.SUPPORT,
+          '🌸'
+        );
+      } else if (detectedEmotionResult.toLowerCase() === 'happy' || detectedEmotionResult.toLowerCase() === 'excited') {
+        addNotification(
+          '😄 Love that positive energy! Keep spreading those good vibes! ✨',
+          NOTIFICATION_TYPES.CELEBRATION,
+          '😄'
+        );
+      } else if (detectedEmotionResult.toLowerCase() === 'angry' || detectedEmotionResult.toLowerCase() === 'frustrated') {
+        addNotification(
+          '🤗 It\'s okay to feel this way. Try some gentle breathing or a quick walk! 🌿',
+          NOTIFICATION_TYPES.SUPPORT,
+          '🤗'
+        );
+      }
+
       // Reset file input to allow re-upload
       e.target.value = '';
 
@@ -232,6 +261,33 @@ const Emotions = () => {
       source: 'manual'
     };
     setEmotionHistory(prev => [newEntry, ...prev.slice(0, 9)]); // Keep last 10 entries
+
+    // Trigger emotion-based notifications for manual selection
+    if (emotion.toLowerCase() === 'sad' || emotion.toLowerCase() === 'depressed') {
+      addNotification(
+        '🌿 Thanks for sharing how you feel. Remember, it\'s okay to not be okay sometimes! 💙',
+        NOTIFICATION_TYPES.SUPPORT,
+        '🌿'
+      );
+    } else if (emotion.toLowerCase() === 'stressed' || emotion.toLowerCase() === 'anxious') {
+      addNotification(
+        '🌸 Acknowledging stress is the first step! Try some gentle breathing exercises! 💫',
+        NOTIFICATION_TYPES.SUPPORT,
+        '🌸'
+      );
+    } else if (emotion.toLowerCase() === 'happy' || emotion.toLowerCase() === 'excited') {
+      addNotification(
+        '😄 Wonderful! Your positive energy is contagious! Keep shining! ✨',
+        NOTIFICATION_TYPES.CELEBRATION,
+        '😄'
+      );
+    } else if (emotion.toLowerCase() === 'angry' || emotion.toLowerCase() === 'frustrated') {
+      addNotification(
+        '🤗 It\'s healthy to recognize anger. Try some deep breathing or gentle movement! 🌿',
+        NOTIFICATION_TYPES.SUPPORT,
+        '🤗'
+      );
+    }
   };
 
   const getEmotionData = () => {

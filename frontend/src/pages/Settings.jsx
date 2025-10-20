@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Settings as SettingsIcon, 
@@ -12,6 +12,8 @@ import {
   X
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
 import { 
   getUserPreferences,
   saveUserPreferences,
@@ -29,6 +31,7 @@ const Settings = () => {
     setAdaptiveMode,
     themes
   } = useTheme();
+  const { user } = useAuth();
 
   const [isOpen, setIsOpen] = useState(false);
   const [prefs, setPrefs] = useState(() => getUserPreferences() || {
@@ -40,6 +43,38 @@ const Settings = () => {
     personalGoals: ''
   });
   const [notificationsEnabled, setNotifications] = useState(getNotificationsEnabled());
+
+  // Load preferences from backend
+  useEffect(() => {
+    const loadPreferences = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const response = await api.get(`/preferences/${user.id}`);
+        if (response.data.success) {
+          const backendPrefs = response.data.data;
+          setPrefs({
+            fullName: backendPrefs.fullName || '',
+            age: backendPrefs.age || '',
+            neurotype: backendPrefs.neurotype || '',
+            notificationTime: backendPrefs.preferredNotificationTimes?.[0] || 'morning',
+            defaultTheme: backendPrefs.defaultTheme || theme,
+            personalGoals: backendPrefs.personalGoals || ''
+          });
+          setNotifications(backendPrefs.notificationsEnabled !== false);
+          setAdaptiveMode(backendPrefs.adaptiveMode !== false);
+          if (backendPrefs.defaultTheme) {
+            setTheme(backendPrefs.defaultTheme);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading preferences from backend:', error);
+        // Fallback to localStorage preferences
+      }
+    };
+
+    loadPreferences();
+  }, [user?.id, theme, setTheme, setAdaptiveMode]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -329,7 +364,41 @@ const Settings = () => {
                       <textarea className="w-full p-3 rounded-lg border" rows={3} style={{ borderColor:'var(--theme-border)', backgroundColor:'var(--theme-card)', color:'var(--theme-text)' }} value={prefs.personalGoals} onChange={(e)=> setPrefs(v=>({...v, personalGoals:e.target.value}))} />
                     </div>
                     <div className="flex justify-end">
-                      <button className="px-4 py-2 rounded-lg text-white" style={{ backgroundColor: 'var(--theme-primary)' }} onClick={()=>{ saveUserPreferences(prefs); setTheme(prefs.defaultTheme || theme); setIsOpen(false); }}>
+                      <button 
+                        className="px-4 py-2 rounded-lg text-white" 
+                        style={{ backgroundColor: 'var(--theme-primary)' }} 
+                        onClick={async () => {
+                          try {
+                            // Save to backend first
+                            if (user?.id) {
+                              const preferencesData = {
+                                userId: user.id,
+                                fullName: prefs.fullName,
+                                age: prefs.age ? parseInt(prefs.age) : null,
+                                neurotype: prefs.neurotype,
+                                preferredNotificationTimes: [prefs.notificationTime],
+                                defaultTheme: prefs.defaultTheme || theme,
+                                personalGoals: prefs.personalGoals,
+                                notificationsEnabled: notificationsEnabled,
+                                adaptiveMode: adaptiveMode
+                              };
+                              
+                              await api.post('/preferences', preferencesData);
+                            }
+                            
+                            // Also save to localStorage as fallback
+                            saveUserPreferences(prefs);
+                            setTheme(prefs.defaultTheme || theme);
+                            setIsOpen(false);
+                          } catch (error) {
+                            console.error('Error saving preferences:', error);
+                            // Fallback to localStorage only
+                            saveUserPreferences(prefs);
+                            setTheme(prefs.defaultTheme || theme);
+                            setIsOpen(false);
+                          }
+                        }}
+                      >
                         Save Preferences
                       </button>
                     </div>

@@ -39,6 +39,9 @@ import {
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications, NOTIFICATION_TYPES } from '../components/NotificationCenter';
+import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
 
 // Task Card Component
 const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
@@ -49,7 +52,7 @@ const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: task.id });
+  } = useSortable({ id: task._id || task.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -138,7 +141,7 @@ const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
         <div className="flex items-center space-x-1">
           {task.status !== 'done' && (
             <button
-              onClick={() => onNudge(task.id)}
+              onClick={() => onNudge(task._id || task.id)}
               className="p-1 rounded hover:bg-gray-100 transition-colors"
               style={{ color: 'var(--theme-text)' }}
               title="Send reminder"
@@ -148,7 +151,7 @@ const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
           )}
           
           <button
-            onClick={() => onUpdate(task.id, { status: task.status === 'done' ? 'todo' : 'done' })}
+            onClick={() => onUpdate(task._id || task.id, { status: task.status === 'done' ? 'todo' : 'done' })}
             className="p-1 rounded hover:bg-gray-100 transition-colors"
             style={{ color: 'var(--theme-text)' }}
             title={task.status === 'done' ? 'Mark as incomplete' : 'Mark as done'}
@@ -157,7 +160,7 @@ const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
           </button>
           
           <button
-            onClick={() => onDelete(task.id)}
+            onClick={() => onDelete(task._id || task.id)}
             className="p-1 rounded hover:bg-red-100 text-red-500 transition-colors"
             title="Delete task"
           >
@@ -212,11 +215,11 @@ const TaskColumn = React.memo(({ title, tasks, status, onTaskUpdate, onTaskDelet
           borderColor: 'var(--theme-primary)',
         }}
       >
-        <SortableContext items={tasks.map(task => task.id)} strategy={verticalListSortingStrategy}>
+        <SortableContext items={tasks.map(task => task._id || task.id)} strategy={verticalListSortingStrategy}>
           <AnimatePresence>
             {tasks.map((task) => (
               <TaskCard
-                key={task.id}
+                key={task._id || task.id}
                 task={task}
                 onUpdate={onTaskUpdate}
                 onDelete={onTaskDelete}
@@ -245,6 +248,8 @@ const TaskColumn = React.memo(({ title, tasks, status, onTaskUpdate, onTaskDelet
 // Main Tasks Component
 const Tasks = () => {
   const { currentTheme } = useTheme();
+  const { addNotification } = useNotifications();
+  const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -264,23 +269,83 @@ const Tasks = () => {
     })
   );
 
-  // Load tasks from localStorage on mount
+  // Load tasks from backend API
   useEffect(() => {
-    const savedTasks = localStorage.getItem('neurocompanion-tasks');
-    if (savedTasks) {
+    const loadTasks = async () => {
+      if (!user?.id) return;
+      
+      setLoading(true);
       try {
-        setTasks(JSON.parse(savedTasks));
+        const response = await api.get(`/tasks/${user.id}`);
+        if (response.data.success) {
+          setTasks(response.data.data.tasks || []);
+        } else {
+          throw new Error('Failed to load tasks');
+        }
       } catch (error) {
         console.error('Error loading tasks:', error);
-        setTasks([]);
+        // Fallback to localStorage if backend fails
+        const savedTasks = localStorage.getItem('neurocompanion-tasks');
+        if (savedTasks) {
+          try {
+            setTasks(JSON.parse(savedTasks));
+          } catch (parseError) {
+            console.error('Error parsing saved tasks:', parseError);
+            setTasks([]);
+          }
+        }
+        toast.error('Failed to load tasks from server. Using local data.');
+      } finally {
+        setLoading(false);
       }
-    }
-  }, []);
+    };
+
+    loadTasks();
+  }, [user?.id]);
 
   // Save tasks to localStorage whenever tasks change
   useEffect(() => {
     localStorage.setItem('neurocompanion-tasks', JSON.stringify(tasks));
   }, [tasks]);
+
+  // Task notification system
+  useEffect(() => {
+    const checkTaskNotifications = () => {
+      const now = new Date();
+      const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+      const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
+
+      tasks.forEach(task => {
+        const dueTime = new Date(task.dueTime);
+        
+        // Task due in 5 minutes
+        if (dueTime <= fiveMinutesFromNow && dueTime > now && task.status !== 'done') {
+          addNotification(
+            `⏰ "${task.title}" is due soon! Time to focus! 🎯`,
+            NOTIFICATION_TYPES.REMINDER,
+            '⏰'
+          );
+        }
+        
+        // Task overdue by 10 minutes
+        if (dueTime <= tenMinutesAgo && task.status !== 'done') {
+          addNotification(
+            `🚨 "${task.title}" is overdue! No worries, let's tackle it now! 💪`,
+            NOTIFICATION_TYPES.REMINDER,
+            '🚨'
+          );
+        }
+      });
+    };
+
+    // Check for notifications every minute
+    const interval = setInterval(checkTaskNotifications, 60000);
+    
+    // Initial check
+    checkTaskNotifications();
+
+    return () => clearInterval(interval);
+  }, [tasks, addNotification]);
 
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
@@ -290,12 +355,50 @@ const Tasks = () => {
       return;
     }
 
+    if (!user?.id) {
+      toast.error('User not authenticated');
+      return;
+    }
+
     if (isCreating) return;
     setIsCreating(true);
 
     try {
-      const task = {
+      const taskData = {
+        userId: user.id,
+        title: newTask.title.trim(),
+        description: newTask.description.trim(),
+        priority: newTask.priority,
+        dueTime: new Date(newTask.dueTime).toISOString(),
+        repeat: newTask.repeat
+      };
+
+      const response = await api.post('/tasks/create', taskData);
+      
+      if (response.data.success) {
+        const newTaskFromAPI = response.data.data;
+        setTasks(prev => [newTaskFromAPI, ...prev]);
+        
+        setNewTask({
+          title: '',
+          description: '',
+          priority: 'medium',
+          dueTime: '',
+          repeat: 'once'
+        });
+        
+        setShowCreateModal(false);
+        toast.success('Task created successfully!');
+      } else {
+        throw new Error(response.data.message || 'Failed to create task');
+      }
+    } catch (error) {
+      console.error('Error creating task:', error);
+      
+      // Fallback: create task locally
+      const fallbackTask = {
         id: Date.now().toString(),
+        userId: user.id,
         title: newTask.title.trim(),
         description: newTask.description.trim(),
         priority: newTask.priority,
@@ -306,7 +409,7 @@ const Tasks = () => {
         nudgeCount: 0
       };
 
-      setTasks(prev => [task, ...prev]);
+      setTasks(prev => [fallbackTask, ...prev]);
       
       setNewTask({
         title: '',
@@ -317,39 +420,107 @@ const Tasks = () => {
       });
       
       setShowCreateModal(false);
-      toast.success('Task created successfully!');
-    } catch (error) {
-      console.error('Error creating task:', error);
-      toast.error('Failed to create task');
+      toast.warning('Task created locally. Will sync when connection is restored.');
     } finally {
       setIsCreating(false);
     }
-  }, [newTask, isCreating]);
+  }, [newTask, isCreating, user?.id]);
 
-  const handleTaskUpdate = useCallback((taskId, updateData) => {
+  const handleTaskUpdate = useCallback(async (taskId, updateData) => {
+    const previousTask = tasks.find(task => task._id === taskId || task.id === taskId);
+    const wasCompleted = previousTask?.status === 'done';
+    
+    // Optimistic update
     setTasks(prev => prev.map(task => 
-      task.id === taskId ? { ...task, ...updateData } : task
+      (task._id === taskId || task.id === taskId) ? { ...task, ...updateData } : task
     ));
     
-    if (updateData.status === 'done') {
-      toast.success('Task completed! 🎉');
-    } else {
-      toast.success('Task updated!');
+    try {
+      const response = await api.put(`/tasks/${taskId}`, updateData);
+      
+      if (response.data.success) {
+        const updatedTask = response.data.data;
+        setTasks(prev => prev.map(task => 
+          (task._id === taskId || task.id === taskId) ? updatedTask : task
+        ));
+        
+        // Celebration notification for task completion
+        if (updateData.status === 'done' && !wasCompleted) {
+          addNotification(
+            `🎉 "${updatedTask.title}" completed! You're on fire! 🔥`,
+            NOTIFICATION_TYPES.CELEBRATION,
+            '🎉'
+          );
+        } else if (updateData.status !== 'done' && wasCompleted) {
+          toast.success('Task marked as incomplete');
+        } else {
+          toast.success('Task updated!');
+        }
+      } else {
+        throw new Error(response.data.message || 'Failed to update task');
+      }
+    } catch (error) {
+      console.error('Error updating task:', error);
+      
+      // Rollback optimistic update
+      setTasks(prev => prev.map(task => 
+        (task._id === taskId || task.id === taskId) ? previousTask : task
+      ));
+      
+      toast.error('Failed to update task. Changes reverted.');
     }
-  }, []);
+  }, [tasks, addNotification]);
 
-  const handleTaskDelete = useCallback((taskId) => {
+  const handleTaskDelete = useCallback(async (taskId) => {
     if (!window.confirm('Are you sure you want to delete this task?')) return;
     
-    setTasks(prev => prev.filter(task => task.id !== taskId));
-    toast.success('Task deleted');
-  }, []);
+    const taskToDelete = tasks.find(task => task._id === taskId || task.id === taskId);
+    
+    // Optimistic delete
+    setTasks(prev => prev.filter(task => task._id !== taskId && task.id !== taskId));
+    
+    try {
+      const response = await api.delete(`/tasks/${taskId}`);
+      
+      if (response.data.success) {
+        toast.success('Task deleted');
+      } else {
+        throw new Error(response.data.message || 'Failed to delete task');
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      
+      // Rollback optimistic delete
+      if (taskToDelete) {
+        setTasks(prev => [taskToDelete, ...prev]);
+      }
+      
+      toast.error('Failed to delete task. Task restored.');
+    }
+  }, [tasks]);
 
-  const handleTaskNudge = useCallback((taskId) => {
-    setTasks(prev => prev.map(task => 
-      task.id === taskId ? { ...task, nudgeCount: task.nudgeCount + 1 } : task
-    ));
-    toast.info('Reminder sent! 🔔');
+  const handleTaskNudge = useCallback(async (taskId) => {
+    try {
+      const response = await api.put(`/tasks/${taskId}/nudge`);
+      
+      if (response.data.success) {
+        const updatedTask = response.data.data;
+        setTasks(prev => prev.map(task => 
+          (task._id === taskId || task.id === taskId) ? updatedTask : task
+        ));
+        toast.info('Reminder sent! 🔔');
+      } else {
+        throw new Error(response.data.message || 'Failed to send reminder');
+      }
+    } catch (error) {
+      console.error('Error sending reminder:', error);
+      
+      // Fallback: update locally
+      setTasks(prev => prev.map(task => 
+        (task._id === taskId || task.id === taskId) ? { ...task, nudgeCount: (task.nudgeCount || 0) + 1 } : task
+      ));
+      toast.info('Reminder sent locally! 🔔');
+    }
   }, []);
 
   const handleDragEnd = useCallback((event) => {
@@ -357,23 +528,24 @@ const Tasks = () => {
 
     if (!over) return;
 
-    const activeTask = tasks.find(task => task.id === active.id);
+    const activeTask = tasks.find(task => task._id === active.id || task.id === active.id);
     if (!activeTask) return;
 
     // Check if dropped on a column (status change)
     if (over.id === 'todo' || over.id === 'in-progress' || over.id === 'done') {
       const newStatus = over.id;
       if (newStatus !== activeTask.status) {
-        handleTaskUpdate(active.id, { status: newStatus });
+        const taskId = activeTask._id || activeTask.id;
+        handleTaskUpdate(taskId, { status: newStatus });
       }
       return;
     }
 
     // Check if dropped on another task (reordering within same column)
-    const overTask = tasks.find(task => task.id === over.id);
+    const overTask = tasks.find(task => task._id === over.id || task.id === over.id);
     if (overTask && activeTask.status === overTask.status) {
-      const oldIndex = tasks.findIndex(task => task.id === active.id);
-      const newIndex = tasks.findIndex(task => task.id === over.id);
+      const oldIndex = tasks.findIndex(task => task._id === active.id || task.id === active.id);
+      const newIndex = tasks.findIndex(task => task._id === over.id || task.id === over.id);
       
       if (oldIndex !== newIndex) {
         setTasks(prev => arrayMove(prev, oldIndex, newIndex));

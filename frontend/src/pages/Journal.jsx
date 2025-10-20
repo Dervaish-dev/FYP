@@ -26,9 +26,12 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { buildUserContextString } from '../utils/userPreferences';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
 
 const Journal = () => {
   const { applyAdaptiveTheme } = useTheme();
+  const { user } = useAuth();
   const [journalEntries, setJournalEntries] = useState([]);
   const [isWriting, setIsWriting] = useState(false);
   const [newEntry, setNewEntry] = useState('');
@@ -40,13 +43,35 @@ const Journal = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [showChatbotButton, setShowChatbotButton] = useState(false);
 
-  // Load journal entries from localStorage
+  // Load journal entries from backend API
   useEffect(() => {
-    const savedEntries = localStorage.getItem('neurocompanion-journal');
-    if (savedEntries) {
-      setJournalEntries(JSON.parse(savedEntries));
-    }
-  }, []);
+    const loadJournalEntries = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const response = await api.get(`/journal/${user.id}`);
+        if (response.data.success) {
+          setJournalEntries(response.data.data.entries || []);
+        } else {
+          throw new Error('Failed to load journal entries');
+        }
+      } catch (error) {
+        console.error('Error loading journal entries:', error);
+        // Fallback to localStorage if backend fails
+        const savedEntries = localStorage.getItem('neurocompanion-journal');
+        if (savedEntries) {
+          try {
+            setJournalEntries(JSON.parse(savedEntries));
+          } catch (parseError) {
+            console.error('Error parsing saved entries:', parseError);
+            setJournalEntries([]);
+          }
+        }
+      }
+    };
+
+    loadJournalEntries();
+  }, [user?.id]);
 
   // Save journal entries to localStorage
   const saveEntries = (entries) => {
@@ -265,36 +290,91 @@ Respond in ${userLanguage} language only. Be a caring friend.`;
         const analysis = await analyzeEmotion(newEntry);
         console.log('📊 Final analysis result:', analysis);
         
-        const entry = {
-          id: Date.now(),
+        const entryData = {
+          userId: user?.id,
           content: newEntry.trim(),
-          timestamp: new Date().toISOString(),
-          mood: analysis.emotion,
+          emotion: analysis.emotion,
+          emotionConfidence: Math.random() * 0.3 + 0.7,
           language: analysis.language,
-          wordCount: newEntry.trim().split(' ').length,
-          emotionConfidence: Math.random() * 0.3 + 0.7 // Mock confidence score
+          mood: 5, // Default mood, can be enhanced later
+          tags: []
         };
 
-        const updatedEntries = [entry, ...journalEntries];
-        saveEntries(updatedEntries);
-        setNewEntry('');
-        setIsWriting(false);
-        
-        // Show chatbot button if emotion is negative
-        if (needsSupport(analysis.emotion)) {
-          console.log('Negative emotion detected, showing chatbot button');
+        // Try to save to backend first
+        try {
+          const response = await api.post('/journal/create', entryData);
           
-          // Apply adaptive theme based on emotion
-          console.log('🎨 Applying adaptive theme for emotion:', analysis.emotion);
-          applyAdaptiveTheme(analysis.emotion);
+          if (response.data.success) {
+            const savedEntry = response.data.data;
+            const entry = {
+              id: savedEntry._id,
+              content: savedEntry.content,
+              timestamp: savedEntry.createdAt,
+              mood: savedEntry.emotion,
+              language: savedEntry.language,
+              wordCount: savedEntry.content.split(' ').length,
+              emotionConfidence: savedEntry.emotionConfidence
+            };
+
+            const updatedEntries = [entry, ...journalEntries];
+            setJournalEntries(updatedEntries);
+            setNewEntry('');
+            setIsWriting(false);
+            
+            // Show chatbot button if emotion is negative
+            if (needsSupport(analysis.emotion)) {
+              console.log('Negative emotion detected, showing chatbot button');
+              
+              // Apply adaptive theme based on emotion
+              console.log('🎨 Applying adaptive theme for emotion:', analysis.emotion);
+              applyAdaptiveTheme(analysis.emotion);
+              
+              setTimeout(() => {
+                setShowChatbotButton(true);
+                // Store the detected language for chatbot responses
+                localStorage.setItem('neurocompanion-user-language', analysis.language);
+              }, 2000);
+            } else {
+              console.log('Positive/neutral emotion, no chatbot needed');
+            }
+          } else {
+            throw new Error(response.data.message || 'Failed to save entry');
+          }
+        } catch (apiError) {
+          console.error('API save failed, falling back to local storage:', apiError);
           
-          setTimeout(() => {
-            setShowChatbotButton(true);
-            // Store the detected language for chatbot responses
-            localStorage.setItem('neurocompanion-user-language', analysis.language);
-          }, 2000);
-        } else {
-          console.log('Positive/neutral emotion, no chatbot needed');
+          // Fallback to local storage
+          const entry = {
+            id: Date.now(),
+            content: newEntry.trim(),
+            timestamp: new Date().toISOString(),
+            mood: analysis.emotion,
+            language: analysis.language,
+            wordCount: newEntry.trim().split(' ').length,
+            emotionConfidence: Math.random() * 0.3 + 0.7
+          };
+
+          const updatedEntries = [entry, ...journalEntries];
+          saveEntries(updatedEntries);
+          setNewEntry('');
+          setIsWriting(false);
+          
+          // Show chatbot button if emotion is negative
+          if (needsSupport(analysis.emotion)) {
+            console.log('Negative emotion detected, showing chatbot button');
+            
+            // Apply adaptive theme based on emotion
+            console.log('🎨 Applying adaptive theme for emotion:', analysis.emotion);
+            applyAdaptiveTheme(analysis.emotion);
+            
+            setTimeout(() => {
+              setShowChatbotButton(true);
+              // Store the detected language for chatbot responses
+              localStorage.setItem('neurocompanion-user-language', analysis.language);
+            }, 2000);
+          } else {
+            console.log('Positive/neutral emotion, no chatbot needed');
+          }
         }
       } catch (error) {
         console.error('Error analyzing emotion:', error);
@@ -304,6 +384,7 @@ Respond in ${userLanguage} language only. Be a caring friend.`;
           content: newEntry.trim(),
           timestamp: new Date().toISOString(),
           mood: 'neutral',
+          language: 'english',
           wordCount: newEntry.trim().split(' ').length,
           emotionConfidence: 0.5
         };
