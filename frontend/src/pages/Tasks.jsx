@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DndContext,
@@ -46,7 +46,7 @@ import api from '../utils/api';
 import { getNotificationsEnabled } from '../utils/userPreferences';
 
 // Task Card Component
-const TaskCard = ({ task, onUpdate, onDelete, onNudge, isRecentlyDropped }) => {
+const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge, isRecentlyDropped }) => {
   const {
     attributes,
     listeners,
@@ -186,7 +186,7 @@ const TaskCard = ({ task, onUpdate, onDelete, onNudge, isRecentlyDropped }) => {
       )}
     </motion.div>
   );
-};
+});
 
 // Task Column Component
 const TaskColumn = ({ title, tasks, status, onTaskUpdate, onTaskDelete, onTaskNudge }) => {
@@ -288,7 +288,7 @@ const Tasks = () => {
   });
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -510,7 +510,11 @@ const Tasks = () => {
     }
   };
 
-  const handleCreateTask = async (e) => {
+  const persistTasks = useCallback((next) => {
+    try { localStorage.setItem('neurocompanion-tasks', JSON.stringify(next)); } catch {}
+  }, []);
+
+  const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
     
     if (!newTask.title.trim()) {
@@ -530,7 +534,7 @@ const Tasks = () => {
       });
       
       if (response.data?.success) {
-        setTasks(prev => [response.data.data, ...prev]);
+        setTasks(prev => { const next = [response.data.data, ...prev]; persistTasks(next); return next; });
       } else {
         const mock = {
           _id: String(Date.now()),
@@ -539,7 +543,7 @@ const Tasks = () => {
           ...newTask,
           dueTime: new Date(newTask.dueTime).toISOString()
         };
-        setTasks(prev => [mock, ...prev]);
+        setTasks(prev => { const next = [mock, ...prev]; persistTasks(next); return next; });
       }
       setNewTask({
         title: '',
@@ -559,7 +563,7 @@ const Tasks = () => {
         ...newTask,
         dueTime: new Date(newTask.dueTime).toISOString()
       };
-      setTasks(prev => [mock, ...prev]);
+      setTasks(prev => { const next = [mock, ...prev]; persistTasks(next); return next; });
       setNewTask({
         title: '',
         description: '',
@@ -572,13 +576,13 @@ const Tasks = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [isSubmitting, newTask, persistTasks]);
 
-  const groupedTasks = {
+  const groupedTasks = useMemo(() => ({
     todo: tasks.filter(task => task.status === 'todo'),
     'in-progress': tasks.filter(task => task.status === 'in-progress'),
     done: tasks.filter(task => task.status === 'done')
-  };
+  }), [tasks]);
 
   // Progress widget data
   const today = new Date().toDateString();
