@@ -23,6 +23,7 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useTheme } from '../context/ThemeContext';
 import api from '../utils/api';
+import { buildUserContextString } from '../utils/userPreferences';
 
 const Emotions = () => {
   const { adaptiveMode, applyAdaptiveTheme } = useTheme();
@@ -164,9 +165,11 @@ const Emotions = () => {
     formData.append('image', file);
 
     try {
+      // Append user context in headers for backend prompt augmentation (ready for future)
       const response = await api.post('/emotion/analyze', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+          'X-User-Context': buildUserContextString()
         },
       });
 

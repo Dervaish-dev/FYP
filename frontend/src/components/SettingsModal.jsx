@@ -11,6 +11,12 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { fontFamilies, fontSizes } from '../utils/themes';
+import { 
+  getUserPreferences, 
+  saveUserPreferences, 
+  getNotificationsEnabled, 
+  setNotificationsEnabled 
+} from '../utils/userPreferences';
 import ThemeSelector from './ThemeSelector';
 
 const SettingsModal = ({ isOpen, onClose }) => {
@@ -29,6 +35,15 @@ const SettingsModal = ({ isOpen, onClose }) => {
   } = useTheme();
 
   const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const [prefs, setPrefs] = useState(() => getUserPreferences() || {
+    fullName: '',
+    age: '',
+    neurotype: '',
+    notificationTime: 'morning',
+    defaultTheme: currentThemeKey,
+    personalGoals: ''
+  });
+  const [notificationsEnabled, setNotifications] = useState(getNotificationsEnabled());
 
   if (!isOpen) return null;
 
@@ -181,6 +196,113 @@ const SettingsModal = ({ isOpen, onClose }) => {
                       animate={{ x: reducedMotion ? 28 : 4 }}
                       transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                     />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* User Preferences */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">User Preferences</h3>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Full name</label>
+                    <input 
+                      className="w-full p-3 border border-gray-200 rounded-lg"
+                      value={prefs.fullName}
+                      onChange={(e)=> setPrefs(v=>({...v, fullName:e.target.value}))}
+                      placeholder="Your name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Age</label>
+                    <input 
+                      type="number"
+                      className="w-full p-3 border border-gray-200 rounded-lg"
+                      value={prefs.age}
+                      onChange={(e)=> setPrefs(v=>({...v, age:e.target.value}))}
+                      placeholder="22"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Neurotype / Diagnosis</label>
+                    <select 
+                      className="w-full p-3 border border-gray-200 rounded-lg"
+                      value={prefs.neurotype}
+                      onChange={(e)=> setPrefs(v=>({...v, neurotype:e.target.value}))}
+                    >
+                      <option value="">Select</option>
+                      <option>ADHD</option>
+                      <option>Autism</option>
+                      <option>Anxiety</option>
+                      <option>Dyslexia</option>
+                      <option>Depression</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Preferred notification times</label>
+                    <select 
+                      className="w-full p-3 border border-gray-200 rounded-lg"
+                      value={prefs.notificationTime}
+                      onChange={(e)=> setPrefs(v=>({...v, notificationTime:e.target.value}))}
+                    >
+                      <option value="morning">Morning</option>
+                      <option value="afternoon">Afternoon</option>
+                      <option value="night">Night</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Default theme</label>
+                    <select 
+                      className="w-full p-3 border border-gray-200 rounded-lg"
+                      value={prefs.defaultTheme}
+                      onChange={(e)=> setPrefs(v=>({...v, defaultTheme:e.target.value}))}
+                    >
+                      {Object.keys(currentTheme?.options || {}).map(k=> (
+                        <option key={k} value={k}>{k}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                    <div>
+                      <p className="text-gray-900 font-medium">Enable notifications</p>
+                      <p className="text-sm text-gray-500">Reminders and motivational nudges</p>
+                    </div>
+                    <button
+                      onClick={() => { const next = !notificationsEnabled; setNotifications(next); setNotificationsEnabled(next); }}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${notificationsEnabled ? 'bg-primary-500' : 'bg-gray-300'}`}
+                    >
+                      <motion.div className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-md" animate={{ x: notificationsEnabled ? 28 : 4 }} transition={{ type:'spring', stiffness:500, damping:30 }} />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Personal goals or notes</label>
+                  <textarea 
+                    className="w-full p-3 border border-gray-200 rounded-lg"
+                    rows={3}
+                    value={prefs.personalGoals}
+                    onChange={(e)=> setPrefs(v=>({...v, personalGoals:e.target.value}))}
+                    placeholder="e.g., Improve focus, maintain sleep schedule"
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <button 
+                    className="px-4 py-2 rounded-lg text-white"
+                    style={{ backgroundColor: 'var(--theme-primary)' }}
+                    onClick={() => { saveUserPreferences(prefs); onClose(); }}
+                  >
+                    Save Preferences
                   </button>
                 </div>
               </div>

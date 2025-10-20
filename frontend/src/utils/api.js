@@ -84,3 +84,55 @@ export const healthCheck = async () => {
 };
 
 export default api;
+
+// ----- Backend-ready wrappers with mock fallbacks -----
+
+export const taskAPI = {
+  async create(task) {
+    try {
+      const res = await api.post('/tasks/create', task);
+      return res.data.data;
+    } catch (e) {
+      // Mock fallback
+      const mock = { _id: String(Date.now()), status: 'todo', nudgeCount: 0, ...task };
+      return mock;
+    }
+  },
+  async update(id, update) {
+    try {
+      const res = await api.put(`/tasks/${id}`, update);
+      return res.data.data;
+    } catch (e) {
+      return { _id: id, ...update };
+    }
+  },
+  async listByUser(userId) {
+    try {
+      const res = await api.get(`/tasks/${userId}`);
+      return res.data.data.tasks;
+    } catch (e) {
+      return [];
+    }
+  }
+};
+
+export const preferencesAPI = {
+  async fetch() {
+    try {
+      const res = await api.get('/preferences');
+      return res.data.data;
+    } catch (e) {
+      const raw = localStorage.getItem('neurocompanion-user-preferences');
+      return raw ? JSON.parse(raw) : null;
+    }
+  },
+  async save(prefs) {
+    try {
+      const res = await api.post('/preferences', prefs);
+      return res.data.data;
+    } catch (e) {
+      localStorage.setItem('neurocompanion-user-preferences', JSON.stringify(prefs));
+      return prefs;
+    }
+  }
+};

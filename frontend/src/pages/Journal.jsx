@@ -24,6 +24,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { buildUserContextString } from '../utils/userPreferences';
 import { useTheme } from '../context/ThemeContext';
 
 const Journal = () => {
@@ -75,7 +76,8 @@ const Journal = () => {
       return { emotion: 'depressed', language: isRomanUrdu ? 'urdu' : 'english' };
     }
     
-    const prompt = `You are an expert emotion detection AI. Analyze the following text and determine the primary emotion and language.
+          const userContext = buildUserContextString();
+          const prompt = `You are an expert emotion detection AI. Analyze the following text and determine the primary emotion and language.\n${userContext ? `\nContext: ${userContext}. Respond empathetically with this context in mind.` : ''}
 
 Text: "${text}"
 
