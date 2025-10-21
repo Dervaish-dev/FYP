@@ -349,13 +349,24 @@ const Settings = () => {
                           ))}
                         </select>
                       </div>
-                      <div className="flex items-center justify-between p-3 rounded-lg border" style={{ borderColor:'var(--theme-border)' }}>
+                      <div className="flex items-center justify-between p-4 rounded-xl border-2" style={{ borderColor:'var(--border-color)', backgroundColor: 'var(--card-bg)' }}>
                         <div>
-                          <p className="font-medium" style={{ color:'var(--theme-text)' }}>Enable notifications</p>
-                          <p className="text-xs opacity-70" style={{ color:'var(--theme-text)' }}>Reminders and motivational nudges</p>
+                          <p className="font-semibold text-lg" style={{ color:'var(--text-color)' }}>Enable notifications</p>
+                          <p className="text-sm opacity-70 mt-1" style={{ color:'var(--text-color)' }}>Reminders and motivational nudges</p>
                         </div>
-                        <button onClick={()=>{const next=!notificationsEnabled; setNotifications(next); setNotificationsEnabled(next);}} className={`relative w-12 h-6 rounded-full transition-colors ${notificationsEnabled ? 'bg-blue-500' : 'bg-gray-300'}`} style={{ backgroundColor: notificationsEnabled ? 'var(--theme-primary)' : 'var(--theme-border)' }}>
-                          <motion.div className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-md" animate={{ x: notificationsEnabled ? 28 : 4 }} transition={{ type:'spring', stiffness:500, damping:30 }} />
+                        <button 
+                          onClick={()=>{const next=!notificationsEnabled; setNotifications(next); setNotificationsEnabled(next);}} 
+                          className="relative w-14 h-7 rounded-full transition-all duration-300 shadow-lg"
+                          style={{ 
+                            backgroundColor: notificationsEnabled ? 'var(--accent-color)' : 'var(--border-color)',
+                            boxShadow: notificationsEnabled ? '0 0 20px rgba(99, 102, 241, 0.3)' : '0 2px 8px rgba(0,0,0,0.1)'
+                          }}
+                        >
+                          <motion.div 
+                            className="absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-lg border-2 border-gray-200" 
+                            animate={{ x: notificationsEnabled ? 28 : 2 }} 
+                            transition={{ type:'spring', stiffness:400, damping:25 }} 
+                          />
                         </button>
                       </div>
                     </div>

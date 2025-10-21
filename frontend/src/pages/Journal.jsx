@@ -43,34 +43,57 @@ const Journal = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [showChatbotButton, setShowChatbotButton] = useState(false);
 
-  // Load journal entries from backend API
+  // Load journal entries from backend API with improved fallback
   useEffect(() => {
     const loadJournalEntries = async () => {
-      if (!user?.id) return;
-      
-      try {
-        const response = await api.get(`/journal/${user.id}`);
-        if (response.data.success) {
-          setJournalEntries(response.data.data.entries || []);
-        } else {
-          throw new Error('Failed to load journal entries');
+      // Always try localStorage first for immediate loading
+      const savedEntries = localStorage.getItem('neurocompanion-journal');
+      if (savedEntries) {
+        try {
+          const parsedEntries = JSON.parse(savedEntries);
+          setJournalEntries(parsedEntries);
+          console.log('Loaded journal entries from localStorage:', parsedEntries.length);
+        } catch (parseError) {
+          console.error('Error parsing saved entries:', parseError);
         }
-      } catch (error) {
-        console.error('Error loading journal entries:', error);
-        // Fallback to localStorage if backend fails
-        const savedEntries = localStorage.getItem('neurocompanion-journal');
-        if (savedEntries) {
-          try {
-            setJournalEntries(JSON.parse(savedEntries));
-          } catch (parseError) {
-            console.error('Error parsing saved entries:', parseError);
-            setJournalEntries([]);
+      }
+      
+      // Then try backend if user is available
+      if (user?.id) {
+        try {
+          const response = await api.get(`/journal/${user.id}`);
+          if (response.data.success) {
+            const backendEntries = response.data.data.entries || [];
+            setJournalEntries(backendEntries);
+            // Update localStorage with backend data
+            localStorage.setItem('neurocompanion-journal', JSON.stringify(backendEntries));
+            console.log('Loaded journal entries from backend:', backendEntries.length);
           }
+        } catch (error) {
+          console.error('Error loading journal entries from backend:', error);
+          // Keep using localStorage data if backend fails
         }
       }
     };
 
+    // Load immediately and also set a timeout to ensure it loads
     loadJournalEntries();
+    
+    // Fallback timeout to ensure data loads even if everything fails
+    const timeoutId = setTimeout(() => {
+      if (journalEntries.length === 0) {
+        const fallbackEntries = localStorage.getItem('neurocompanion-journal');
+        if (fallbackEntries) {
+          try {
+            setJournalEntries(JSON.parse(fallbackEntries));
+          } catch (e) {
+            console.error('Fallback loading failed:', e);
+          }
+        }
+      }
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
   }, [user?.id]);
 
   // Save journal entries to localStorage

@@ -193,20 +193,19 @@ const EmojiMascot = () => {
             ease: "easeInOut"
           }}
         >
-          {/* Animated Background Pattern */}
+          {/* Animated Background Pattern - Simplified */}
           <motion.div
-            className="absolute inset-0 opacity-20"
+            className="absolute inset-0 opacity-10"
             style={{
-              background: 'radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 70%)'
+              background: 'radial-gradient(circle at center, rgba(255,255,255,0.2) 0%, transparent 60%)'
             }}
             animate={{
-              rotate: [0, 360],
-              scale: [1, 1.2, 1]
+              scale: [1, 1.1, 1]
             }}
             transition={{
-              duration: 8,
+              duration: 6,
               repeat: Infinity,
-              ease: "linear"
+              ease: "easeInOut"
             }}
           />
 
@@ -279,27 +278,27 @@ const EmojiMascot = () => {
         </motion.div>
       </motion.div>
 
-      {/* Enhanced Floating Particles */}
+      {/* Simplified Floating Particles */}
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(5)].map((_, i) => (
+        {[...Array(2)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-2 h-2 rounded-full"
+            className="absolute w-1 h-1 rounded-full"
             style={{
-              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              background: 'rgba(255, 255, 255, 0.6)',
               left: '50%',
               top: '50%'
             }}
             animate={{
-              x: [0, Math.random() * 40 - 20],
-              y: [0, Math.random() * 40 - 20],
-              opacity: [0, 0.8, 0],
-              scale: [0, 1.2, 0]
+              x: [0, Math.random() * 20 - 10],
+              y: [0, Math.random() * 20 - 10],
+              opacity: [0, 0.5, 0],
+              scale: [0, 0.8, 0]
             }}
             transition={{
-              duration: 4,
+              duration: 5,
               repeat: Infinity,
-              delay: i * 0.8,
+              delay: i * 2,
               ease: "easeOut"
             }}
           />
