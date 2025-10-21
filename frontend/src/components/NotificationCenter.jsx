@@ -91,48 +91,56 @@ const NotificationCard = ({ notification, onDismiss, index }) => {
   };
 
   const getNotificationStyle = (type) => {
+    // Dark theme-adaptive colors that blend better with the app
     switch (type) {
       case NOTIFICATION_TYPES.REMINDER:
         return {
-          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+          background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)',
           borderColor: '#f59e0b',
-          iconColor: '#f59e0b'
+          iconColor: '#f59e0b',
+          textColor: '#f9fafb'
         };
       case NOTIFICATION_TYPES.MOTIVATION:
         return {
-          background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-          borderColor: '#3b82f6',
-          iconColor: '#3b82f6'
+          background: 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%)',
+          borderColor: '#60a5fa',
+          iconColor: '#60a5fa',
+          textColor: '#f9fafb'
         };
       case NOTIFICATION_TYPES.MOOD_CHECK:
         return {
-          background: 'linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%)',
-          borderColor: '#ec4899',
-          iconColor: '#ec4899'
+          background: 'linear-gradient(135deg, #7c2d12 0%, #991b1b 100%)',
+          borderColor: '#f472b6',
+          iconColor: '#f472b6',
+          textColor: '#f9fafb'
         };
       case NOTIFICATION_TYPES.CELEBRATION:
         return {
-          background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
-          borderColor: '#10b981',
-          iconColor: '#10b981'
+          background: 'linear-gradient(135deg, #14532d 0%, #166534 100%)',
+          borderColor: '#34d399',
+          iconColor: '#34d399',
+          textColor: '#f9fafb'
         };
       case NOTIFICATION_TYPES.SUPPORT:
         return {
-          background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-          borderColor: '#06b6d4',
-          iconColor: '#06b6d4'
+          background: 'linear-gradient(135deg, #0c4a6e 0%, #075985 100%)',
+          borderColor: '#22d3ee',
+          iconColor: '#22d3ee',
+          textColor: '#f9fafb'
         };
       case NOTIFICATION_TYPES.BREAK:
         return {
-          background: 'linear-gradient(135deg, #fef7ff 0%, #f3e8ff 100%)',
-          borderColor: '#8b5cf6',
-          iconColor: '#8b5cf6'
+          background: 'linear-gradient(135deg, #581c87 0%, #6b21a8 100%)',
+          borderColor: '#a78bfa',
+          iconColor: '#a78bfa',
+          textColor: '#f9fafb'
         };
       default:
         return {
-          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-          borderColor: '#64748b',
-          iconColor: '#64748b'
+          background: 'linear-gradient(135deg, #374151 0%, #4b5563 100%)',
+          borderColor: '#9ca3af',
+          iconColor: '#9ca3af',
+          textColor: '#f9fafb'
         };
     }
   };
@@ -178,8 +186,17 @@ const NotificationCard = ({ notification, onDismiss, index }) => {
         {/* Close Button */}
         <button
           onClick={() => onDismiss(notification.id)}
-          className="absolute top-2 right-2 p-1 rounded-full hover:bg-black hover:bg-opacity-10 transition-colors"
-          style={{ color: style.iconColor }}
+          className="absolute top-2 right-2 p-1 rounded-full transition-colors"
+          style={{ 
+            color: style.iconColor,
+            backgroundColor: 'rgba(255, 255, 255, 0.1)'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+          }}
         >
           <X className="h-4 w-4" />
         </button>
@@ -205,12 +222,18 @@ const NotificationCard = ({ notification, onDismiss, index }) => {
 
           {/* Message */}
           <div className="flex-1">
-            <p className="text-sm font-medium text-gray-800 leading-relaxed">
+            <p 
+              className="text-sm font-medium leading-relaxed"
+              style={{ color: style.textColor }}
+            >
               {notification.message}
             </p>
             
             {/* Timestamp */}
-            <p className="text-xs text-gray-500 mt-1">
+            <p 
+              className="text-xs mt-1 opacity-70"
+              style={{ color: style.textColor }}
+            >
               {new Date(notification.createdAt).toLocaleTimeString([], { 
                 hour: '2-digit', 
                 minute: '2-digit' 
