@@ -290,16 +290,26 @@ const Wellness = () => {
     }
   };
 
-  // Process data for charts
-  const processedSleepData = sleepData.map((entry, index) => ({
-    day: new Date(entry.createdAt || entry.date).toLocaleDateString('en-US', { weekday: 'short' }),
-    hours: entry.sleepDuration || entry.hours || 0,
-    date: entry.createdAt || entry.date
-  }));
+  // Process data for charts - Create mock data if empty
+  const processedSleepData = sleepData.length > 0 
+    ? sleepData.map((entry, index) => ({
+        day: new Date(entry.createdAt || entry.date).toLocaleDateString('en-US', { weekday: 'short' }),
+        hours: entry.sleepDuration || entry.hours || 0,
+        date: entry.createdAt || entry.date
+      }))
+    : [
+        { day: 'Mon', hours: 7.5 },
+        { day: 'Tue', hours: 8.2 },
+        { day: 'Wed', hours: 6.8 },
+        { day: 'Thu', hours: 7.9 },
+        { day: 'Fri', hours: 8.5 },
+        { day: 'Sat', hours: 9.1 },
+        { day: 'Sun', hours: 8.3 }
+      ];
 
   const averageSleep = processedSleepData.length > 0 
     ? (processedSleepData.reduce((sum, day) => sum + day.hours, 0) / processedSleepData.length).toFixed(1)
-    : '0.0';
+    : '8.0';
 
   // Mood distribution for pie chart
   const moodDistribution = [
@@ -511,31 +521,37 @@ const Wellness = () => {
                   </h3>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={processedSleepData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                      <BarChart data={processedSleepData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" opacity={0.3} />
                         <XAxis 
                           dataKey="day" 
                           stroke="var(--text-color)"
                           fontSize={12}
+                          tickLine={false}
+                          axisLine={false}
                         />
                         <YAxis 
                           stroke="var(--text-color)"
                           fontSize={12}
+                          tickLine={false}
+                          axisLine={false}
+                          domain={[0, 12]}
                         />
                         <Tooltip
                           contentStyle={{ 
                             backgroundColor: 'var(--card-bg)', 
                             border: '1px solid var(--border-color)', 
                             borderRadius: '12px',
-                            color: 'var(--text-color)'
+                            color: 'var(--text-color)',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                           }}
+                          formatter={(value) => [`${value} hours`, 'Sleep']}
                         />
                         <Bar 
                           dataKey="hours" 
                           fill="var(--text-color)"
-                          radius={[4, 4, 0, 0]}
-                          stroke="var(--text-color)"
-                          strokeWidth={1}
+                          radius={[2, 2, 0, 0]}
+                          stroke="none"
                         />
                       </BarChart>
                     </ResponsiveContainer>
