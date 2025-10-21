@@ -148,41 +148,43 @@ const EmojiMascot = () => {
 
   return (
     <motion.div
-      className="fixed right-0 top-1/2 transform -translate-y-1/2 z-50"
+      className="fixed right-4 top-1/2 transform -translate-y-1/2 z-50"
       initial={{ x: 0 }}
       animate={{ x: 0 }}
-      whileHover={{ x: -10 }}
+      whileHover={{ x: -5 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
     >
-      {/* Mascot Container */}
+      {/* Bold Mascot Container */}
       <motion.div
         className="relative cursor-pointer"
         onClick={handleMascotClick}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
         animate={isAnimating ? {
-          rotate: [0, -10, 10, -10, 10, 0],
-          scale: [1, 1.2, 1]
+          rotate: [0, -5, 5, -5, 5, 0],
+          scale: [1, 1.1, 1]
         } : {}}
         transition={{ duration: 0.6 }}
       >
-        {/* Background Circle */}
+        {/* Bold Background Circle with Gradient */}
         <motion.div
-          className="w-16 h-16 rounded-full shadow-lg border-2 flex items-center justify-center"
+          className="w-20 h-20 rounded-full shadow-2xl border-4 flex items-center justify-center relative overflow-hidden"
           style={{
-            backgroundColor: isGenerating ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.9)',
-            borderColor: isGenerating ? '#3b82f6' : 'var(--theme-primary)',
+            background: isGenerating 
+              ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+              : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            borderColor: isGenerating ? '#60a5fa' : '#a78bfa',
             backdropFilter: 'blur(10px)'
           }}
           animate={{
             boxShadow: isGenerating ? [
-              '0 4px 20px rgba(59, 130, 246, 0.3)',
-              '0 8px 30px rgba(59, 130, 246, 0.5)',
-              '0 4px 20px rgba(59, 130, 246, 0.3)'
+              '0 8px 32px rgba(59, 130, 246, 0.4)',
+              '0 12px 40px rgba(59, 130, 246, 0.6)',
+              '0 8px 32px rgba(59, 130, 246, 0.4)'
             ] : [
-              '0 4px 20px rgba(0,0,0,0.1)',
-              '0 8px 30px rgba(0,0,0,0.2)',
-              '0 4px 20px rgba(0,0,0,0.1)'
+              '0 8px 32px rgba(99, 102, 241, 0.4)',
+              '0 12px 40px rgba(139, 92, 246, 0.6)',
+              '0 8px 32px rgba(99, 102, 241, 0.4)'
             ]
           }}
           transition={{
@@ -191,22 +193,39 @@ const EmojiMascot = () => {
             ease: "easeInOut"
           }}
         >
+          {/* Animated Background Pattern */}
+          <motion.div
+            className="absolute inset-0 opacity-20"
+            style={{
+              background: 'radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 70%)'
+            }}
+            animate={{
+              rotate: [0, 360],
+              scale: [1, 1.2, 1]
+            }}
+            transition={{
+              duration: 8,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+          />
+
           {/* Emoji or Loading Spinner */}
           {isGenerating ? (
             <motion.div
-              className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"
+              className="w-8 h-8 border-3 border-white border-t-transparent rounded-full"
               animate={{ rotate: 360 }}
               transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
             />
           ) : (
             <motion.span
-              className="text-3xl"
+              className="text-4xl relative z-10"
               animate={{
-                y: [0, -2, 0],
-                rotate: [0, 5, -5, 0]
+                y: [0, -3, 0],
+                rotate: [0, 3, -3, 0]
               }}
               transition={{
-                duration: 3,
+                duration: 4,
                 repeat: Infinity,
                 ease: "easeInOut"
               }}
@@ -216,33 +235,17 @@ const EmojiMascot = () => {
           )}
         </motion.div>
 
-        {/* Peek Effect - Only show part of the mascot */}
+        {/* Bold Notification Badge */}
         <motion.div
-          className="absolute inset-0 rounded-full"
+          className="absolute -top-3 -right-3 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-lg"
           style={{
-            backgroundColor: 'var(--theme-background)',
-            clipPath: 'polygon(50% 0%, 100% 0%, 100% 100%, 50% 100%)'
+            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+            color: 'white',
+            border: '3px solid white'
           }}
           animate={{
-            x: [0, -5, 0]
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-
-        {/* Click Indicator */}
-        <motion.div
-          className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-          style={{
-            backgroundColor: 'var(--theme-primary)',
-            color: 'white'
-          }}
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.7, 1, 0.7]
+            scale: [1, 1.15, 1],
+            opacity: [0.8, 1, 0.8]
           }}
           transition={{
             duration: 2,
@@ -253,48 +256,50 @@ const EmojiMascot = () => {
           !
         </motion.div>
 
-        {/* Speech Bubble (appears on hover) */}
+        {/* Bold Speech Bubble */}
         <motion.div
-          className="absolute right-20 top-1/2 transform -translate-y-1/2 bg-white rounded-lg px-3 py-2 shadow-lg border"
+          className="absolute right-24 top-1/2 transform -translate-y-1/2 rounded-xl px-4 py-3 shadow-xl border-2"
           style={{
-            borderColor: 'var(--theme-border)'
+            background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)',
+            borderColor: '#6366f1',
+            color: '#f9fafb'
           }}
-          initial={{ opacity: 0, x: 10 }}
-          whileHover={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3 }}
+          initial={{ opacity: 0, x: 15, scale: 0.8 }}
+          whileHover={{ opacity: 1, x: 0, scale: 1 }}
+          transition={{ duration: 0.3, type: "spring", stiffness: 300 }}
         >
-          <p className="text-sm font-medium whitespace-nowrap" style={{ color: 'var(--theme-text)' }}>
-            {isGenerating ? 'Generating wisdom...' : 'Click me! 👆'}
+          <p className="text-sm font-semibold whitespace-nowrap">
+            {isGenerating ? '✨ Generating wisdom...' : '💡 Click for motivation!'}
           </p>
           {/* Speech bubble tail */}
           <div
             className="absolute left-full top-1/2 transform -translate-y-1/2 w-0 h-0 border-l-8 border-t-4 border-b-4 border-transparent"
-            style={{ borderLeftColor: 'white' }}
+            style={{ borderLeftColor: '#374151' }}
           />
         </motion.div>
       </motion.div>
 
-      {/* Floating particles effect */}
+      {/* Enhanced Floating Particles */}
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(3)].map((_, i) => (
+        {[...Array(5)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-1 h-1 rounded-full"
+            className="absolute w-2 h-2 rounded-full"
             style={{
-              backgroundColor: 'var(--theme-primary)',
+              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
               left: '50%',
               top: '50%'
             }}
             animate={{
-              x: [0, Math.random() * 20 - 10],
-              y: [0, Math.random() * 20 - 10],
-              opacity: [0, 1, 0],
-              scale: [0, 1, 0]
+              x: [0, Math.random() * 40 - 20],
+              y: [0, Math.random() * 40 - 20],
+              opacity: [0, 0.8, 0],
+              scale: [0, 1.2, 0]
             }}
             transition={{
-              duration: 3,
+              duration: 4,
               repeat: Infinity,
-              delay: i * 0.5,
+              delay: i * 0.8,
               ease: "easeOut"
             }}
           />
