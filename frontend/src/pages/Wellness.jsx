@@ -21,6 +21,7 @@ import {
   Save,
   Loader,
   TrendingUp,
+  Target,
   Sparkles,
   Coffee,
   Sunrise,
@@ -502,7 +503,7 @@ const Wellness = () => {
                     className="text-lg font-semibold mb-4 flex items-center"
                     style={{ color: 'var(--text-color)' }}
                   >
-                    <TrendingUp 
+                    <Target 
                       className="h-5 w-5 mr-2" 
                       style={{ color: 'var(--accent-color)' }}
                     />
@@ -510,7 +511,7 @@ const Wellness = () => {
                   </h3>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={processedSleepData}>
+                      <BarChart data={processedSleepData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                         <XAxis 
                           dataKey="day" 
@@ -529,16 +530,14 @@ const Wellness = () => {
                             color: 'var(--text-color)'
                           }}
                         />
-                        <Line 
-                          type="monotone" 
+                        <Bar 
                           dataKey="hours" 
-                          stroke="var(--accent-color)" 
-                          strokeWidth={3}
-                          dot={{ fill: 'var(--accent-color)', strokeWidth: 2, r: 6 }}
-                          activeDot={{ r: 8, stroke: 'var(--accent-color)', strokeWidth: 2 }}
-                          name="Sleep Hours"
+                          fill="var(--text-color)"
+                          radius={[4, 4, 0, 0]}
+                          stroke="var(--text-color)"
+                          strokeWidth={1}
                         />
-                      </LineChart>
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
                   <div className="text-center mt-4">
