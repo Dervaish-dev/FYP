@@ -2,10 +2,9 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Check, Palette } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
-import { themes } from '../utils/themes';
 
 const ThemeSelector = ({ isOpen, onClose }) => {
-  const { theme: currentThemeKey, setTheme } = useTheme();
+  const { theme: currentThemeKey, setTheme, themes } = useTheme();
 
   const handleThemeChange = (themeKey) => {
     setTheme(themeKey);
@@ -60,27 +59,28 @@ const ThemeSelector = ({ isOpen, onClose }) => {
                   <div className="flex space-x-1">
                     <div
                       className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: theme.colors.primary[500] }}
+                      style={{ backgroundColor: theme.colors.primary }}
                     />
                     <div
                       className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: theme.colors.secondary[500] }}
+                      style={{ backgroundColor: theme.colors.secondary }}
                     />
                     <div
                       className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: theme.colors.background.light }}
+                      style={{ backgroundColor: theme.colors.background }}
                     />
                   </div>
                   
                   <div>
                     <h3 className="font-semibold text-gray-900">{theme.name}</h3>
                     <p className="text-sm text-gray-500">
-                      {key === 'teal' && 'Fresh and calming'}
-                      {key === 'pink' && 'Warm and energetic'}
-                      {key === 'dark' && 'Professional and focused'}
+                      {key === 'ocean' && 'Fresh and calming'}
+                      {key === 'coral' && 'Warm and energetic'}
+                      {key === 'midnight' && 'Professional and focused'}
                       {key === 'mint' && 'Natural and refreshing'}
                       {key === 'lavender' && 'Creative and peaceful'}
-                      {key === 'warm' && 'Cozy and inviting'}
+                      {key === 'golden' && 'Cozy and inviting'}
+                      {key.startsWith('theme-') && 'Emotion-based theme'}
                     </p>
                   </div>
                 </div>
@@ -99,7 +99,10 @@ const ThemeSelector = ({ isOpen, onClose }) => {
 
               {/* Theme preview gradient */}
               <div
-                className={`absolute inset-0 rounded-xl opacity-10 pointer-events-none bg-gradient-to-r ${theme.gradients.primary}`}
+                className="absolute inset-0 rounded-xl opacity-10 pointer-events-none"
+                style={{
+                  background: `linear-gradient(135deg, ${theme.colors.primary}20, ${theme.colors.secondary}20)`
+                }}
               />
             </motion.button>
           ))}

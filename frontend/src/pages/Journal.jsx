@@ -26,12 +26,12 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { buildUserContextString } from '../utils/userPreferences';
 import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../context/AuthContext';
-import api from '../utils/api';
+// Removed auth dependencies for now
 
 const Journal = () => {
   const { applyAdaptiveTheme } = useTheme();
-  const { user } = useAuth();
+  // Mock user for now - no auth needed
+  const user = { id: 'test-user-id', name: 'Dervaish Abbas', email: 'dervaishabbas@gmail.com' };
   const [journalEntries, setJournalEntries] = useState([]);
   const [isWriting, setIsWriting] = useState(false);
   const [newEntry, setNewEntry] = useState('');
@@ -43,58 +43,22 @@ const Journal = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [showChatbotButton, setShowChatbotButton] = useState(false);
 
-  // Load journal entries from backend API with improved fallback
+  // Load journal entries from localStorage only
   useEffect(() => {
-    const loadJournalEntries = async () => {
-      // Always try localStorage first for immediate loading
-      const savedEntries = localStorage.getItem('neurocompanion-journal');
-      if (savedEntries) {
-        try {
-          const parsedEntries = JSON.parse(savedEntries);
-          setJournalEntries(parsedEntries);
-          console.log('Loaded journal entries from localStorage:', parsedEntries.length);
-        } catch (parseError) {
-          console.error('Error parsing saved entries:', parseError);
+    const loadJournalEntries = () => {
+      try {
+        const savedEntries = localStorage.getItem('neurocompanion-journal');
+        if (savedEntries) {
+          setJournalEntries(JSON.parse(savedEntries));
         }
-      }
-      
-      // Then try backend if user is available
-      if (user?.id) {
-        try {
-          const response = await api.get(`/journal/${user.id}`);
-          if (response.data.success) {
-            const backendEntries = response.data.data.entries || [];
-            setJournalEntries(backendEntries);
-            // Update localStorage with backend data
-            localStorage.setItem('neurocompanion-journal', JSON.stringify(backendEntries));
-            console.log('Loaded journal entries from backend:', backendEntries.length);
-          }
-        } catch (error) {
-          console.error('Error loading journal entries from backend:', error);
-          // Keep using localStorage data if backend fails
-        }
+      } catch (error) {
+        console.error('Error loading journal entries:', error);
+        setJournalEntries([]);
       }
     };
 
-    // Load immediately and also set a timeout to ensure it loads
     loadJournalEntries();
-    
-    // Fallback timeout to ensure data loads even if everything fails
-    const timeoutId = setTimeout(() => {
-      if (journalEntries.length === 0) {
-        const fallbackEntries = localStorage.getItem('neurocompanion-journal');
-        if (fallbackEntries) {
-          try {
-            setJournalEntries(JSON.parse(fallbackEntries));
-          } catch (e) {
-            console.error('Fallback loading failed:', e);
-          }
-        }
-      }
-    }, 1000);
-
-    return () => clearTimeout(timeoutId);
-  }, [user?.id]);
+  }, []);
 
   // Save journal entries to localStorage
   const saveEntries = (entries) => {
@@ -255,50 +219,97 @@ Respond with ONLY this JSON format:
     return needsHelp;
   };
 
-  // Get multilingual chatbot response
+  // Get multilingual chatbot response using Gemini API
   const getChatbotResponse = async (userMessage, userLanguage = 'english') => {
-    const apiKey = "AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0";
+    const apiKey = process.env.REACT_APP_GEMINI_API_KEY || "AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0";
     
-    const prompt = `You are a caring friend chatbot. The user is chatting with you in ${userLanguage}. Respond in the SAME language they are using. Be supportive, empathetic, and helpful. Keep responses short (1-2 sentences) and friendly.
+    console.log('🤖 Chatbot API call started:', { userMessage, userLanguage, apiKey: apiKey.substring(0, 10) + '...' });
+    
+    const prompt = `You are a caring, empathetic AI friend. The user is chatting with you in ${userLanguage}. Respond in the SAME language they are using. Be supportive, understanding, and helpful. Keep responses conversational and warm (2-3 sentences max).
 
 IMPORTANT: 
 - If userLanguage is "urdu", respond in Roman Urdu (using English alphabet)
-- If userLanguage is "arabic", respond in Arabic
+- If userLanguage is "arabic", respond in Arabic  
 - If userLanguage is "english", respond in English
-- Be a caring friend who listens and helps
+- Be a caring friend who listens and provides emotional support
+- Don't give medical advice, just be supportive
 
 User message: "${userMessage}"
 
-Respond in ${userLanguage} language only. Be a caring friend.`;
+Respond in ${userLanguage} language only. Be warm and supportive.`;
 
     try {
+      console.log('📡 Making API request to Gemini...');
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*"
+          },
           body: JSON.stringify({
             contents: [
               {
-                role: "user",
                 parts: [{ text: prompt }]
               }
             ],
             generationConfig: {
               temperature: 0.7,
               topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 100,
+              topP: 0.8,
+              maxOutputTokens: 150,
             },
           }),
         }
       );
 
+      console.log('📡 API response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API error response:', errorText);
+        throw new Error(`API error: ${response.status} - ${errorText}`);
+      }
+
       const data = await response.json();
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm here for you. How can I help?";
+      console.log('📡 API response data:', data);
+      
+      const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      if (generatedText.trim()) {
+        console.log('✅ Generated response:', generatedText.trim());
+        return generatedText.trim();
+      } else {
+        console.error('❌ No text generated in response');
+        throw new Error('No response generated');
+      }
     } catch (error) {
-      console.error('Error getting chatbot response:', error);
-      return "I'm here to listen. What's on your mind?";
+      console.error('❌ Chatbot API error:', error);
+      
+      // Fallback responses based on language
+      const fallbackResponses = {
+        'urdu': [
+          "Main yahan hun aapke liye. Aap apni feelings share kar sakte hain.",
+          "Sab theek ho jayega. Main aapke saath hun.",
+          "Aapko koi baat pareshan kar rahi hai? Main sun raha hun."
+        ],
+        'arabic': [
+          "أنا هنا من أجلك. يمكنك مشاركة مشاعرك معي.",
+          "كل شيء سيكون على ما يرام. أنا معك.",
+          "هل هناك شيء يزعجك؟ أنا أستمع إليك."
+        ],
+        'english': [
+          "I'm here for you. You can share your feelings with me.",
+          "Everything will be okay. I'm with you.",
+          "Is something bothering you? I'm listening."
+        ]
+      };
+      
+      const responses = fallbackResponses[userLanguage] || fallbackResponses['english'];
+      const fallbackResponse = responses[Math.floor(Math.random() * responses.length)];
+      console.log('🔄 Using fallback response:', fallbackResponse);
+      return fallbackResponse;
     }
   };
 
@@ -323,81 +334,37 @@ Respond in ${userLanguage} language only. Be a caring friend.`;
           tags: []
         };
 
-        // Try to save to backend first
-        try {
-          const response = await api.post('/journal/create', entryData);
-          
-          if (response.data.success) {
-            const savedEntry = response.data.data;
-            const entry = {
-              id: savedEntry._id,
-              content: savedEntry.content,
-              timestamp: savedEntry.createdAt,
-              mood: savedEntry.emotion,
-              language: savedEntry.language,
-              wordCount: savedEntry.content.split(' ').length,
-              emotionConfidence: savedEntry.emotionConfidence
-            };
+        // Save to localStorage only
+        const entry = {
+          id: Date.now(),
+          content: newEntry.trim(),
+          timestamp: new Date().toISOString(),
+          mood: analysis.emotion,
+          language: analysis.language,
+          wordCount: newEntry.trim().split(' ').length,
+          emotionConfidence: Math.random() * 0.3 + 0.7
+        };
 
-            const updatedEntries = [entry, ...journalEntries];
-            setJournalEntries(updatedEntries);
-            setNewEntry('');
-            setIsWriting(false);
-            
-            // Show chatbot button if emotion is negative
-            if (needsSupport(analysis.emotion)) {
-              console.log('Negative emotion detected, showing chatbot button');
-              
-              // Apply adaptive theme based on emotion
-              console.log('🎨 Applying adaptive theme for emotion:', analysis.emotion);
-              applyAdaptiveTheme(analysis.emotion);
-              
-              setTimeout(() => {
-                setShowChatbotButton(true);
-                // Store the detected language for chatbot responses
-                localStorage.setItem('neurocompanion-user-language', analysis.language);
-              }, 2000);
-            } else {
-              console.log('Positive/neutral emotion, no chatbot needed');
-            }
-          } else {
-            throw new Error(response.data.message || 'Failed to save entry');
-          }
-        } catch (apiError) {
-          console.error('API save failed, falling back to local storage:', apiError);
+        const updatedEntries = [entry, ...journalEntries];
+        saveEntries(updatedEntries);
+        setNewEntry('');
+        setIsWriting(false);
+        
+        // Show chatbot button if emotion is negative
+        if (needsSupport(analysis.emotion)) {
+          console.log('Negative emotion detected, showing chatbot button');
           
-          // Fallback to local storage
-          const entry = {
-            id: Date.now(),
-            content: newEntry.trim(),
-            timestamp: new Date().toISOString(),
-            mood: analysis.emotion,
-            language: analysis.language,
-            wordCount: newEntry.trim().split(' ').length,
-            emotionConfidence: Math.random() * 0.3 + 0.7
-          };
-
-          const updatedEntries = [entry, ...journalEntries];
-          saveEntries(updatedEntries);
-          setNewEntry('');
-          setIsWriting(false);
+          // Apply adaptive theme based on emotion
+          console.log('🎨 Applying adaptive theme for emotion:', analysis.emotion);
+          applyAdaptiveTheme(analysis.emotion);
           
-          // Show chatbot button if emotion is negative
-          if (needsSupport(analysis.emotion)) {
-            console.log('Negative emotion detected, showing chatbot button');
-            
-            // Apply adaptive theme based on emotion
-            console.log('🎨 Applying adaptive theme for emotion:', analysis.emotion);
-            applyAdaptiveTheme(analysis.emotion);
-            
-            setTimeout(() => {
-              setShowChatbotButton(true);
-              // Store the detected language for chatbot responses
-              localStorage.setItem('neurocompanion-user-language', analysis.language);
-            }, 2000);
-          } else {
-            console.log('Positive/neutral emotion, no chatbot needed');
-          }
+          setTimeout(() => {
+            setShowChatbotButton(true);
+            // Store the detected language for chatbot responses
+            localStorage.setItem('neurocompanion-user-language', analysis.language);
+          }, 2000);
+        } else {
+          console.log('Positive/neutral emotion, no chatbot needed');
         }
       } catch (error) {
         console.error('Error analyzing emotion:', error);
@@ -482,6 +449,12 @@ Respond in ${userLanguage} language only. Be a caring friend.`;
     saveEntries(updatedEntries);
   };
 
+  const handleEditEntry = (entry) => {
+    setEditingEntry(entry);
+    setNewEntry(entry.content);
+    setIsWriting(true);
+  };
+
   const handleChatbotSend = async () => {
     if (!chatbotInput.trim()) return;
 
@@ -492,6 +465,9 @@ Respond in ${userLanguage} language only. Be a caring friend.`;
       timestamp: new Date()
     };
 
+    // Store the input before clearing it
+    const messageText = chatbotInput.trim();
+    
     setChatbotMessages(prev => [...prev, userMessage]);
     setChatbotInput('');
     setIsTyping(true);
@@ -499,7 +475,10 @@ Respond in ${userLanguage} language only. Be a caring friend.`;
     try {
       // Get user's language from localStorage or detect from current message
       const storedLanguage = localStorage.getItem('neurocompanion-user-language') || 'english';
-      const response = await getChatbotResponse(chatbotInput, storedLanguage);
+      console.log('Sending message to chatbot:', messageText, 'Language:', storedLanguage);
+      
+      const response = await getChatbotResponse(messageText, storedLanguage);
+      console.log('Received chatbot response:', response);
       
       const botMessage = {
         id: Date.now() + 1,
@@ -514,7 +493,19 @@ Respond in ${userLanguage} language only. Be a caring friend.`;
       }, 1500);
     } catch (error) {
       console.error('Error getting chatbot response:', error);
-      setIsTyping(false);
+      
+      // Add fallback message
+      const fallbackMessage = {
+        id: Date.now() + 1,
+        text: "I'm here for you. How can I help you feel better?",
+        sender: 'bot',
+        timestamp: new Date()
+      };
+      
+      setTimeout(() => {
+        setChatbotMessages(prev => [...prev, fallbackMessage]);
+        setIsTyping(false);
+      }, 1000);
     }
   };
 
@@ -1086,32 +1077,18 @@ Respond in ${userLanguage} language only. Be a caring friend.`;
               </p>
             </motion.div>
             
-            {/* Chatbot Button */}
+            {/* Chatbot Button - No Animation */}
             <motion.button
               onClick={openChatbot}
-              className="w-16 h-16 rounded-full shadow-2xl border flex items-center justify-center"
+              className="w-16 h-16 rounded-full shadow-lg border flex items-center justify-center relative"
               style={{ 
                 backgroundColor: 'var(--theme-primary)',
                 borderColor: 'var(--theme-border)'
               }}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               <Bot className="h-8 w-8 text-white" />
-              {/* Gentle pulsing animation */}
-              <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{ backgroundColor: 'var(--theme-primary)' }}
-                animate={{ 
-                  scale: [1, 1.2, 1],
-                  opacity: [0.7, 0.3, 0.7]
-                }}
-                transition={{ 
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-              />
             </motion.button>
           </motion.div>
         )}
@@ -1164,9 +1141,16 @@ Respond in ${userLanguage} language only. Be a caring friend.`;
                 >
                   <div className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
                     message.sender === 'user'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
+                      ? 'text-white'
+                      : 'text-white'
+                  }`}
+                  style={{
+                    backgroundColor: message.sender === 'user' 
+                      ? 'var(--theme-primary)' 
+                      : 'rgba(255, 255, 255, 0.1)',
+                    borderColor: 'var(--theme-border)',
+                    border: '1px solid'
+                  }}>
                     {message.text}
                   </div>
                 </motion.div>
@@ -1178,11 +1162,18 @@ Respond in ${userLanguage} language only. Be a caring friend.`;
                   animate={{ opacity: 1 }}
                   className="flex justify-start"
                 >
-                  <div className="bg-gray-100 text-gray-800 px-3 py-2 rounded-lg text-sm">
+                  <div 
+                    className="px-3 py-2 rounded-lg text-sm text-white"
+                    style={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      borderColor: 'var(--theme-border)',
+                      border: '1px solid'
+                    }}
+                  >
                     <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                     </div>
                   </div>
                 </motion.div>
@@ -1209,7 +1200,8 @@ Respond in ${userLanguage} language only. Be a caring friend.`;
                 <button
                   onClick={handleChatbotSend}
                   disabled={!chatbotInput.trim() || isTyping}
-                  className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm disabled:opacity-50"
+                  className="px-3 py-2 text-white rounded-lg text-sm disabled:opacity-50 transition-colors"
+                  style={{ backgroundColor: 'var(--theme-primary)' }}
                 >
                   <Send size={14} />
                 </button>

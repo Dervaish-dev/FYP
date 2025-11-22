@@ -53,7 +53,66 @@ const Analytics = () => {
     const journalData = JSON.parse(localStorage.getItem('neurocompanion-journal') || '[]');
     
     // Load Emotion data
-    const emotionData = JSON.parse(localStorage.getItem('neurocompanion-emotions') || '[]');
+    const emotionData = JSON.parse(localStorage.getItem('neurocompanion-emotion-history') || '[]');
+    
+    // If no emotion data exists, add some sample data for demonstration
+    if (emotionData.length === 0) {
+      const sampleEmotions = [
+        { 
+          id: Date.now() - 7, 
+          date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+          emotion: 'happy', 
+          intensity: 8, 
+          confidence: 0.85,
+          note: 'Great day at work!',
+          timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          source: 'manual'
+        },
+        { 
+          id: Date.now() - 6, 
+          date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+          emotion: 'calm', 
+          intensity: 6, 
+          confidence: 0.78,
+          note: 'Peaceful evening',
+          timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+          source: 'manual'
+        },
+        { 
+          id: Date.now() - 5, 
+          date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+          emotion: 'stressed', 
+          intensity: 7, 
+          confidence: 0.82,
+          note: 'Busy day',
+          timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+          source: 'manual'
+        },
+        { 
+          id: Date.now() - 4, 
+          date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+          emotion: 'excited', 
+          intensity: 9, 
+          confidence: 0.90,
+          note: 'Excited about weekend plans',
+          timestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+          source: 'manual'
+        },
+        { 
+          id: Date.now() - 3, 
+          date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
+          emotion: 'neutral', 
+          intensity: 5, 
+          confidence: 0.75,
+          note: 'Regular day',
+          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+          source: 'manual'
+        }
+      ];
+      // Store sample data in localStorage for demonstration
+      localStorage.setItem('neurocompanion-emotion-history', JSON.stringify(sampleEmotions));
+      emotionData.push(...sampleEmotions);
+    }
     
     // Load Task data
     const taskData = JSON.parse(localStorage.getItem('neurocompanion-tasks') || '[]');
@@ -98,7 +157,7 @@ const Analytics = () => {
     // Emotion stability (20% weight)
     if (emotions.length > 0) {
       const stableEmotions = emotions.filter(emotion => 
-        ['happy', 'calm', 'neutral'].includes(emotion.emotion)
+        ['happy', 'calm', 'neutral', 'excited', 'grateful', 'hopeful', 'peaceful', 'content', 'optimistic'].includes(emotion.emotion)
       ).length;
       const emotionScore = (stableEmotions / emotions.length) * 100;
       score += emotionScore * 0.2;
@@ -165,7 +224,7 @@ const Analytics = () => {
       new Date(emotion.timestamp) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     );
     const negativeEmotions = recentEmotions.filter(emotion => 
-      ['sad', 'angry', 'stressed', 'anxious', 'depressed'].includes(emotion.emotion)
+      ['sad', 'angry', 'stressed', 'anxious', 'depressed', 'frustrated', 'overwhelmed', 'worried', 'confused', 'lonely', 'nervous', 'pessimistic'].includes(emotion.emotion)
     ).length;
 
     if (negativeEmotions > recentEmotions.length * 0.6) {
@@ -183,8 +242,9 @@ const Analytics = () => {
 
   // Prepare chart data
   const getMoodDistributionData = () => {
-    const moodCounts = analyticsData.journal.reduce((acc, entry) => {
-      acc[entry.mood] = (acc[entry.mood] || 0) + 1;
+    // Process emotion history data
+    const emotionCounts = analyticsData.emotions.reduce((acc, entry) => {
+      acc[entry.emotion] = (acc[entry.emotion] || 0) + 1;
       return acc;
     }, {});
 
@@ -196,13 +256,27 @@ const Analytics = () => {
       anxious: '#8B5CF6',
       neutral: '#6B7280',
       excited: '#EC4899',
-      worried: '#F97316'
+      worried: '#F97316',
+      angry: '#DC2626',
+      confused: '#64748B',
+      surprised: '#EC4899',
+      depressed: '#7C2D12',
+      frustrated: '#F97316',
+      overwhelmed: '#F59E0B',
+      lonely: '#6B7280',
+      grateful: '#10B981',
+      hopeful: '#3B82F6',
+      peaceful: '#10B981',
+      content: '#10B981',
+      nervous: '#F59E0B',
+      optimistic: '#10B981',
+      pessimistic: '#6B7280'
     };
 
-    return Object.entries(moodCounts).map(([mood, count]) => ({
-      name: mood.charAt(0).toUpperCase() + mood.slice(1),
+    return Object.entries(emotionCounts).map(([emotion, count]) => ({
+      name: emotion.charAt(0).toUpperCase() + emotion.slice(1),
       value: count,
-      color: colors[mood] || '#6B7280'
+      color: colors[emotion] || '#6B7280'
     }));
   };
 
@@ -215,15 +289,26 @@ const Analytics = () => {
 
     return last7Days.map(date => {
       const dayEntries = analyticsData.journal.filter(entry => 
-        entry.timestamp.startsWith(date)
+        entry.timestamp && entry.timestamp.startsWith(date)
+      );
+      
+      const dayEmotions = analyticsData.emotions.filter(emotion => 
+        emotion.timestamp && emotion.timestamp.startsWith(date)
       );
       
       const dayTasks = analyticsData.tasks.filter(task => 
         task.createdAt && task.createdAt.startsWith(date)
       );
 
-      const avgMood = dayEntries.length > 0 ? 
-        dayEntries.reduce((sum, entry) => {
+      // Calculate average mood from both journal entries and emotion records
+      let avgMood = 3; // Default neutral
+      
+      if (dayEmotions.length > 0) {
+        // Use emotion intensity as mood score
+        avgMood = dayEmotions.reduce((sum, emotion) => sum + emotion.intensity, 0) / dayEmotions.length;
+      } else if (dayEntries.length > 0) {
+        // Fallback to journal mood scoring
+        avgMood = dayEntries.reduce((sum, entry) => {
           const moodScores = {
             happy: 5, excited: 5, grateful: 5, hopeful: 5, peaceful: 5, content: 5, optimistic: 5,
             calm: 4, neutral: 3,
@@ -231,13 +316,14 @@ const Analytics = () => {
             angry: 1, stressed: 1, depressed: 1, frustrated: 1, overwhelmed: 1
           };
           return sum + (moodScores[entry.mood] || 3);
-        }, 0) / dayEntries.length : 3;
+        }, 0) / dayEntries.length;
+      }
 
       return {
         date: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
         mood: avgMood,
         tasks: dayTasks.length,
-        entries: dayEntries.length
+        entries: dayEntries.length + dayEmotions.length
       };
     });
   };

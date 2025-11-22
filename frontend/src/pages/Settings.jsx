@@ -12,8 +12,6 @@ import {
   X
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../context/AuthContext';
-import api from '../utils/api';
 import { 
   getUserPreferences,
   saveUserPreferences,
@@ -31,7 +29,8 @@ const Settings = () => {
     setAdaptiveMode,
     themes
   } = useTheme();
-  const { user } = useAuth();
+  // Mock user for now - no auth needed
+  const user = { id: 'test-user-id', name: 'Dervaish Abbas', email: 'dervaishabbas@gmail.com' };
 
   const [isOpen, setIsOpen] = useState(false);
   const [prefs, setPrefs] = useState(() => getUserPreferences() || {
@@ -44,37 +43,21 @@ const Settings = () => {
   });
   const [notificationsEnabled, setNotifications] = useState(getNotificationsEnabled());
 
-  // Load preferences from backend
+  // Load preferences from localStorage
   useEffect(() => {
-    const loadPreferences = async () => {
-      if (!user?.id) return;
-      
+    const loadPreferences = () => {
       try {
-        const response = await api.get(`/preferences/${user.id}`);
-        if (response.data.success) {
-          const backendPrefs = response.data.data;
-          setPrefs({
-            fullName: backendPrefs.fullName || '',
-            age: backendPrefs.age || '',
-            neurotype: backendPrefs.neurotype || '',
-            notificationTime: backendPrefs.preferredNotificationTimes?.[0] || 'morning',
-            defaultTheme: backendPrefs.defaultTheme || theme,
-            personalGoals: backendPrefs.personalGoals || ''
-          });
-          setNotifications(backendPrefs.notificationsEnabled !== false);
-          setAdaptiveMode(backendPrefs.adaptiveMode !== false);
-          if (backendPrefs.defaultTheme) {
-            setTheme(backendPrefs.defaultTheme);
-          }
+        const savedPrefs = getUserPreferences();
+        if (savedPrefs) {
+          setPrefs(savedPrefs);
         }
       } catch (error) {
-        console.error('Error loading preferences from backend:', error);
-        // Fallback to localStorage preferences
+        console.error('Error loading preferences:', error);
       }
     };
 
     loadPreferences();
-  }, [user?.id, theme, setTheme, setAdaptiveMode]);
+  }, [theme, setTheme, setAdaptiveMode]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -349,24 +332,13 @@ const Settings = () => {
                           ))}
                         </select>
                       </div>
-                      <div className="flex items-center justify-between p-4 rounded-xl border-2" style={{ borderColor:'var(--border-color)', backgroundColor: 'var(--card-bg)' }}>
+                      <div className="flex items-center justify-between p-3 rounded-lg border" style={{ borderColor:'var(--theme-border)' }}>
                         <div>
-                          <p className="font-semibold text-lg" style={{ color:'var(--text-color)' }}>Enable notifications</p>
-                          <p className="text-sm opacity-70 mt-1" style={{ color:'var(--text-color)' }}>Reminders and motivational nudges</p>
+                          <p className="font-medium" style={{ color:'var(--theme-text)' }}>Enable notifications</p>
+                          <p className="text-xs opacity-70" style={{ color:'var(--theme-text)' }}>Reminders and motivational nudges</p>
                         </div>
-                        <button 
-                          onClick={()=>{const next=!notificationsEnabled; setNotifications(next); setNotificationsEnabled(next);}} 
-                          className="relative w-14 h-7 rounded-full transition-all duration-300 shadow-lg"
-                          style={{ 
-                            backgroundColor: notificationsEnabled ? 'var(--accent-color)' : 'var(--border-color)',
-                            boxShadow: notificationsEnabled ? '0 0 20px rgba(99, 102, 241, 0.3)' : '0 2px 8px rgba(0,0,0,0.1)'
-                          }}
-                        >
-                          <motion.div 
-                            className="absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-lg border-2 border-gray-200" 
-                            animate={{ x: notificationsEnabled ? 28 : 2 }} 
-                            transition={{ type:'spring', stiffness:400, damping:25 }} 
-                          />
+                        <button onClick={()=>{const next=!notificationsEnabled; setNotifications(next); setNotificationsEnabled(next);}} className={`relative w-12 h-6 rounded-full transition-colors ${notificationsEnabled ? 'bg-blue-500' : 'bg-gray-300'}`} style={{ backgroundColor: notificationsEnabled ? 'var(--theme-primary)' : 'var(--theme-border)' }}>
+                          <motion.div className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-md" animate={{ x: notificationsEnabled ? 28 : 4 }} transition={{ type:'spring', stiffness:500, damping:30 }} />
                         </button>
                       </div>
                     </div>
@@ -378,35 +350,14 @@ const Settings = () => {
                       <button 
                         className="px-4 py-2 rounded-lg text-white" 
                         style={{ backgroundColor: 'var(--theme-primary)' }} 
-                        onClick={async () => {
+                        onClick={() => {
                           try {
-                            // Save to backend first
-                            if (user?.id) {
-                              const preferencesData = {
-                                userId: user.id,
-                                fullName: prefs.fullName,
-                                age: prefs.age ? parseInt(prefs.age) : null,
-                                neurotype: prefs.neurotype,
-                                preferredNotificationTimes: [prefs.notificationTime],
-                                defaultTheme: prefs.defaultTheme || theme,
-                                personalGoals: prefs.personalGoals,
-                                notificationsEnabled: notificationsEnabled,
-                                adaptiveMode: adaptiveMode
-                              };
-                              
-                              await api.post('/preferences', preferencesData);
-                            }
-                            
-                            // Also save to localStorage as fallback
+                            // Save to localStorage
                             saveUserPreferences(prefs);
                             setTheme(prefs.defaultTheme || theme);
                             setIsOpen(false);
                           } catch (error) {
                             console.error('Error saving preferences:', error);
-                            // Fallback to localStorage only
-                            saveUserPreferences(prefs);
-                            setTheme(prefs.defaultTheme || theme);
-                            setIsOpen(false);
                           }
                         }}
                       >

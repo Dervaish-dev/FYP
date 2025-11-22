@@ -17,7 +17,9 @@ const VoiceAssistant = () => {
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
   const messagesEndRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -26,6 +28,68 @@ const VoiceAssistant = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Check for speech recognition support
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      setSpeechSupported(true);
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'en-US';
+      
+      recognitionRef.current.onstart = () => {
+        setIsListening(true);
+        toast.info('Listening... Speak now!');
+      };
+      
+      recognitionRef.current.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        console.log('Speech recognized:', transcript);
+        setInputText(transcript);
+        
+        // Don't auto-send, let user review and send manually
+        toast.success('Speech converted to text! Review and send when ready.');
+      };
+      
+      recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        
+        switch(event.error) {
+          case 'no-speech':
+            toast.error('No speech detected. Please try again.');
+            break;
+          case 'audio-capture':
+            toast.error('Microphone not accessible. Please check permissions.');
+            break;
+          case 'not-allowed':
+            toast.error('Microphone permission denied. Please allow microphone access.');
+            break;
+          default:
+            toast.error('Speech recognition failed. Please try again.');
+        }
+      };
+      
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    } else {
+      setSpeechSupported(false);
+      console.warn('Speech recognition not supported in this browser');
+    }
+  }, []);
+
+  // Cleanup speech recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
 
   const getTherapeuticResponse = async (userMessage) => {
     const apiKey = "AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0";
@@ -79,12 +143,13 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!inputText.trim()) return;
+  const handleSendMessage = async (messageText = null) => {
+    const textToSend = messageText || inputText;
+    if (!textToSend.trim()) return;
 
     const userMessage = {
       id: Date.now(),
-      text: inputText,
+      text: textToSend,
       sender: 'user',
       timestamp: new Date(),
       type: 'user'
@@ -95,7 +160,7 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
     setIsTyping(true);
 
     try {
-      const response = await getTherapeuticResponse(inputText);
+      const response = await getTherapeuticResponse(textToSend);
       
       const assistantMessage = {
         id: Date.now() + 1,
@@ -117,44 +182,25 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
   };
 
   const handleStartListening = () => {
-    setIsListening(true);
-    // Simulate listening animation
-    setTimeout(() => {
-      setIsListening(false);
-      // Simulate voice input
-      const userMessage = {
-        id: Date.now(),
-        text: "I feel stressed today",
-        sender: 'user',
-        timestamp: new Date(),
-        type: 'user'
-      };
-      setMessages(prev => [...prev, userMessage]);
-      
-      // Get therapeutic response
-      setTimeout(async () => {
-        setIsTyping(true);
-        try {
-          const response = await getTherapeuticResponse("I feel stressed today");
-          const assistantMessage = {
-            id: Date.now() + 1,
-            text: response,
-            sender: 'assistant',
-            timestamp: new Date(),
-            type: 'therapeutic'
-          };
-          setTimeout(() => {
-            setMessages(prev => [...prev, assistantMessage]);
-            setIsTyping(false);
-          }, 1500);
-        } catch (error) {
-          setIsTyping(false);
-        }
-      }, 1000);
-    }, 2000);
+    if (!speechSupported) {
+      toast.error('Speech recognition not supported in this browser. Please use Chrome or Edge.');
+      return;
+    }
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('Error starting speech recognition:', error);
+        toast.error('Failed to start speech recognition. Please try again.');
+      }
+    }
   };
 
   const handleStopListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
     setIsListening(false);
   };
 
@@ -223,70 +269,25 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
             </p>
           </div>
 
-          {/* Voice Interface */}
+          {/* Voice Interface - Simplified */}
           <div 
-            className="rounded-2xl p-8 shadow-lg border text-center"
+            className="rounded-2xl p-6 shadow-lg border text-center"
             style={{ 
               backgroundColor: 'var(--theme-card)',
               borderColor: 'var(--theme-border)'
             }}
           >
-            <div className="mb-6">
-              <motion.div
-                className="relative inline-block"
-                animate={isListening ? {
-                  scale: [1, 1.2, 1],
-                  rotate: [0, 5, -5, 0]
-                } : {}}
-                transition={{
-                  duration: 0.5,
-                  repeat: isListening ? Infinity : 0,
-                  repeatDelay: 0.5
-                }}
-              >
-                <button
-                  onClick={isListening ? handleStopListening : handleStartListening}
-                  className={`h-24 w-24 rounded-full flex items-center justify-center text-white font-bold text-lg transition-all duration-300 ${
-                    isListening 
-                      ? 'bg-red-500 hover:bg-red-600' 
-                      : 'bg-blue-500 hover:bg-blue-600'
-                  }`}
-                  style={{ backgroundColor: isListening ? '#ef4444' : 'var(--theme-primary)' }}
-                >
-                  {isListening ? <MicOff size={32} /> : <Mic size={32} />}
-                </button>
-                
-                {/* Voice wave animation */}
-                {isListening && (
-                  <motion.div
-                    className="absolute inset-0 rounded-full border-4 border-red-300"
-                    animate={{
-                      scale: [1, 1.5, 2],
-                      opacity: [1, 0.5, 0]
-                    }}
-                    transition={{
-                      duration: 1,
-                      repeat: Infinity,
-                      repeatDelay: 0
-                    }}
-                  />
-                )}
-              </motion.div>
+            <div className="mb-4">
+              <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--theme-text)' }}>
+                Voice Assistant & Therapeutic Support
+              </h2>
+              <p className="opacity-70" style={{ color: 'var(--theme-text)' }}>
+                {speechSupported 
+                  ? 'Speak or type your thoughts - I\'m here to listen and help'
+                  : 'Type your thoughts below - I\'m here to listen and help'
+                }
+              </p>
             </div>
-            
-            <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--theme-text)' }}>
-              {isListening ? 'Listening...' : 'Tap to start conversation'}
-            </h2>
-            <p className="opacity-70 mb-6" style={{ color: 'var(--theme-text)' }}>
-              {isListening 
-                ? 'Speak now, I\'m listening' 
-                : 'Click the microphone to start talking with your AI companion'
-              }
-            </p>
-
-            <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
-              Use the text input below to chat with your AI companion
-            </p>
           </div>
 
           {/* Chat Container */}
@@ -371,22 +372,52 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
             {/* Fixed Input Area at Bottom */}
             <div className="border-t p-4" style={{ borderColor: 'var(--theme-border)' }}>
               <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Share how you're feeling or what's on your mind..."
-                  className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  style={{ 
-                    backgroundColor: 'var(--theme-card)',
-                    borderColor: 'var(--theme-border)',
-                    color: 'var(--theme-text)'
-                  }}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                  disabled={isTyping}
-                />
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    placeholder="Share how you're feeling or what's on your mind..."
+                    className="w-full px-4 py-2 pr-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    style={{ 
+                      backgroundColor: 'var(--theme-card)',
+                      borderColor: 'var(--theme-border)',
+                      color: 'var(--theme-text)'
+                    }}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                    disabled={isTyping}
+                  />
+                  
+                  {/* Small microphone icon */}
+                  <button
+                    onClick={isListening ? handleStopListening : handleStartListening}
+                    disabled={!speechSupported || isTyping}
+                    className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 rounded-full transition-all duration-200 ${
+                      isListening 
+                        ? 'bg-red-500 text-white' 
+                        : speechSupported
+                          ? 'bg-gray-200 hover:bg-gray-300 text-gray-600 hover:text-gray-800'
+                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                    title={isListening ? 'Stop listening' : 'Start voice input'}
+                  >
+                    {isListening ? (
+                      <MicOff size={16} />
+                    ) : (
+                      <Mic size={16} />
+                    )}
+                  </button>
+                  
+                  {/* Listening indicator */}
+                  {isListening && (
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                      <div className="w-6 h-6 rounded-full bg-red-500 animate-pulse"></div>
+                    </div>
+                  )}
+                </div>
+                
                 <motion.button
-                  onClick={handleSendMessage}
+                  onClick={() => handleSendMessage()}
                   disabled={!inputText.trim() || isTyping}
                   className="px-4 py-2 rounded-lg text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ backgroundColor: 'var(--theme-primary)' }}

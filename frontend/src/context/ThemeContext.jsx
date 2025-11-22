@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import { themes as themeDefinitions } from '../utils/themes';
 
 const ThemeContext = createContext();
 
@@ -26,7 +27,7 @@ export const ThemeProvider = ({ children }) => {
     return saved === 'true';
   });
 
-  // Theme definitions
+  // Convert theme definitions to simple format for CSS variables
   const themes = {
     ocean: {
       name: 'Ocean',
@@ -143,13 +144,10 @@ export const ThemeProvider = ({ children }) => {
 
   const currentTheme = themes[theme];
 
-  // Apply theme and font size to document with smooth transitions
+  // Apply theme and font size to document
   useEffect(() => {
     if (currentTheme) {
       const root = document.documentElement;
-      
-      // Add transition class for smooth theme changes
-      root.classList.add('theme-transition');
       
       // Set CSS custom properties
       root.style.setProperty('--theme-primary', currentTheme.colors.primary);
@@ -165,15 +163,9 @@ export const ThemeProvider = ({ children }) => {
       // Set data attribute for theme
       root.setAttribute('data-theme', theme);
       
-      // Apply to body with smooth transition
-      document.body.style.transition = 'background-color 1.5s ease, color 1.5s ease';
+      // Apply to body
       document.body.style.backgroundColor = currentTheme.colors.background;
       document.body.style.color = currentTheme.colors.text;
-      
-      // Remove transition class after animation
-      setTimeout(() => {
-        root.classList.remove('theme-transition');
-      }, 1500);
     }
   }, [theme, fontSize, currentTheme]);
 
@@ -195,24 +187,34 @@ export const ThemeProvider = ({ children }) => {
     if (!adaptiveMode) return;
     
     const emotionThemeMap = {
-      happy: 'theme-happy',       // bright yellows / sky blue
-      sad: 'theme-calm',          // pastel lavender / white
-      angry: 'theme-neutral',     // beige / muted grey
+      happy: 'theme-happy',
+      sad: 'theme-calm',
+      angry: 'theme-neutral',
       stressed: 'theme-neutral',
-      calm: 'theme-balance',      // teal / mint
+      calm: 'theme-balance',
       neutral: 'theme-balance',
       excited: 'theme-happy',
       worried: 'theme-neutral',
       confused: 'theme-neutral',
-      surprised: 'theme-happy'
+      surprised: 'theme-happy',
+      depressed: 'theme-calm',
+      anxious: 'theme-neutral',
+      frustrated: 'theme-neutral',
+      overwhelmed: 'theme-neutral',
+      lonely: 'theme-calm',
+      grateful: 'theme-happy',
+      hopeful: 'theme-happy',
+      peaceful: 'theme-balance',
+      content: 'theme-happy',
+      nervous: 'theme-neutral',
+      optimistic: 'theme-happy',
+      pessimistic: 'theme-neutral'
     };
     
     const newTheme = emotionThemeMap[emotion.toLowerCase()] || 'theme-balance';
     
-    if (newTheme !== theme) {
-      console.log(`🎨 Adapting theme based on emotion: ${emotion} → ${newTheme}`);
-      setTheme(newTheme);
-    }
+    console.log(`🎨 Applying adaptive theme: ${emotion} → ${newTheme}`);
+    setTheme(newTheme);
   };
 
   const value = {
