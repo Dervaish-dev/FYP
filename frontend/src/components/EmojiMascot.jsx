@@ -166,25 +166,22 @@ const EmojiMascot = () => {
         } : {}}
         transition={{ duration: 0.6 }}
       >
-        {/* Bold Background Circle with Gradient */}
+        {/* Clean Background Circle */}
         <motion.div
-          className="w-20 h-20 rounded-full shadow-2xl border-4 flex items-center justify-center relative overflow-hidden"
+          className="w-20 h-20 rounded-full shadow-lg border-2 flex items-center justify-center relative overflow-hidden bg-white"
           style={{
-            background: isGenerating 
-              ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
-              : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-            borderColor: isGenerating ? '#60a5fa' : '#a78bfa',
+            borderColor: isGenerating ? '#3b82f6' : '#e5e7eb',
             backdropFilter: 'blur(10px)'
           }}
           animate={{
             boxShadow: isGenerating ? [
-              '0 8px 32px rgba(59, 130, 246, 0.4)',
-              '0 12px 40px rgba(59, 130, 246, 0.6)',
-              '0 8px 32px rgba(59, 130, 246, 0.4)'
+              '0 4px 16px rgba(59, 130, 246, 0.2)',
+              '0 6px 20px rgba(59, 130, 246, 0.3)',
+              '0 4px 16px rgba(59, 130, 246, 0.2)'
             ] : [
-              '0 8px 32px rgba(99, 102, 241, 0.4)',
-              '0 12px 40px rgba(139, 92, 246, 0.6)',
-              '0 8px 32px rgba(99, 102, 241, 0.4)'
+              '0 4px 16px rgba(0, 0, 0, 0.1)',
+              '0 6px 20px rgba(0, 0, 0, 0.15)',
+              '0 4px 16px rgba(0, 0, 0, 0.1)'
             ]
           }}
           transition={{
@@ -193,19 +190,20 @@ const EmojiMascot = () => {
             ease: "easeInOut"
           }}
         >
-          {/* Animated Background Pattern - Simplified */}
+          {/* Animated Background Pattern */}
           <motion.div
-            className="absolute inset-0 opacity-10"
+            className="absolute inset-0 opacity-20"
             style={{
-              background: 'radial-gradient(circle at center, rgba(255,255,255,0.2) 0%, transparent 60%)'
+              background: 'radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 70%)'
             }}
             animate={{
-              scale: [1, 1.1, 1]
+              rotate: [0, 360],
+              scale: [1, 1.2, 1]
             }}
             transition={{
-              duration: 6,
+              duration: 8,
               repeat: Infinity,
-              ease: "easeInOut"
+              ease: "linear"
             }}
           />
 
@@ -234,16 +232,11 @@ const EmojiMascot = () => {
           )}
         </motion.div>
 
-        {/* Bold Notification Badge */}
+        {/* Clean Notification Badge */}
         <motion.div
-          className="absolute -top-3 -right-3 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-lg"
-          style={{
-            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-            color: 'white',
-            border: '3px solid white'
-          }}
+          className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-md bg-red-500 text-white border-2 border-white"
           animate={{
-            scale: [1, 1.15, 1],
+            scale: [1, 1.1, 1],
             opacity: [0.8, 1, 0.8]
           }}
           transition={{
@@ -255,50 +248,43 @@ const EmojiMascot = () => {
           !
         </motion.div>
 
-        {/* Bold Speech Bubble */}
+        {/* Clean Speech Bubble */}
         <motion.div
-          className="absolute right-24 top-1/2 transform -translate-y-1/2 rounded-xl px-4 py-3 shadow-xl border-2"
-          style={{
-            background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)',
-            borderColor: '#6366f1',
-            color: '#f9fafb'
-          }}
+          className="absolute right-24 top-1/2 transform -translate-y-1/2 rounded-lg px-3 py-2 shadow-md border bg-white text-gray-800"
           initial={{ opacity: 0, x: 15, scale: 0.8 }}
           whileHover={{ opacity: 1, x: 0, scale: 1 }}
           transition={{ duration: 0.3, type: "spring", stiffness: 300 }}
         >
-          <p className="text-sm font-semibold whitespace-nowrap">
+          <p className="text-sm font-medium whitespace-nowrap">
             {isGenerating ? '✨ Generating wisdom...' : '💡 Click for motivation!'}
           </p>
           {/* Speech bubble tail */}
           <div
-            className="absolute left-full top-1/2 transform -translate-y-1/2 w-0 h-0 border-l-8 border-t-4 border-b-4 border-transparent"
-            style={{ borderLeftColor: '#374151' }}
+            className="absolute left-full top-1/2 transform -translate-y-1/2 w-0 h-0 border-l-6 border-t-3 border-b-3 border-transparent border-l-white"
           />
         </motion.div>
       </motion.div>
 
-      {/* Simplified Floating Particles */}
+      {/* Subtle Floating Particles */}
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(2)].map((_, i) => (
+        {[...Array(3)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-1 h-1 rounded-full"
+            className="absolute w-1 h-1 rounded-full bg-blue-200 opacity-60"
             style={{
-              background: 'rgba(255, 255, 255, 0.6)',
               left: '50%',
               top: '50%'
             }}
             animate={{
               x: [0, Math.random() * 20 - 10],
               y: [0, Math.random() * 20 - 10],
-              opacity: [0, 0.5, 0],
-              scale: [0, 0.8, 0]
+              opacity: [0, 0.6, 0],
+              scale: [0, 1, 0]
             }}
             transition={{
-              duration: 5,
+              duration: 3,
               repeat: Infinity,
-              delay: i * 2,
+              delay: i * 1,
               ease: "easeOut"
             }}
           />

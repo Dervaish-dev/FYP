@@ -14,11 +14,11 @@ import {
   Activity
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../context/AuthContext';
 import Settings from '../pages/Settings';
 
 const Layout = ({ children }) => {
-  const { user } = useAuth();
+  // Mock user for now - no auth needed
+  const user = { name: 'Dervaish Abbas', email: 'dervaishabbas@gmail.com' };
   const location = useLocation();
 
   const navigationItems = [

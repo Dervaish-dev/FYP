@@ -40,8 +40,6 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications, NOTIFICATION_TYPES } from '../components/NotificationCenter';
-import { useAuth } from '../context/AuthContext';
-import api from '../utils/api';
 
 // Task Card Component
 const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
@@ -249,7 +247,8 @@ const TaskColumn = React.memo(({ title, tasks, status, onTaskUpdate, onTaskDelet
 const Tasks = () => {
   const { currentTheme } = useTheme();
   const { addNotification } = useNotifications();
-  const { user } = useAuth();
+  // Mock user for now - no auth needed
+  const user = { id: 'test-user-id', name: 'Dervaish Abbas', email: 'dervaishabbas@gmail.com' };
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -269,43 +268,76 @@ const Tasks = () => {
     })
   );
 
-  // Load tasks from backend API
+  // Load tasks from localStorage
   useEffect(() => {
-    const loadTasks = async () => {
-      if (!user?.id) return;
-      
-      setLoading(true);
+    const loadTasks = () => {
       try {
-        const response = await api.get(`/tasks/${user.id}`);
-        if (response.data.success) {
-          setTasks(response.data.data.tasks || []);
+        const savedTasks = localStorage.getItem('neurocompanion-tasks');
+        if (savedTasks) {
+          const parsedTasks = JSON.parse(savedTasks);
+          console.log('Loaded tasks from localStorage:', parsedTasks);
+          setTasks(parsedTasks);
         } else {
-          throw new Error('Failed to load tasks');
+          console.log('No tasks found in localStorage, starting with empty array');
+          // Add some sample tasks for demonstration
+          const sampleTasks = [
+            {
+              id: Date.now().toString(),
+              userId: user.id,
+              title: 'Complete project documentation',
+              description: 'Write comprehensive documentation for the NeuroCompanion project',
+              priority: 'high',
+              status: 'todo',
+              dueTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+              repeat: 'once',
+              createdAt: new Date().toISOString(),
+              nudgeCount: 0
+            },
+            {
+              id: (Date.now() + 1).toString(),
+              userId: user.id,
+              title: 'Review code changes',
+              description: 'Review all recent code changes and provide feedback',
+              priority: 'medium',
+              status: 'in-progress',
+              dueTime: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
+              repeat: 'once',
+              createdAt: new Date().toISOString(),
+              nudgeCount: 0
+            },
+            {
+              id: (Date.now() + 2).toString(),
+              userId: user.id,
+              title: 'Update README file',
+              description: 'Update the project README with latest information',
+              priority: 'low',
+              status: 'done',
+              dueTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+              repeat: 'once',
+              createdAt: new Date().toISOString(),
+              nudgeCount: 0
+            }
+          ];
+          setTasks(sampleTasks);
+          localStorage.setItem('neurocompanion-tasks', JSON.stringify(sampleTasks));
         }
       } catch (error) {
         console.error('Error loading tasks:', error);
-        // Fallback to localStorage if backend fails
-        const savedTasks = localStorage.getItem('neurocompanion-tasks');
-        if (savedTasks) {
-          try {
-            setTasks(JSON.parse(savedTasks));
-          } catch (parseError) {
-            console.error('Error parsing saved tasks:', parseError);
-            setTasks([]);
-          }
-        }
-        toast.error('Failed to load tasks from server. Using local data.');
-      } finally {
-        setLoading(false);
+        setTasks([]);
       }
     };
 
     loadTasks();
-  }, [user?.id]);
+  }, []);
 
   // Save tasks to localStorage whenever tasks change
   useEffect(() => {
-    localStorage.setItem('neurocompanion-tasks', JSON.stringify(tasks));
+    try {
+      localStorage.setItem('neurocompanion-tasks', JSON.stringify(tasks));
+      console.log('Saved tasks to localStorage:', tasks);
+    } catch (error) {
+      console.error('Error saving tasks to localStorage:', error);
+    }
   }, [tasks]);
 
   // Task notification system
@@ -355,61 +387,25 @@ const Tasks = () => {
       return;
     }
 
-    if (!user?.id) {
-      toast.error('User not authenticated');
-      return;
-    }
-
     if (isCreating) return;
     setIsCreating(true);
 
     try {
-      const taskData = {
-        userId: user.id,
-        title: newTask.title.trim(),
-        description: newTask.description.trim(),
-        priority: newTask.priority,
-        dueTime: new Date(newTask.dueTime).toISOString(),
-        repeat: newTask.repeat
-      };
-
-      const response = await api.post('/tasks/create', taskData);
-      
-      if (response.data.success) {
-        const newTaskFromAPI = response.data.data;
-        setTasks(prev => [newTaskFromAPI, ...prev]);
-        
-        setNewTask({
-          title: '',
-          description: '',
-          priority: 'medium',
-          dueTime: '',
-          repeat: 'once'
-        });
-        
-        setShowCreateModal(false);
-        toast.success('Task created successfully!');
-      } else {
-        throw new Error(response.data.message || 'Failed to create task');
-      }
-    } catch (error) {
-      console.error('Error creating task:', error);
-      
-      // Fallback: create task locally
-      const fallbackTask = {
+      // Create task locally
+      const newTaskWithId = {
         id: Date.now().toString(),
         userId: user.id,
         title: newTask.title.trim(),
         description: newTask.description.trim(),
         priority: newTask.priority,
         status: 'todo',
-        dueTime: new Date(newTask.dueTime).toISOString(),
+        dueTime: newTask.dueTime ? new Date(newTask.dueTime).toISOString() : null,
         repeat: newTask.repeat,
         createdAt: new Date().toISOString(),
         nudgeCount: 0
       };
 
-      setTasks(prev => [fallbackTask, ...prev]);
+      setTasks(prev => [newTaskWithId, ...prev]);
       
       setNewTask({
         title: '',
@@ -420,7 +416,10 @@ const Tasks = () => {
       });
       
       setShowCreateModal(false);
-      toast.warning('Task created locally. Will sync when connection is restored.');
+      toast.success('Task created successfully!');
+    } catch (error) {
+      console.error('Error creating task:', error);
+      toast.error('Failed to create task');
     } finally {
       setIsCreating(false);
     }
@@ -430,96 +429,54 @@ const Tasks = () => {
     const previousTask = tasks.find(task => task._id === taskId || task.id === taskId);
     const wasCompleted = previousTask?.status === 'done';
     
-    // Optimistic update
-    setTasks(prev => prev.map(task => 
-      (task._id === taskId || task.id === taskId) ? { ...task, ...updateData } : task
-    ));
-    
     try {
-      const response = await api.put(`/tasks/${taskId}`, updateData);
-      
-      if (response.data.success) {
-        const updatedTask = response.data.data;
-        setTasks(prev => prev.map(task => 
-          (task._id === taskId || task.id === taskId) ? updatedTask : task
-        ));
-        
-        // Celebration notification for task completion
-        if (updateData.status === 'done' && !wasCompleted) {
-          addNotification(
-            `🎉 "${updatedTask.title}" completed! You're on fire! 🔥`,
-            NOTIFICATION_TYPES.CELEBRATION,
-            '🎉'
-          );
-        } else if (updateData.status !== 'done' && wasCompleted) {
-          toast.success('Task marked as incomplete');
-        } else {
-          toast.success('Task updated!');
-        }
+      // Update task locally
+      setTasks(prev => prev.map(task => 
+        (task._id === taskId || task.id === taskId) ? { ...task, ...updateData } : task
+      ));
+
+      // Show success notification
+      if (updateData.status === 'done' && !wasCompleted) {
+        addNotification(
+          `🎉 "${previousTask?.title}" completed! You're on fire! 🔥`,
+          NOTIFICATION_TYPES.CELEBRATION,
+          '🎉'
+        );
+        toast.success('Task completed! Great job!');
+      } else if (updateData.status !== 'done' && wasCompleted) {
+        toast.success('Task marked as incomplete');
       } else {
-        throw new Error(response.data.message || 'Failed to update task');
+        toast.success('Task updated!');
       }
     } catch (error) {
       console.error('Error updating task:', error);
-      
-      // Rollback optimistic update
-      setTasks(prev => prev.map(task => 
-        (task._id === taskId || task.id === taskId) ? previousTask : task
-      ));
-      
-      toast.error('Failed to update task. Changes reverted.');
+      toast.error('Failed to update task');
     }
   }, [tasks, addNotification]);
 
   const handleTaskDelete = useCallback(async (taskId) => {
     if (!window.confirm('Are you sure you want to delete this task?')) return;
     
-    const taskToDelete = tasks.find(task => task._id === taskId || task.id === taskId);
-    
-    // Optimistic delete
-    setTasks(prev => prev.filter(task => task._id !== taskId && task.id !== taskId));
-    
     try {
-      const response = await api.delete(`/tasks/${taskId}`);
-      
-      if (response.data.success) {
-        toast.success('Task deleted');
-      } else {
-        throw new Error(response.data.message || 'Failed to delete task');
-      }
+      // Delete task locally
+      setTasks(prev => prev.filter(task => task._id !== taskId && task.id !== taskId));
+      toast.success('Task deleted');
     } catch (error) {
       console.error('Error deleting task:', error);
-      
-      // Rollback optimistic delete
-      if (taskToDelete) {
-        setTasks(prev => [taskToDelete, ...prev]);
-      }
-      
-      toast.error('Failed to delete task. Task restored.');
+      toast.error('Failed to delete task');
     }
   }, [tasks]);
 
   const handleTaskNudge = useCallback(async (taskId) => {
     try {
-      const response = await api.put(`/tasks/${taskId}/nudge`);
-      
-      if (response.data.success) {
-        const updatedTask = response.data.data;
-        setTasks(prev => prev.map(task => 
-          (task._id === taskId || task.id === taskId) ? updatedTask : task
-        ));
-        toast.info('Reminder sent! 🔔');
-      } else {
-        throw new Error(response.data.message || 'Failed to send reminder');
-      }
-    } catch (error) {
-      console.error('Error sending reminder:', error);
-      
-      // Fallback: update locally
+      // Update nudge count locally
       setTasks(prev => prev.map(task => 
         (task._id === taskId || task.id === taskId) ? { ...task, nudgeCount: (task.nudgeCount || 0) + 1 } : task
       ));
-      toast.info('Reminder sent locally! 🔔');
+      toast.info('Reminder sent! 🔔');
+    } catch (error) {
+      console.error('Error sending reminder:', error);
+      toast.error('Failed to send reminder');
     }
   }, []);
 

@@ -1,8 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './pages/Login';
-import Register from './pages/Register';
+import { ThemeProvider } from './context/ThemeContext';
 import Dashboard from './pages/Dashboard';
 import Emotions from './pages/Emotions';
 import Tasks from './pages/Tasks';
@@ -17,157 +15,91 @@ import NotificationCenter from './components/NotificationCenter';
 import EmojiMascot from './components/EmojiMascot';
 import WellnessNotificationCenter from './components/WellnessNotificationCenter';
 
-// Protected Route Component
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
-};
-
-// Public Route Component (redirect to dashboard if already authenticated)
-const PublicRoute = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : children;
-};
-
 // Main App Routes
 const AppRoutes = () => {
   return (
     <>
       <Routes>
         <Route 
-          path="/login" 
-          element={
-            <PublicRoute>
-              <Login />
-            </PublicRoute>
-          } 
-        />
-        <Route 
-          path="/register" 
-          element={
-            <PublicRoute>
-              <Register />
-            </PublicRoute>
-          } 
-        />
-        <Route 
           path="/dashboard" 
           element={
-            <ProtectedRoute>
-              <Layout>
-                <Dashboard />
-              </Layout>
-            </ProtectedRoute>
+            <Layout>
+              <Dashboard />
+            </Layout>
           } 
         />
         <Route 
           path="/emotions" 
           element={
-            <ProtectedRoute>
-              <Layout>
-                <Emotions />
-              </Layout>
-            </ProtectedRoute>
+            <Layout>
+              <Emotions />
+            </Layout>
           } 
         />
         <Route 
           path="/tasks" 
           element={
-            <ProtectedRoute>
-              <Layout>
-                <Tasks />
-              </Layout>
-            </ProtectedRoute>
+            <Layout>
+              <Tasks />
+            </Layout>
           } 
         />
         <Route 
           path="/journal" 
           element={
-            <ProtectedRoute>
-              <Layout>
-                <Journal />
-              </Layout>
-            </ProtectedRoute>
+            <Layout>
+              <Journal />
+            </Layout>
           } 
         />
         <Route 
           path="/analytics" 
           element={
-            <ProtectedRoute>
-              <Layout>
-                <Analytics />
-              </Layout>
-            </ProtectedRoute>
+            <Layout>
+              <Analytics />
+            </Layout>
           } 
         />
         <Route 
           path="/voice" 
           element={
-            <ProtectedRoute>
-              <Layout>
-                <VoiceAssistant />
-              </Layout>
-            </ProtectedRoute>
+            <Layout>
+              <VoiceAssistant />
+            </Layout>
           } 
         />
         <Route 
           path="/caregiver" 
           element={
-            <ProtectedRoute>
-              <Layout>
-                <CaregiverPortal />
-              </Layout>
-            </ProtectedRoute>
+            <Layout>
+              <CaregiverPortal />
+            </Layout>
           } 
         />
         <Route 
           path="/settings" 
           element={
-            <ProtectedRoute>
-              <Layout>
-                <Settings />
-              </Layout>
-            </ProtectedRoute>
+            <Layout>
+              <Settings />
+            </Layout>
           } 
         />
         <Route 
           path="/wellness" 
           element={
-            <ProtectedRoute>
-              <Layout>
-                <Wellness />
-              </Layout>
-            </ProtectedRoute>
+            <Layout>
+              <Wellness />
+            </Layout>
           } 
         />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       
-      {/* Global Components - Only show on authenticated pages */}
-        <ProtectedRoute>
-          <NotificationCenter />
-          <EmojiMascot />
-          <WellnessNotificationCenter />
-        </ProtectedRoute>
+      {/* Global Components */}
+      <NotificationCenter />
+      <EmojiMascot />
+      <WellnessNotificationCenter />
     </>
   );
 };
@@ -175,13 +107,13 @@ const AppRoutes = () => {
 // Main App Component
 const App = () => {
   return (
-    <AuthProvider>
+    <ThemeProvider>
       <Router>
         <div className="App">
           <AppRoutes />
         </div>
       </Router>
-    </AuthProvider>
+    </ThemeProvider>
   );
 };
 

@@ -6,6 +6,9 @@ import authRoutes from './routes/authRoutes.js';
 import emotionRoutes from './routes/emotionRoutes.js';
 import emotionHistoryRoutes from './routes/emotionHistoryRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
+import journalRoutes from './routes/journalRoutes.js';
+import preferencesRoutes from './routes/preferencesRoutes.js';
+import wellnessRoutes from './routes/wellnessRoutes.js';
 
 dotenv.config();
 
@@ -19,7 +22,7 @@ connectDB().catch(() => {
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:5555',
+  origin: 'http://localhost:5556',
   credentials: true
 }));
 app.use(express.json());
@@ -30,6 +33,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/emotion', emotionRoutes);
 app.use('/api/emotions', emotionHistoryRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/journal', journalRoutes);
+app.use('/api/preferences', preferencesRoutes);
+app.use('/api/wellness', wellnessRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
