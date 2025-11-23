@@ -1,5 +1,31 @@
 import jwt from 'jsonwebtoken';
+import { validationResult, body } from 'express-validator';
 import User from '../models/User.js';
+
+// Validation rules
+export const validateRegister = [
+  body('name')
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Name must be between 2 and 50 characters'),
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email'),
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters long'),
+];
+
+export const validateLogin = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email'),
+  body('password')
+    .notEmpty()
+    .withMessage('Password is required'),
+];
 
 // Generate JWT Token
 const generateToken = (userId) => {
@@ -11,6 +37,16 @@ const generateToken = (userId) => {
 // Register User
 const register = async (req, res) => {
   try {
+    // Check validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
     const { name, email, password } = req.body;
 
     // Check if user already exists
@@ -67,6 +103,16 @@ const register = async (req, res) => {
 // Login User
 const login = async (req, res) => {
   try {
+    // Check validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
     const { email, password } = req.body;
 
     // Find user by email
@@ -144,8 +190,27 @@ const getCurrentUser = async (req, res) => {
   }
 };
 
+// Logout User
+const logout = async (req, res) => {
+  try {
+    // For JWT, logout is handled client-side by removing the token
+    // But we can log the logout event here if needed
+    res.status(200).json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
 export {
   register,
   login,
-  getCurrentUser
+  getCurrentUser,
+  logout
 };
