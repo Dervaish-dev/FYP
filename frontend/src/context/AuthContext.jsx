@@ -71,25 +71,6 @@ export const AuthProvider = ({ children }) => {
 // Check for existing token on app load
   useEffect(() => {
     const initAuth = async () => {
-      // BYPASS AUTH FOR TESTING - Remove this later
-      const mockUser = {
-        id: 'test-user-id',
-        name: 'Dervaish Abbas',
-        email: 'dervaishabbas@gmail.com'
-      };
-      const mockToken = 'mock-jwt-token-for-testing';
-      
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_SUCCESS,
-        payload: {
-          user: mockUser,
-          token: mockToken,
-        },
-      });
-      return;
-
-      // Original auth code (commented out for testing)
-      /*
       const token = localStorage.getItem('token');
       const user = localStorage.getItem('user');
 
@@ -113,7 +94,6 @@ export const AuthProvider = ({ children }) => {
       } else {
         dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
       }
-      */
     };
 
     initAuth();
@@ -125,25 +105,6 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
       dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
 
-      // BYPASS AUTH FOR TESTING - Remove this later
-      const mockUser = {
-        id: 'test-user-id',
-        name: 'Dervaish Abbas',
-        email: credentials.email || 'dervaishabbas@gmail.com'
-      };
-      const mockToken = 'mock-jwt-token-for-testing';
-      
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_SUCCESS,
-        payload: {
-          user: mockUser,
-          token: mockToken,
-        },
-      });
-      return { success: true };
-
-      // Original login code (commented out for testing)
-      /*
       const response = await authAPI.login(credentials);
       
       // Store in localStorage
@@ -156,7 +117,6 @@ export const AuthProvider = ({ children }) => {
       });
 
       return response;
-      */
     } catch (error) {
       dispatch({
         type: AUTH_ACTIONS.SET_ERROR,
@@ -172,25 +132,6 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
       dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
 
-      // BYPASS AUTH FOR TESTING - Remove this later
-      const mockUser = {
-        id: 'test-user-id',
-        name: userData.name || 'Dervaish Abbas',
-        email: userData.email || 'dervaishabbas@gmail.com'
-      };
-      const mockToken = 'mock-jwt-token-for-testing';
-      
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_SUCCESS,
-        payload: {
-          user: mockUser,
-          token: mockToken,
-        },
-      });
-      return { success: true };
-
-      // Original register code (commented out for testing)
-      /*
       const response = await authAPI.register(userData);
       
       // Store in localStorage
@@ -203,7 +144,6 @@ export const AuthProvider = ({ children }) => {
       });
 
       return response;
-      */
     } catch (error) {
       dispatch({
         type: AUTH_ACTIONS.SET_ERROR,
@@ -214,7 +154,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Logout function
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await authAPI.logout();
+    } catch (error) {
+      console.error('Logout API error:', error);
+      // Continue with client-side logout even if API fails
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     dispatch({ type: AUTH_ACTIONS.LOGOUT });

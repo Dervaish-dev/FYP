@@ -9,9 +9,12 @@ import {
   Check,
   Brain,
   Zap,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { 
   getUserPreferences,
   saveUserPreferences,
@@ -29,8 +32,8 @@ const Settings = () => {
     setAdaptiveMode,
     themes
   } = useTheme();
-  // Mock user for now - no auth needed
-  const user = { id: 'test-user-id', name: 'Dervaish Abbas', email: 'dervaishabbas@gmail.com' };
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
 
   const [isOpen, setIsOpen] = useState(false);
   const [prefs, setPrefs] = useState(() => getUserPreferences() || {
@@ -114,6 +117,16 @@ const Settings = () => {
 
   const handleAdaptiveModeToggle = () => {
     setAdaptiveMode(!adaptiveMode);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setIsOpen(false);
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -406,6 +419,21 @@ const Settings = () => {
                       </div>
                     </div>
                   </div>
+                </motion.div>
+
+                {/* Logout Button */}
+                <motion.div variants={itemVariants} className="mt-6">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90"
+                    style={{ backgroundColor: '#EF4444' }}
+                  >
+                    <LogOut size={20} />
+                    <span>Logout</span>
+                  </button>
+                  <p className="text-xs text-center mt-2 opacity-60" style={{ color: 'var(--theme-text)' }}>
+                    All settings are saved automatically
+                  </p>
                 </motion.div>
               </motion.div>
             </motion.div>

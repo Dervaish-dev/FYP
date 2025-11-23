@@ -18,6 +18,8 @@ import {
   setNotificationsEnabled 
 } from '../utils/userPreferences';
 import ThemeSelector from './ThemeSelector';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const SettingsModal = ({ isOpen, onClose }) => {
   const {
@@ -34,6 +36,9 @@ const SettingsModal = ({ isOpen, onClose }) => {
     toggleReducedMotion,
   } = useTheme();
 
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
   const [showThemeSelector, setShowThemeSelector] = useState(false);
   const [prefs, setPrefs] = useState(() => getUserPreferences() || {
     fullName: '',
@@ -46,6 +51,12 @@ const SettingsModal = ({ isOpen, onClose }) => {
   const [notificationsEnabled, setNotifications] = useState(getNotificationsEnabled());
 
   if (!isOpen) return null;
+
+  const handleLogout = () => {
+    logout();
+    onClose();
+    navigate('/login');
+  };
 
   return (
     <>
@@ -332,6 +343,14 @@ const SettingsModal = ({ isOpen, onClose }) => {
 
           {/* Footer */}
           <div className="mt-6 pt-4 border-t border-gray-200">
+            <div className="flex justify-center mb-4">
+              <button
+                onClick={handleLogout}
+                className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
             <p className="text-sm text-gray-500 text-center">
               All settings are saved automatically and persist across sessions
             </p>
