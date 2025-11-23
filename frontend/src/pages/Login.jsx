@@ -71,7 +71,7 @@ const Login = () => {
             <p className="text-gray-600">
               Don't have an account?{' '}
               <Link 
-                to="/register" 
+                to="/signup" 
                 className="text-primary-600 hover:text-primary-700 font-medium inline-flex items-center space-x-1 transition-colors"
               >
                 <span>Sign up</span>
