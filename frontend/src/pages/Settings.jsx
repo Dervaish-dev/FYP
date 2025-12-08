@@ -1,446 +1,314 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Settings as SettingsIcon, 
-  Palette, 
-  Type, 
-  Volume2, 
-  Eye,
-  Check,
+import { motion } from 'framer-motion';
+import {
+  User,
+  Lock,
+  Bell,
+  Palette,
+  Type,
   Brain,
-  Zap,
-  X,
-  LogOut
+  LogOut,
+  ChevronRight,
+  Shield,
+  Save
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { 
-  getUserPreferences,
-  saveUserPreferences,
+import { useTheme } from '../context/ThemeContext';
+import { toast } from 'react-toastify';
+import { preferencesAPI } from '../utils/api';
+import {
   getNotificationsEnabled,
   setNotificationsEnabled
 } from '../utils/userPreferences';
 
+const SettingsSection = ({ title, icon: Icon, children }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="bg-white rounded-2xl p-6 shadow-sm border mb-6"
+    style={{
+      backgroundColor: 'var(--theme-card)',
+      borderColor: 'var(--theme-border)'
+    }}
+  >
+    <div className="flex items-center mb-6 border-b pb-4" style={{ borderColor: 'var(--theme-border)' }}>
+      <div className="p-2 rounded-lg bg-opacity-10 mr-4" style={{ backgroundColor: 'rgba(var(--primary-rgb), 0.1)' }}>
+        <Icon size={24} style={{ color: 'var(--theme-primary)' }} />
+      </div>
+      <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text)' }}>{title}</h2>
+    </div>
+    {children}
+  </motion.div>
+);
+
 const Settings = () => {
+  const { user, logout } = useAuth();
   const {
     theme,
     setTheme,
+    themes,
     fontSize,
     setFontSize,
     adaptiveMode,
-    setAdaptiveMode,
-    themes
+    setAdaptiveMode
   } = useTheme();
-  const { logout, user } = useAuth();
-  const navigate = useNavigate();
 
-  const [isOpen, setIsOpen] = useState(false);
+  const [notifications, setNotifications] = useState(getNotificationsEnabled());
+  const [loading, setLoading] = useState(false);
   const [prefs, setPrefs] = useState(() => getUserPreferences() || {
-    fullName: '',
+    fullName: user?.name || '',
     age: '',
     neurotype: '',
     notificationTime: 'morning',
     defaultTheme: theme,
     personalGoals: ''
   });
-  const [notificationsEnabled, setNotifications] = useState(getNotificationsEnabled());
 
-  // Load preferences from localStorage
+  // Load preferences from API
   useEffect(() => {
-    const loadPreferences = () => {
+    const loadPreferences = async () => {
+      if (!user?.id) return;
       try {
-        const savedPrefs = getUserPreferences();
+        const savedPrefs = await preferencesAPI.fetch(user.id);
         if (savedPrefs) {
-          setPrefs(savedPrefs);
+          setPrefs(prev => ({ ...prev, ...savedPrefs }));
+          // Apply saved theme if exists
+          if (savedPrefs.defaultTheme && savedPrefs.defaultTheme !== theme) {
+            setTheme(savedPrefs.defaultTheme);
+          }
+          // Apply adaptive mode
+          if (savedPrefs.adaptiveMode !== undefined && savedPrefs.adaptiveMode !== adaptiveMode) {
+            setAdaptiveMode(savedPrefs.adaptiveMode);
+          }
         }
       } catch (error) {
         console.error('Error loading preferences:', error);
       }
     };
-
     loadPreferences();
-  }, [theme, setTheme, setAdaptiveMode]);
+  }, [user]);
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5 }
-    }
-  };
-
-  const modalVariants = {
-    hidden: { 
-      opacity: 0, 
-      scale: 0.8,
-      y: -50
-    },
-    visible: { 
-      opacity: 1, 
-      scale: 1,
-      y: 0,
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 30
-      }
-    },
-    exit: { 
-      opacity: 0, 
-      scale: 0.8,
-      y: -50,
-      transition: {
-        duration: 0.2
-      }
-    }
-  };
-
-  const handleThemeChange = (themeKey) => {
-    setTheme(themeKey);
-  };
-
-  const handleFontSizeChange = (event) => {
-    setFontSize(parseInt(event.target.value));
-  };
-
-  const handleAdaptiveModeToggle = () => {
-    setAdaptiveMode(!adaptiveMode);
-  };
-
-  const handleLogout = async () => {
+  const handleSave = async () => {
+    if (!user?.id) return;
+    setLoading(true);
     try {
-      await logout();
-      setIsOpen(false);
-      navigate('/login');
+      await preferencesAPI.save(user.id, {
+        ...prefs,
+        notificationsEnabled: notifications,
+        adaptiveMode: adaptiveMode
+      });
+      setNotificationsEnabled(notifications);
+      toast.success('Settings saved successfully');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Failed to save settings:', error);
+      toast.error('Failed to save settings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    if (window.confirm('Are you sure you want to log out?')) {
+      logout();
     }
   };
 
   return (
-    <>
-      {/* Settings Button */}
-      <motion.button
-        onClick={() => setIsOpen(true)}
-        className="p-2 rounded-lg hover:bg-opacity-10 transition-colors"
-        style={{ 
-          color: 'var(--theme-text)',
-          backgroundColor: 'transparent'
-        }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-      >
-        <SettingsIcon size={20} />
-      </motion.button>
+    <div className="min-h-screen p-6 pb-24" style={{ backgroundColor: 'var(--theme-background)' }}>
+      <div className="max-w-4xl mx-auto">
+        <header className="mb-8">
+          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--theme-text)' }}>Settings</h1>
+          <p className="opacity-70" style={{ color: 'var(--theme-text)' }}>Manage your account and preferences</p>
+        </header>
 
-      {/* Settings Modal */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsOpen(false)}
-          >
-            <motion.div
-              className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
-              style={{ 
-                backgroundColor: 'var(--theme-card)',
-                color: 'var(--theme-text)'
-              }}
-              variants={modalVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-2">
-                  <SettingsIcon className="h-6 w-6" style={{ color: 'var(--theme-primary)' }} />
-                  <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text)' }}>
-                    Settings
-                  </h2>
-                </div>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
+        {/* Profile Section */}
+        <SettingsSection title="Profile Information" icon={User}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--theme-text)' }}>Full Name</label>
+              <input
+                type="text"
+                value={user?.name || ''}
+                disabled
+                className="w-full p-3 rounded-xl border bg-gray-50 opacity-70 cursor-not-allowed"
+                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--theme-text)' }}>Email Address</label>
+              <input
+                type="email"
+                value={user?.email || ''}
+                disabled
+                className="w-full p-3 rounded-xl border bg-gray-50 opacity-70 cursor-not-allowed"
+                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--theme-text)' }}>Age</label>
+              <input
+                type="number"
+                value={prefs.age}
+                onChange={(e) => setPrefs({ ...prefs, age: e.target.value })}
+                className="w-full p-3 rounded-xl border bg-transparent"
+                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--theme-text)' }}>Neurotype</label>
+              <select
+                value={prefs.neurotype}
+                onChange={(e) => setPrefs({ ...prefs, neurotype: e.target.value })}
+                className="w-full p-3 rounded-xl border bg-transparent"
+                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
               >
-                {/* Theme Selection */}
-                <motion.div variants={itemVariants} className="mb-6">
-                  <label className="block text-sm font-medium mb-3" style={{ color: 'var(--theme-text)' }}>
-                    Theme
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {Object.entries(themes).map(([key, themeData]) => (
-                      <motion.button
-                        key={key}
-                        onClick={() => handleThemeChange(key)}
-                        className={`relative p-3 rounded-xl border-2 transition-all duration-300 ${
-                          theme === key
-                            ? 'border-opacity-100 shadow-lg'
-                            : 'border-opacity-30 hover:border-opacity-60'
-                        }`}
-                        style={{
-                          borderColor: theme === key ? themeData.colors.primary : 'var(--theme-border)',
-                          backgroundColor: theme === key ? `${themeData.colors.primary}20` : 'transparent'
-                        }}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <div className="flex items-center space-x-2">
-                          {/* Theme color preview */}
-                          <div className="flex space-x-1">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: themeData.colors.primary }}
-                            />
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: themeData.colors.secondary }}
-                            />
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: themeData.colors.background }}
-                            />
-                          </div>
-                          
-                          <span className="text-sm font-medium" style={{ color: 'var(--theme-text)' }}>
-                            {themeData.name}
-                          </span>
-                        </div>
+                <option value="">Select...</option>
+                <option value="ADHD">ADHD</option>
+                <option value="Autism">Autism</option>
+                <option value="Anxiety">Anxiety</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+        </SettingsSection>
 
-                        {theme === key && (
-                          <motion.div
-                            className="absolute top-1 right-1 flex items-center justify-center w-5 h-5 rounded-full"
-                            style={{ backgroundColor: themeData.colors.primary }}
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                          >
-                            <Check size={12} className="text-white" />
-                          </motion.div>
-                        )}
-                      </motion.button>
-                    ))}
-                  </div>
-                </motion.div>
+        {/* Security Section (Placeholder) */}
+        <SettingsSection title="Security" icon={Lock}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 rounded-xl border" style={{ borderColor: 'var(--theme-border)' }}>
+              <div>
+                <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Password</p>
+                <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Last changed 3 months ago</p>
+              </div>
+              <button className="px-4 py-2 text-sm font-medium rounded-lg border hover:bg-gray-50 transition-colors" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}>
+                Change Password
+              </button>
+            </div>
+            <div className="flex items-center justify-between p-4 rounded-xl border" style={{ borderColor: 'var(--theme-border)' }}>
+              <div>
+                <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Two-Factor Authentication</p>
+                <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Add an extra layer of security</p>
+              </div>
+              <button className="px-4 py-2 text-sm font-medium rounded-lg border hover:bg-gray-50 transition-colors" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}>
+                Enable
+              </button>
+            </div>
+          </div>
+        </SettingsSection>
 
-                {/* Font Size Slider */}
-                <motion.div variants={itemVariants} className="mb-6">
-                  <label className="block text-sm font-medium mb-3" style={{ color: 'var(--theme-text)' }}>
-                    Font Size: {fontSize}px
-                  </label>
-                  <input
-                    type="range"
-                    min="12"
-                    max="24"
-                    value={fontSize}
-                    onChange={handleFontSizeChange}
-                    className="w-full h-2 rounded-lg appearance-none cursor-pointer"
-                    style={{
-                      background: `linear-gradient(to right, var(--theme-primary) 0%, var(--theme-primary) ${((fontSize - 12) / (24 - 12)) * 100}%, var(--theme-border) ${((fontSize - 12) / (24 - 12)) * 100}%, var(--theme-border) 100%)`
-                    }}
-                  />
-                  <div className="flex justify-between text-xs opacity-70 mt-1" style={{ color: 'var(--theme-text)' }}>
-                    <span>Small</span>
-                    <span>Large</span>
-                  </div>
-                </motion.div>
-
-                {/* Adaptive UI Mode Toggle */}
-                <motion.div variants={itemVariants}>
-                  <div className="flex items-center justify-between p-4 rounded-lg border" style={{ borderColor: 'var(--theme-border)' }}>
-                    <div className="flex items-center space-x-3">
-                      <Brain className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
-                      <div>
-                        <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Adaptive UI Mode</p>
-                        <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
-                          Automatically adjust theme based on emotions
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleAdaptiveModeToggle}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${
-                        adaptiveMode ? 'bg-blue-500' : 'bg-gray-300'
-                      }`}
-                      style={{ backgroundColor: adaptiveMode ? 'var(--theme-primary)' : 'var(--theme-border)' }}
-                    >
-                      <motion.div
-                        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-md"
-                        animate={{ x: adaptiveMode ? 28 : 4 }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                      />
-                    </button>
-                  </div>
-                </motion.div>
-
-                {/* User Preferences */}
-                <motion.div variants={itemVariants} className="mt-6">
-                  <h3 className="text-sm font-medium mb-3" style={{ color: 'var(--theme-text)' }}>
-                    User Preferences
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs mb-1" style={{ color: 'var(--theme-text)' }}>Full name</label>
-                        <input className="w-full p-3 rounded-lg border" style={{ borderColor:'var(--theme-border)', backgroundColor:'var(--theme-card)', color:'var(--theme-text)' }} value={prefs.fullName} onChange={(e)=> setPrefs(v=>({...v, fullName:e.target.value}))} />
-                      </div>
-                      <div>
-                        <label className="block text-xs mb-1" style={{ color: 'var(--theme-text)' }}>Age</label>
-                        <input type="number" className="w-full p-3 rounded-lg border" style={{ borderColor:'var(--theme-border)', backgroundColor:'var(--theme-card)', color:'var(--theme-text)' }} value={prefs.age} onChange={(e)=> setPrefs(v=>({...v, age:e.target.value}))} />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs mb-1" style={{ color: 'var(--theme-text)' }}>Neurotype / Diagnosis</label>
-                        <select className="w-full p-3 rounded-lg border" style={{ borderColor:'var(--theme-border)', backgroundColor:'var(--theme-card)', color:'var(--theme-text)' }} value={prefs.neurotype} onChange={(e)=> setPrefs(v=>({...v, neurotype:e.target.value}))}>
-                          <option value="">Select</option>
-                          <option>ADHD</option>
-                          <option>Autism</option>
-                          <option>Anxiety</option>
-                          <option>Dyslexia</option>
-                          <option>Depression</option>
-                          <option>Other</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs mb-1" style={{ color: 'var(--theme-text)' }}>Preferred notification times</label>
-                        <select className="w-full p-3 rounded-lg border" style={{ borderColor:'var(--theme-border)', backgroundColor:'var(--theme-card)', color:'var(--theme-text)' }} value={prefs.notificationTime} onChange={(e)=> setPrefs(v=>({...v, notificationTime:e.target.value}))}>
-                          <option value="morning">Morning</option>
-                          <option value="afternoon">Afternoon</option>
-                          <option value="night">Night</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs mb-1" style={{ color: 'var(--theme-text)' }}>Default theme</label>
-                        <select className="w-full p-3 rounded-lg border" style={{ borderColor:'var(--theme-border)', backgroundColor:'var(--theme-card)', color:'var(--theme-text)' }} value={prefs.defaultTheme} onChange={(e)=> setPrefs(v=>({...v, defaultTheme:e.target.value}))}>
-                          {Object.keys(themes).map(k => (
-                            <option key={k} value={k}>{themes[k].name || k}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex items-center justify-between p-3 rounded-lg border" style={{ borderColor:'var(--theme-border)' }}>
-                        <div>
-                          <p className="font-medium" style={{ color:'var(--theme-text)' }}>Enable notifications</p>
-                          <p className="text-xs opacity-70" style={{ color:'var(--theme-text)' }}>Reminders and motivational nudges</p>
-                        </div>
-                        <button onClick={()=>{const next=!notificationsEnabled; setNotifications(next); setNotificationsEnabled(next);}} className={`relative w-12 h-6 rounded-full transition-colors ${notificationsEnabled ? 'bg-blue-500' : 'bg-gray-300'}`} style={{ backgroundColor: notificationsEnabled ? 'var(--theme-primary)' : 'var(--theme-border)' }}>
-                          <motion.div className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-md" animate={{ x: notificationsEnabled ? 28 : 4 }} transition={{ type:'spring', stiffness:500, damping:30 }} />
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs mb-1" style={{ color: 'var(--theme-text)' }}>Personal goals or notes</label>
-                      <textarea className="w-full p-3 rounded-lg border" rows={3} style={{ borderColor:'var(--theme-border)', backgroundColor:'var(--theme-card)', color:'var(--theme-text)' }} value={prefs.personalGoals} onChange={(e)=> setPrefs(v=>({...v, personalGoals:e.target.value}))} />
-                    </div>
-                    <div className="flex justify-end">
-                      <button 
-                        className="px-4 py-2 rounded-lg text-white" 
-                        style={{ backgroundColor: 'var(--theme-primary)' }} 
-                        onClick={() => {
-                          try {
-                            // Save to localStorage
-                            saveUserPreferences(prefs);
-                            setTheme(prefs.defaultTheme || theme);
-                            setIsOpen(false);
-                          } catch (error) {
-                            console.error('Error saving preferences:', error);
-                          }
-                        }}
-                      >
-                        Save Preferences
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Preview Section */}
-                <motion.div variants={itemVariants} className="mt-6">
-                  <h3 className="text-sm font-medium mb-3" style={{ color: 'var(--theme-text)' }}>
-                    Preview
-                  </h3>
-                  <div 
-                    className="p-4 rounded-lg border"
-                    style={{ 
-                      backgroundColor: 'var(--theme-background)',
-                      borderColor: 'var(--theme-border)'
-                    }}
-                  >
-                    <div className="space-y-2">
-                      <h4 className="font-bold" style={{ color: 'var(--theme-text)' }}>Sample Card</h4>
-                      <p className="opacity-70" style={{ color: 'var(--theme-text)' }}>
-                        This is how your content will look with the current settings.
-                      </p>
-                      <div className="flex space-x-2">
-                        <span 
-                          className="px-3 py-1 rounded-full text-sm font-medium"
-                          style={{ 
-                            backgroundColor: 'var(--theme-primary)',
-                            color: 'white'
-                          }}
-                        >
-                          Tag
-                        </span>
-                        <span 
-                          className="px-3 py-1 rounded-full text-sm font-medium"
-                          style={{ 
-                            backgroundColor: 'var(--theme-secondary)',
-                            color: 'white'
-                          }}
-                        >
-                          Another
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Logout Button */}
-                <motion.div variants={itemVariants} className="mt-6">
+        {/* Appearance & Preferences */}
+        <SettingsSection title="Appearance & Experience" icon={Palette}>
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium mb-3" style={{ color: 'var(--theme-text)' }}>Theme</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {Object.entries(themes).map(([key, themeData]) => (
                   <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90"
-                    style={{ backgroundColor: '#EF4444' }}
+                    key={key}
+                    onClick={() => setTheme(key)}
+                    className={`p-3 rounded-xl border-2 transition-all ${theme === key ? 'ring-2 ring-blue-500 border-transparent' : 'border-gray-200'}`}
+                    style={{ backgroundColor: key === theme ? `${themeData.colors.primary}10` : 'transparent' }}
                   >
-                    <LogOut size={20} />
-                    <span>Logout</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: themeData.colors.primary }} />
+                      <span className="text-sm font-medium" style={{ color: 'var(--theme-text)' }}>{themeData.name}</span>
+                    </div>
                   </button>
-                  <p className="text-xs text-center mt-2 opacity-60" style={{ color: 'var(--theme-text)' }}>
-                    All settings are saved automatically
-                  </p>
-                </motion.div>
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between py-4 border-t" style={{ borderColor: 'var(--theme-border)' }}>
+              <div className="flex items-center space-x-3">
+                <Brain className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
+                <div>
+                  <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Adaptive UI</p>
+                  <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Automatically adjust theme based on mood</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAdaptiveMode(!adaptiveMode)}
+                className={`relative w-12 h-6 rounded-full transition-colors ${adaptiveMode ? 'bg-green-500' : 'bg-gray-300'}`}
+              >
+                <motion.div
+                  className="absolute top-1 left-1 bg-white w-4 h-4 rounded-full shadow"
+                  animate={{ x: adaptiveMode ? 24 : 0 }}
+                />
+              </button>
+            </div>
+
+            <div>
+              <div className="flex items-center space-x-2 mb-3">
+                <Type className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
+                <label className="font-medium" style={{ color: 'var(--theme-text)' }}>Font Size ({fontSize}px)</label>
+              </div>
+              <input
+                type="range"
+                min="12"
+                max="20"
+                value={fontSize}
+                onChange={(e) => setFontSize(parseInt(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              />
+            </div>
+          </div>
+        </SettingsSection>
+
+        {/* Notifications */}
+        <SettingsSection title="Notifications" icon={Bell}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Push Notifications</p>
+              <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Receive updates about tasks and wellness nudges</p>
+            </div>
+            <button
+              onClick={() => setNotifications(!notifications)}
+              className={`relative w-12 h-6 rounded-full transition-colors ${notifications ? 'bg-green-500' : 'bg-gray-300'}`}
+            >
+              <motion.div
+                className="absolute top-1 left-1 bg-white w-4 h-4 rounded-full shadow"
+                animate={{ x: notifications ? 24 : 0 }}
+              />
+            </button>
+          </div>
+        </SettingsSection>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
+          <button
+            onClick={handleLogout}
+            className="flex items-center space-x-2 px-6 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <LogOut size={20} />
+            <span className="font-medium">Sign Out</span>
+          </button>
+
+          <div className="flex space-x-4">
+            <button
+              className="px-8 py-3 rounded-xl font-medium opacity-70 hover:opacity-100 transition-opacity"
+              style={{ color: 'var(--theme-text)' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="flex items-center space-x-2 px-8 py-3 rounded-xl font-medium text-white shadow-lg shadow-blue-500/20 hover:shadow-xl hover:-translate-y-0.5 transition-all"
+              style={{ backgroundColor: 'var(--theme-primary)' }}
+            >
+              {loading ? (
+                <span>Saving...</span>
+              ) : (
+                <>
+                  <Save size={20} />
+                  <span>Save Changes</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

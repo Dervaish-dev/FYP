@@ -17,20 +17,20 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
+
     // Log all API requests
     const timestamp = new Date().toLocaleTimeString();
-    console.log(`%c[${timestamp}] ${config.method.toUpperCase()} ${config.url}`, 
+    console.log(`%c[${timestamp}] ${config.method.toUpperCase()} ${config.url}`,
       'color: #4CAF50; font-weight: bold');
-    
+
     if (config.data) {
       console.log('%cRequest Data:', 'color: #2196F3; font-weight: bold', config.data);
     }
-    
+
     if (config.params) {
       console.log('%cRequest Params:', 'color: #2196F3; font-weight: bold', config.params);
     }
-    
+
     return config;
   },
   (error) => {
@@ -44,21 +44,21 @@ api.interceptors.response.use(
   (response) => {
     // Log successful responses
     const timestamp = new Date().toLocaleTimeString();
-    console.log(`%c[${timestamp}] ✓ ${response.config.method.toUpperCase()} ${response.config.url}`, 
+    console.log(`%c[${timestamp}] ✓ ${response.config.method.toUpperCase()} ${response.config.url}`,
       'color: #4CAF50; font-weight: bold');
     console.log('%cResponse Status:', 'color: #2196F3; font-weight: bold', response.status);
     console.log('%cResponse Data:', 'color: #2196F3; font-weight: bold', response.data);
-    
+
     return response;
   },
   (error) => {
     // Log error responses
     const timestamp = new Date().toLocaleTimeString();
-    console.error(`%c[${timestamp}] ✗ ${error.config?.method?.toUpperCase() || 'REQUEST'} ${error.config?.url || 'Unknown'}`, 
+    console.error(`%c[${timestamp}] ✗ ${error.config?.method?.toUpperCase() || 'REQUEST'} ${error.config?.url || 'Unknown'}`,
       'color: #f44336; font-weight: bold');
     console.error('%cError Status:', 'color: #f44336; font-weight: bold', error.response?.status);
     console.error('%cError Data:', 'color: #f44336; font-weight: bold', error.response?.data);
-    
+
     if (error.response?.status === 401) {
       // Token expired or invalid
       console.warn('%c⚠ Unauthorized - Redirecting to login', 'color: #FF9800; font-weight: bold');
@@ -174,32 +174,128 @@ export const taskAPI = {
       console.warn('%c⚠ TASK LIST FAILED - Using Empty Array', 'color: #FF9800; font-weight: bold; font-size: 14px');
       return [];
     }
+  },
+  async delete(id) {
+    console.log('%c🗑️ DELETE TASK', 'color: #00BCD4; font-weight: bold; font-size: 14px', id);
+    try {
+      await api.delete(`/tasks/${id}`);
+      console.log('%c✓ TASK DELETED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
+      return true;
+    } catch (e) {
+      console.warn('%c⚠ TASK DELETE FAILED', 'color: #FF9800; font-weight: bold; font-size: 14px');
+      throw e;
+    }
+  },
+  async nudge(id) {
+    console.log('%c🔔 NUDGE TASK', 'color: #00BCD4; font-weight: bold; font-size: 14px', id);
+    try {
+      const res = await api.put(`/tasks/${id}/nudge`);
+      console.log('%c✓ TASK NUDGED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
+      return res.data.data;
+    } catch (e) {
+      console.warn('%c⚠ TASK NUDGE FAILED', 'color: #FF9800; font-weight: bold; font-size: 14px');
+      throw e;
+    }
   }
 };
 
 export const preferencesAPI = {
-  async fetch() {
-    console.log('%c⚙️ FETCH PREFERENCES', 'color: #673AB7; font-weight: bold; font-size: 14px');
+  async fetch(userId) {
+    console.log('%c⚙️ FETCH PREFERENCES', 'color: #673AB7; font-weight: bold; font-size: 14px', userId);
     try {
-      const res = await api.get('/preferences');
+      const res = await api.get(`/preferences/${userId}`);
       console.log('%c✓ PREFERENCES RETRIEVED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
       return res.data.data;
     } catch (e) {
-      console.warn('%c⚠ PREFERENCES FETCH FAILED - Using LocalStorage', 'color: #FF9800; font-weight: bold; font-size: 14px');
-      const raw = localStorage.getItem('neurocompanion-user-preferences');
-      return raw ? JSON.parse(raw) : null;
+      console.warn('%c⚠ PREFERENCES FETCH FAILED - Using Defaults', 'color: #FF9800; font-weight: bold; font-size: 14px');
+      return null;
     }
   },
-  async save(prefs) {
-    console.log('%c💾 SAVE PREFERENCES', 'color: #673AB7; font-weight: bold; font-size: 14px');
+  async save(userId, prefs) {
+    console.log('%c💾 SAVE PREFERENCES', 'color: #673AB7; font-weight: bold; font-size: 14px', userId);
     try {
-      const res = await api.post('/preferences', prefs);
+      // Backend expects userId in body for POST/create or just handled via URL for PUT
+      // Based on routes, POST /preferences expects userId in body
+      const payload = { userId, ...prefs };
+      const res = await api.post('/preferences', payload);
       console.log('%c✓ PREFERENCES SAVED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
       return res.data.data;
     } catch (e) {
-      console.warn('%c⚠ PREFERENCES SAVE FAILED - Using LocalStorage', 'color: #FF9800; font-weight: bold; font-size: 14px');
-      localStorage.setItem('neurocompanion-user-preferences', JSON.stringify(prefs));
-      return prefs;
+      console.error('%c✗ PREFERENCES SAVE FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e);
+      throw e;
+    }
+  }
+};
+// Journal API functions
+export const journalAPI = {
+  async create(entry) {
+    console.log('%c📝 CREATE JOURNAL ENTRY', 'color: #00BCD4; font-weight: bold; font-size: 14px');
+    try {
+      const res = await api.post('/journal/create', entry);
+      console.log('%c✓ JOURNAL ENTRY CREATED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
+      return res.data.data;
+    } catch (e) {
+      console.error('%c✗ JOURNAL CREATE FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e);
+      throw e;
+    }
+  },
+  async update(id, updateData) {
+    console.log('%c✏️ UPDATE JOURNAL ENTRY', 'color: #00BCD4; font-weight: bold; font-size: 14px', id);
+    try {
+      const res = await api.put(`/journal/${id}`, updateData);
+      console.log('%c✓ JOURNAL ENTRY UPDATED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
+      return res.data.data;
+    } catch (e) {
+      console.error('%c✗ JOURNAL UPDATE FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e);
+      throw e;
+    }
+  },
+  async delete(id) {
+    console.log('%c🗑️ DELETE JOURNAL ENTRY', 'color: #00BCD4; font-weight: bold; font-size: 14px', id);
+    try {
+      await api.delete(`/journal/${id}`);
+      console.log('%c✓ JOURNAL ENTRY DELETED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
+      return true;
+    } catch (e) {
+      console.error('%c✗ JOURNAL DELETE FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e);
+      throw e;
+    }
+  },
+  async listByUser(userId) {
+    console.log('%c📋 LIST JOURNAL ENTRIES', 'color: #00BCD4; font-weight: bold; font-size: 14px', userId);
+    try {
+      const res = await api.get(`/journal/${userId}`);
+      console.log('%c✓ JOURNAL ENTRIES RETRIEVED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
+      return res.data.data.entries;
+    } catch (e) {
+      console.error('%c✗ JOURNAL LIST FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e);
+      throw e;
+    }
+  }
+};
+
+// Wellness API functions
+export const wellnessAPI = {
+  async logSleep(data) {
+    console.log('%c🌙 LOG SLEEP DATA', 'color: #673AB7; font-weight: bold; font-size: 14px');
+    try {
+      const res = await api.post('/wellness/sleep', data);
+      console.log('%c✓ SLEEP DATA LOGGED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
+      return res.data.data;
+    } catch (e) {
+      console.error('%c✗ SLEEP LOG FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e);
+      throw e;
+    }
+  },
+  async getSleepData(userId) {
+    console.log('%c📉 GET SLEEP DATA', 'color: #673AB7; font-weight: bold; font-size: 14px', userId);
+    try {
+      const res = await api.get(`/wellness/sleep/${userId}`);
+      console.log('%c✓ SLEEP DATA RETRIEVED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
+      return res.data.data.entries;
+    } catch (e) {
+      console.error('%c✗ SLEEP DATA FETCH FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e);
+      throw e;
     }
   }
 };

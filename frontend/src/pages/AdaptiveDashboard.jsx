@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { 
-  Brain, 
-  Heart, 
+import {
+  Brain,
+  Heart,
   Calendar,
   Activity,
   Moon,
@@ -65,7 +65,7 @@ const AdaptiveDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50">
       {/* Header */}
-      <motion.div 
+      <motion.div
         className="bg-white shadow-sm"
         variants={itemVariants}
         initial="hidden"
@@ -83,7 +83,7 @@ const AdaptiveDashboard = () => {
                 <span className="text-sm text-gray-600">LIVE</span>
               </div>
             </div>
-            
+
             {/* User Info */}
             <div className="flex items-center space-x-3">
               <div className="h-10 w-10 bg-gradient-to-r from-orange-400 to-yellow-500 rounded-full flex items-center justify-center">
@@ -100,7 +100,7 @@ const AdaptiveDashboard = () => {
               <button className="p-2 text-gray-600 hover:text-gray-900 transition-colors">
                 <Bell size={20} />
               </button>
-              <button 
+              <button
                 className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
                 onClick={() => setShowSettings(true)}
               >
@@ -112,7 +112,7 @@ const AdaptiveDashboard = () => {
       </motion.div>
 
       {/* Date Selector */}
-      <motion.div 
+      <motion.div
         className="bg-white border-b border-gray-100"
         variants={itemVariants}
         initial="hidden"
@@ -123,11 +123,10 @@ const AdaptiveDashboard = () => {
             <div className="flex space-x-6">
               {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day, index) => (
                 <div key={day} className="text-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    day === 'THU' 
-                      ? 'bg-gray-900 text-white' 
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${day === 'THU'
+                      ? 'bg-gray-900 text-white'
                       : 'text-gray-600 hover:text-gray-900'
-                  }`}>
+                    }`}>
                     {day}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
@@ -161,7 +160,7 @@ const AdaptiveDashboard = () => {
                       LIVE
                     </div>
                     <span className="text-lg font-semibold text-gray-900">
-                      Dervaish is focused and calm
+                      {user?.name ? `${user.name} is` : 'User is'} focused and calm
                     </span>
                   </div>
                   <div className="flex items-center space-x-4 text-sm text-gray-600">
@@ -196,7 +195,7 @@ const AdaptiveDashboard = () => {
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <motion.div 
+                  <motion.div
                     className="bg-orange-500 h-2 rounded-full"
                     initial={{ width: 0 }}
                     animate={{ width: '38%' }}
@@ -217,7 +216,7 @@ const AdaptiveDashboard = () => {
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <motion.div 
+                  <motion.div
                     className="bg-green-500 h-2 rounded-full"
                     initial={{ width: 0 }}
                     animate={{ width: '62%' }}
@@ -238,7 +237,7 @@ const AdaptiveDashboard = () => {
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <motion.div 
+                  <motion.div
                     className="bg-purple-500 h-2 rounded-full"
                     initial={{ width: 0 }}
                     animate={{ width: '87%' }}
@@ -259,7 +258,7 @@ const AdaptiveDashboard = () => {
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <motion.div 
+                  <motion.div
                     className="bg-pink-500 h-2 rounded-full"
                     initial={{ width: 0 }}
                     animate={{ width: '76%' }}
@@ -281,7 +280,7 @@ const AdaptiveDashboard = () => {
                   <ChevronRight size={16} />
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-3 gap-6">
                 <div className="text-center">
                   <div className="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-3">
@@ -290,7 +289,7 @@ const AdaptiveDashboard = () => {
                   <div className="text-sm font-medium text-gray-900">Focus Sessions</div>
                   <div className="text-xs text-gray-600">3 completed</div>
                 </div>
-                
+
                 <div className="text-center">
                   <div className="h-12 w-12 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-3">
                     <Heart className="h-6 w-6 text-green-600" />
@@ -298,7 +297,7 @@ const AdaptiveDashboard = () => {
                   <div className="text-sm font-medium text-gray-900">Breathing Exercises</div>
                   <div className="text-xs text-gray-600">5 sessions</div>
                 </div>
-                
+
                 <div className="text-center">
                   <div className="h-12 w-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-3">
                     <Calendar className="h-6 w-6 text-purple-600" />
@@ -320,7 +319,7 @@ const AdaptiveDashboard = () => {
                   2 New Notifications
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="p-4 bg-gray-50 rounded-xl">
                   <div className="flex items-start space-x-3">
@@ -329,13 +328,13 @@ const AdaptiveDashboard = () => {
                     </div>
                     <div>
                       <p className="text-sm text-gray-700">
-                        <span className="font-medium">31 Jan</span> Your emotional patterns show increased stability this week. 
+                        <span className="font-medium">31 Jan</span> Your emotional patterns show increased stability this week.
                         Consider maintaining your current routine for continued progress.
                       </p>
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="p-4 bg-green-50 rounded-xl">
                   <div className="flex items-start space-x-3">
                     <div className="h-8 w-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -343,7 +342,7 @@ const AdaptiveDashboard = () => {
                     </div>
                     <div>
                       <p className="text-sm text-gray-700">
-                        <span className="font-medium">Task Completion:</span> You're 15% ahead of your weekly goal. 
+                        <span className="font-medium">Task Completion:</span> You're 15% ahead of your weekly goal.
                         Great job maintaining consistency!
                       </p>
                     </div>
@@ -365,7 +364,7 @@ const AdaptiveDashboard = () => {
                   <button className="px-3 py-1 text-sm bg-gray-100 text-gray-600 rounded-lg">MONTHLY</button>
                 </div>
               </div>
-              
+
               <div className="h-48 flex items-end justify-between space-x-2">
                 {[
                   { day: 'F', value: 90, label: '90%' },
@@ -386,7 +385,7 @@ const AdaptiveDashboard = () => {
                     <div className="text-xs text-gray-500">{item.label}</div>
                     <div
                       className="w-8 bg-gradient-to-t from-orange-400 to-yellow-500 rounded-t"
-                      style={{ 
+                      style={{
                         height: `${(item.value / 100) * 120}px`,
                         minHeight: '20px'
                       }}
@@ -395,7 +394,7 @@ const AdaptiveDashboard = () => {
                   </motion.div>
                 ))}
               </div>
-              
+
               <div className="mt-4 flex items-center justify-center">
                 <div className="w-full h-px bg-gray-200 relative">
                   <div className="absolute left-1/2 top-0 w-16 h-px bg-orange-400 transform -translate-x-1/2" />
@@ -410,7 +409,7 @@ const AdaptiveDashboard = () => {
       </div>
 
       {/* Bottom Navigation */}
-      <motion.div 
+      <motion.div
         className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200"
         variants={itemVariants}
         initial="hidden"
@@ -427,11 +426,10 @@ const AdaptiveDashboard = () => {
             ].map((item, index) => (
               <Link key={index} to={item.path}>
                 <motion.button
-                  className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
-                    item.active 
-                      ? 'bg-orange-100 text-orange-600' 
+                  className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${item.active
+                      ? 'bg-orange-100 text-orange-600'
                       : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                    }`}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -445,9 +443,9 @@ const AdaptiveDashboard = () => {
       </motion.div>
 
       {/* Settings Modal */}
-      <SettingsModal 
-        isOpen={showSettings} 
-        onClose={() => setShowSettings(false)} 
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
       />
     </div>
   );

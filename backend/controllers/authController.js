@@ -13,8 +13,10 @@ export const validateRegister = [
     .normalizeEmail()
     .withMessage('Please provide a valid email'),
   body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long'),
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long')
+    .matches(/^(?=.*[A-Za-z])(?=.*\d)/)
+    .withMessage('Password must contain both letters and numbers'),
 ];
 
 export const validateLogin = [
@@ -83,7 +85,7 @@ const register = async (req, res) => {
 
   } catch (error) {
     console.error('Registration error:', error);
-    
+
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
@@ -162,7 +164,7 @@ const login = async (req, res) => {
 const getCurrentUser = async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select('-password');
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,

@@ -3,12 +3,12 @@ import { motion } from 'framer-motion';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import InputField from './InputField';
 
-const AuthForm = ({ 
-  type = 'login', 
-  onSubmit, 
-  isLoading, 
+const AuthForm = ({
+  type = 'login',
+  onSubmit,
+  isLoading,
   error,
-  onClearError 
+  onClearError
 }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -26,7 +26,7 @@ const AuthForm = ({
       ...prev,
       [name]: value
     }));
-    
+
     // Clear field error when user starts typing
     if (formErrors[name]) {
       setFormErrors(prev => ({
@@ -34,7 +34,7 @@ const AuthForm = ({
         [name]: ''
       }));
     }
-    
+
     // Clear general error
     if (error && onClearError) {
       onClearError();
@@ -43,41 +43,45 @@ const AuthForm = ({
 
   const validateForm = () => {
     const errors = {};
-    
+
     if (!isLogin && !formData.name.trim()) {
       errors.name = 'Name is required';
     }
-    
+
     if (!formData.email.trim()) {
       errors.email = 'Email is required';
+    } else if (!formData.email.includes('@')) {
+      errors.email = 'Email must contain @ symbol';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       errors.email = 'Email is invalid';
     }
-    
+
     if (!formData.password) {
       errors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters';
+    } else if (formData.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters';
+    } else if (!/^(?=.*[A-Za-z])(?=.*\d)/.test(formData.password)) {
+      errors.password = 'Password must check contain both letters and numbers';
     }
-    
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     if (validateForm()) {
-      const submitData = isLogin 
+      const submitData = isLogin
         ? { email: formData.email, password: formData.password }
         : formData;
-      
+
       onSubmit(submitData);
     }
   };
 
   return (
-    <motion.form 
+    <motion.form
       onSubmit={handleSubmit}
       className="space-y-6"
       initial={{ opacity: 0, y: 20 }}
@@ -95,7 +99,7 @@ const AuthForm = ({
           required
         />
       )}
-      
+
       <InputField
         label="Email Address"
         type="email"
@@ -106,7 +110,7 @@ const AuthForm = ({
         placeholder="Enter your email"
         required
       />
-      
+
       <div className="relative">
         <InputField
           label="Password"
@@ -128,7 +132,7 @@ const AuthForm = ({
       </div>
 
       {error && (
-        <motion.div 
+        <motion.div
           className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg"
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
