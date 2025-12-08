@@ -55,7 +55,7 @@ const Settings = () => {
 
   const [notifications, setNotifications] = useState(getNotificationsEnabled());
   const [loading, setLoading] = useState(false);
-  const [prefs, setPrefs] = useState(() => getUserPreferences() || {
+  const [prefs, setPrefs] = useState({
     fullName: user?.name || '',
     age: '',
     neurotype: '',
