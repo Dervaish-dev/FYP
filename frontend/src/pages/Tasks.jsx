@@ -40,6 +40,8 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications, NOTIFICATION_TYPES } from '../components/NotificationCenter';
+import { useAuth } from '../context/AuthContext';
+import { taskAPI } from '../utils/api';
 
 // Task Card Component
 const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
@@ -109,24 +111,24 @@ const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
               style={{ backgroundColor: getPriorityColor(task.priority) }}
             />
           </div>
-          
+
           {task.description && (
             <p className="text-sm opacity-70 mb-2" style={{ color: 'var(--theme-text)' }}>
               {task.description}
             </p>
           )}
-          
+
           <div className="flex items-center space-x-4 text-xs">
             <div className="flex items-center space-x-1">
               <Calendar className="h-3 w-3" />
-              <span 
+              <span
                 className={isOverdue ? 'text-red-500 font-medium' : isDueSoon ? 'text-orange-500 font-medium' : ''}
                 style={{ color: isOverdue ? '#ef4444' : isDueSoon ? '#f59e0b' : 'var(--theme-text)' }}
               >
                 {new Date(task.dueTime).toLocaleDateString()} {new Date(task.dueTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
-            
+
             {task.repeat !== 'once' && (
               <div className="flex items-center space-x-1">
                 <Target className="h-3 w-3" />
@@ -135,7 +137,7 @@ const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
             )}
           </div>
         </div>
-        
+
         <div className="flex items-center space-x-1">
           {task.status !== 'done' && (
             <button
@@ -147,7 +149,7 @@ const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
               <Bell className="h-4 w-4" />
             </button>
           )}
-          
+
           <button
             onClick={() => onUpdate(task._id || task.id, { status: task.status === 'done' ? 'todo' : 'done' })}
             className="p-1 rounded hover:bg-gray-100 transition-colors"
@@ -156,7 +158,7 @@ const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
           >
             {task.status === 'done' ? <Circle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
           </button>
-          
+
           <button
             onClick={() => onDelete(task._id || task.id)}
             className="p-1 rounded hover:bg-red-100 text-red-500 transition-colors"
@@ -166,9 +168,9 @@ const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
           </button>
         </div>
       </div>
-      
+
       {isOverdue && (
-        <motion.div 
+        <motion.div
           className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs flex items-center space-x-1"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -197,8 +199,8 @@ const TaskColumn = React.memo(({ title, tasks, status, onTaskUpdate, onTaskDelet
           </span>
         </h2>
       </div>
-      
-      <motion.div 
+
+      <motion.div
         ref={setNodeRef}
         className="space-y-3 min-h-96 p-4 rounded-lg transition-all duration-300"
         animate={{
@@ -209,7 +211,7 @@ const TaskColumn = React.memo(({ title, tasks, status, onTaskUpdate, onTaskDelet
           scale: isOver ? 1.02 : 1,
         }}
         transition={{ duration: 0.2, ease: "easeInOut" }}
-        style={{ 
+        style={{
           borderColor: 'var(--theme-primary)',
         }}
       >
@@ -226,9 +228,9 @@ const TaskColumn = React.memo(({ title, tasks, status, onTaskUpdate, onTaskDelet
             ))}
           </AnimatePresence>
         </SortableContext>
-        
+
         {tasks.length === 0 && (
-          <motion.div 
+          <motion.div
             className="text-center py-8 text-gray-400"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -247,8 +249,7 @@ const TaskColumn = React.memo(({ title, tasks, status, onTaskUpdate, onTaskDelet
 const Tasks = () => {
   const { currentTheme } = useTheme();
   const { addNotification } = useNotifications();
-  // Mock user for now - no auth needed
-  const user = { id: 'test-user-id', name: 'Dervaish Abbas', email: 'dervaishabbas@gmail.com' };
+  const { user } = useAuth(); // Use real authenticated user
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -268,77 +269,28 @@ const Tasks = () => {
     })
   );
 
-  // Load tasks from localStorage
+  // Load tasks from API
   useEffect(() => {
-    const loadTasks = () => {
+    const loadTasks = async () => {
+      if (!user?.id) return;
+
+      setLoading(true);
       try {
-        const savedTasks = localStorage.getItem('neurocompanion-tasks');
-        if (savedTasks) {
-          const parsedTasks = JSON.parse(savedTasks);
-          console.log('Loaded tasks from localStorage:', parsedTasks);
-          setTasks(parsedTasks);
-        } else {
-          console.log('No tasks found in localStorage, starting with empty array');
-          // Add some sample tasks for demonstration
-          const sampleTasks = [
-            {
-              id: Date.now().toString(),
-              userId: user.id,
-              title: 'Complete project documentation',
-              description: 'Write comprehensive documentation for the NeuroCompanion project',
-              priority: 'high',
-              status: 'todo',
-              dueTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-              repeat: 'once',
-              createdAt: new Date().toISOString(),
-              nudgeCount: 0
-            },
-            {
-              id: (Date.now() + 1).toString(),
-              userId: user.id,
-              title: 'Review code changes',
-              description: 'Review all recent code changes and provide feedback',
-              priority: 'medium',
-              status: 'in-progress',
-              dueTime: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
-              repeat: 'once',
-              createdAt: new Date().toISOString(),
-              nudgeCount: 0
-            },
-            {
-              id: (Date.now() + 2).toString(),
-              userId: user.id,
-              title: 'Update README file',
-              description: 'Update the project README with latest information',
-              priority: 'low',
-              status: 'done',
-              dueTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-              repeat: 'once',
-              createdAt: new Date().toISOString(),
-              nudgeCount: 0
-            }
-          ];
-          setTasks(sampleTasks);
-          localStorage.setItem('neurocompanion-tasks', JSON.stringify(sampleTasks));
-        }
+        const fetchedTasks = await taskAPI.listByUser(user.id);
+        setTasks(fetchedTasks || []);
       } catch (error) {
         console.error('Error loading tasks:', error);
-        setTasks([]);
+        toast.error('Failed to load tasks');
+      } finally {
+        setLoading(false);
       }
     };
 
     loadTasks();
-  }, []);
+  }, [user]);
 
-  // Save tasks to localStorage whenever tasks change
-  useEffect(() => {
-    try {
-      localStorage.setItem('neurocompanion-tasks', JSON.stringify(tasks));
-      console.log('Saved tasks to localStorage:', tasks);
-    } catch (error) {
-      console.error('Error saving tasks to localStorage:', error);
-    }
-  }, [tasks]);
+  // Removed localStorage sync
+
 
   // Task notification system
   useEffect(() => {
@@ -349,7 +301,7 @@ const Tasks = () => {
 
       tasks.forEach(task => {
         const dueTime = new Date(task.dueTime);
-        
+
         // Task due in 5 minutes
         if (dueTime <= fiveMinutesFromNow && dueTime > now && task.status !== 'done') {
           addNotification(
@@ -358,7 +310,7 @@ const Tasks = () => {
             '⏰'
           );
         }
-        
+
         // Task overdue by 10 minutes
         if (dueTime <= tenMinutesAgo && task.status !== 'done') {
           addNotification(
@@ -372,7 +324,7 @@ const Tasks = () => {
 
     // Check for notifications every minute
     const interval = setInterval(checkTaskNotifications, 60000);
-    
+
     // Initial check
     checkTaskNotifications();
 
@@ -381,19 +333,27 @@ const Tasks = () => {
 
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
-    
+
     if (!newTask.title.trim()) {
       toast.error('Please enter a task title');
       return;
+    }
+
+    // Validate due date is not in the past
+    if (newTask.dueTime) {
+      const selectedDate = new Date(newTask.dueTime);
+      const now = new Date();
+      if (selectedDate < now) {
+        toast.error('Due date cannot be in the past');
+        return;
+      }
     }
 
     if (isCreating) return;
     setIsCreating(true);
 
     try {
-      // Create task locally
-      const newTaskWithId = {
-        id: Date.now().toString(),
+      const taskData = {
         userId: user.id,
         title: newTask.title.trim(),
         description: newTask.description.trim(),
@@ -401,12 +361,12 @@ const Tasks = () => {
         status: 'todo',
         dueTime: newTask.dueTime ? new Date(newTask.dueTime).toISOString() : null,
         repeat: newTask.repeat,
-        createdAt: new Date().toISOString(),
-        nudgeCount: 0
       };
 
-      setTasks(prev => [newTaskWithId, ...prev]);
-      
+      const createdTask = await taskAPI.create(taskData);
+
+      setTasks(prev => [createdTask, ...prev]);
+
       setNewTask({
         title: '',
         description: '',
@@ -414,7 +374,7 @@ const Tasks = () => {
         dueTime: '',
         repeat: 'once'
       });
-      
+
       setShowCreateModal(false);
       toast.success('Task created successfully!');
     } catch (error) {
@@ -428,12 +388,14 @@ const Tasks = () => {
   const handleTaskUpdate = useCallback(async (taskId, updateData) => {
     const previousTask = tasks.find(task => task._id === taskId || task.id === taskId);
     const wasCompleted = previousTask?.status === 'done';
-    
+
     try {
-      // Update task locally
-      setTasks(prev => prev.map(task => 
+      // Optimistic update
+      setTasks(prev => prev.map(task =>
         (task._id === taskId || task.id === taskId) ? { ...task, ...updateData } : task
       ));
+
+      await taskAPI.update(taskId, updateData);
 
       // Show success notification
       if (updateData.status === 'done' && !wasCompleted) {
@@ -451,28 +413,42 @@ const Tasks = () => {
     } catch (error) {
       console.error('Error updating task:', error);
       toast.error('Failed to update task');
+      // Revert optimistic update
+      if (previousTask) {
+        setTasks(prev => prev.map(task =>
+          (task._id === taskId || task.id === taskId) ? previousTask : task
+        ));
+      }
     }
   }, [tasks, addNotification]);
 
   const handleTaskDelete = useCallback(async (taskId) => {
     if (!window.confirm('Are you sure you want to delete this task?')) return;
-    
+
+    const previousTasks = [...tasks];
     try {
-      // Delete task locally
+      // Optimistic update
       setTasks(prev => prev.filter(task => task._id !== taskId && task.id !== taskId));
+
+      await taskAPI.delete(taskId);
+
       toast.success('Task deleted');
     } catch (error) {
       console.error('Error deleting task:', error);
       toast.error('Failed to delete task');
+      setTasks(previousTasks); // Revert
     }
   }, [tasks]);
 
   const handleTaskNudge = useCallback(async (taskId) => {
     try {
-      // Update nudge count locally
-      setTasks(prev => prev.map(task => 
+      // Optimistic update for UI feedback
+      setTasks(prev => prev.map(task =>
         (task._id === taskId || task.id === taskId) ? { ...task, nudgeCount: (task.nudgeCount || 0) + 1 } : task
       ));
+
+      await taskAPI.nudge(taskId);
+
       toast.info('Reminder sent! 🔔');
     } catch (error) {
       console.error('Error sending reminder:', error);
@@ -503,7 +479,7 @@ const Tasks = () => {
     if (overTask && activeTask.status === overTask.status) {
       const oldIndex = tasks.findIndex(task => task._id === active.id || task.id === active.id);
       const newIndex = tasks.findIndex(task => task._id === over.id || task.id === over.id);
-      
+
       if (oldIndex !== newIndex) {
         setTasks(prev => arrayMove(prev, oldIndex, newIndex));
       }
@@ -518,10 +494,10 @@ const Tasks = () => {
 
   // Progress widget data
   const today = new Date().toDateString();
-  const todayCompleted = tasks.filter(t => 
+  const todayCompleted = tasks.filter(t =>
     t.status === 'done' && new Date(t.createdAt).toDateString() === today
   ).length;
-  const totalToday = tasks.filter(t => 
+  const totalToday = tasks.filter(t =>
     new Date(t.createdAt).toDateString() === today
   ).length;
   const completionRateToday = totalToday > 0 ? Math.round((todayCompleted / totalToday) * 100) : 0;
@@ -546,7 +522,7 @@ const Tasks = () => {
     <div className="min-h-screen p-6" style={{ backgroundColor: 'var(--theme-background)' }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <motion.div 
+        <motion.div
           className="flex justify-between items-center mb-8"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -560,7 +536,7 @@ const Tasks = () => {
               Organize your tasks and stay on track
             </p>
           </div>
-          
+
           <motion.button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center space-x-2 px-6 py-3 rounded-lg text-white font-medium shadow-lg hover:shadow-xl transition-all duration-300"
@@ -574,34 +550,34 @@ const Tasks = () => {
         </motion.div>
 
         {/* Progress Widget */}
-        <motion.div 
+        <motion.div
           className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          <div className="p-4 rounded-xl border shadow-sm" style={{ backgroundColor:'var(--theme-card)', borderColor:'var(--theme-border)' }}>
+          <div className="p-4 rounded-xl border shadow-sm" style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm opacity-70" style={{ color:'var(--theme-text)' }}>Today completion</p>
-                <p className="text-2xl font-bold" style={{ color:'var(--theme-text)' }}>{completionRateToday}%</p>
+                <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Today completion</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--theme-text)' }}>{completionRateToday}%</p>
               </div>
-              <TrendingUp className="h-6 w-6" style={{ color:'var(--theme-primary)' }} />
+              <TrendingUp className="h-6 w-6" style={{ color: 'var(--theme-primary)' }} />
             </div>
           </div>
-          <div className="p-4 rounded-xl border shadow-sm" style={{ backgroundColor:'var(--theme-card)', borderColor:'var(--theme-border)' }}>
+          <div className="p-4 rounded-xl border shadow-sm" style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm opacity-70" style={{ color:'var(--theme-text)' }}>Weekly average</p>
-                <p className="text-2xl font-bold" style={{ color:'var(--theme-text)' }}>{weeklyAvg}%</p>
+                <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Weekly average</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--theme-text)' }}>{weeklyAvg}%</p>
               </div>
-              <BarChart3 className="h-6 w-6" style={{ color:'var(--theme-primary)' }} />
+              <BarChart3 className="h-6 w-6" style={{ color: 'var(--theme-primary)' }} />
             </div>
           </div>
-          <div className="p-4 rounded-xl border shadow-sm" style={{ backgroundColor:'var(--theme-card)', borderColor:'var(--theme-border)' }}>
+          <div className="p-4 rounded-xl border shadow-sm" style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm opacity-70" style={{ color:'var(--theme-text)' }}>Completed today</p>
+                <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Completed today</p>
                 <p className="text-2xl font-bold text-green-500">{todayCompleted}</p>
               </div>
               <CheckCircle2 className="h-6 w-6 text-green-500" />
@@ -615,7 +591,7 @@ const Tasks = () => {
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
-          <motion.div 
+          <motion.div
             className="grid grid-cols-1 lg:grid-cols-3 gap-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -629,7 +605,7 @@ const Tasks = () => {
               onTaskDelete={handleTaskDelete}
               onTaskNudge={handleTaskNudge}
             />
-            
+
             <TaskColumn
               title="In Progress"
               tasks={groupedTasks['in-progress']}
@@ -638,7 +614,7 @@ const Tasks = () => {
               onTaskDelete={handleTaskDelete}
               onTaskNudge={handleTaskNudge}
             />
-            
+
             <TaskColumn
               title="Done"
               tasks={groupedTasks.done}
@@ -680,7 +656,7 @@ const Tasks = () => {
                     <X className="h-5 w-5" />
                   </button>
                 </div>
-                
+
                 <form onSubmit={handleCreateTask} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-1" style={{ color: 'var(--theme-text)' }}>
@@ -689,7 +665,7 @@ const Tasks = () => {
                     <input
                       type="text"
                       className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      style={{ 
+                      style={{
                         backgroundColor: 'var(--theme-background)',
                         borderColor: 'var(--theme-border)',
                         color: 'var(--theme-text)'
@@ -700,14 +676,14 @@ const Tasks = () => {
                       required
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium mb-1" style={{ color: 'var(--theme-text)' }}>
                       Description
                     </label>
                     <textarea
                       className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      style={{ 
+                      style={{
                         backgroundColor: 'var(--theme-background)',
                         borderColor: 'var(--theme-border)',
                         color: 'var(--theme-text)'
@@ -718,7 +694,7 @@ const Tasks = () => {
                       placeholder="Enter task description"
                     />
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1" style={{ color: 'var(--theme-text)' }}>
@@ -726,7 +702,7 @@ const Tasks = () => {
                       </label>
                       <select
                         className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                        style={{ 
+                        style={{
                           backgroundColor: 'var(--theme-background)',
                           borderColor: 'var(--theme-border)',
                           color: 'var(--theme-text)'
@@ -739,14 +715,14 @@ const Tasks = () => {
                         <option value="high">High</option>
                       </select>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium mb-1" style={{ color: 'var(--theme-text)' }}>
                         Repeat
                       </label>
                       <select
                         className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                        style={{ 
+                        style={{
                           backgroundColor: 'var(--theme-background)',
                           borderColor: 'var(--theme-border)',
                           color: 'var(--theme-text)'
@@ -760,7 +736,7 @@ const Tasks = () => {
                       </select>
                     </div>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium mb-1" style={{ color: 'var(--theme-text)' }}>
                       Due Date & Time *
@@ -768,7 +744,7 @@ const Tasks = () => {
                     <input
                       type="datetime-local"
                       className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      style={{ 
+                      style={{
                         backgroundColor: 'var(--theme-background)',
                         borderColor: 'var(--theme-border)',
                         color: 'var(--theme-text)'
@@ -778,7 +754,7 @@ const Tasks = () => {
                       required
                     />
                   </div>
-                  
+
                   <div className="flex space-x-3 pt-4">
                     <button
                       type="submit"
@@ -792,7 +768,7 @@ const Tasks = () => {
                       type="button"
                       onClick={() => setShowCreateModal(false)}
                       className="flex-1 px-4 py-3 rounded-lg border transition-all duration-300"
-                      style={{ 
+                      style={{
                         backgroundColor: 'var(--theme-background)',
                         borderColor: 'var(--theme-border)',
                         color: 'var(--theme-text)'
@@ -814,9 +790,9 @@ const Tasks = () => {
           transition={{ duration: 0.6, delay: 0.6 }}
           className="mt-8"
         >
-          <div 
+          <div
             className="rounded-2xl p-6 shadow-lg border"
-            style={{ 
+            style={{
               backgroundColor: 'var(--theme-card)',
               borderColor: 'var(--theme-border)'
             }}
@@ -833,7 +809,7 @@ const Tasks = () => {
                   <TrendingUp className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
                   <span>Completion Stats</span>
                 </h4>
-                
+
                 <div className="space-y-4">
                   <div className="flex justify-between items-center p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-background)' }}>
                     <div className="flex items-center space-x-2">
@@ -842,7 +818,7 @@ const Tasks = () => {
                     </div>
                     <span className="text-2xl font-bold text-green-500">{todayCompleted}</span>
                   </div>
-                  
+
                   <div className="flex justify-between items-center p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-background)' }}>
                     <div className="flex items-center space-x-2">
                       <Activity className="h-5 w-5 text-blue-500" />
@@ -850,7 +826,7 @@ const Tasks = () => {
                     </div>
                     <span className="text-2xl font-bold text-blue-500">{tasks.length}</span>
                   </div>
-                  
+
                   <div className="flex justify-between items-center p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-background)' }}>
                     <div className="flex items-center space-x-2">
                       <Target className="h-5 w-5 text-purple-500" />
@@ -867,7 +843,7 @@ const Tasks = () => {
                   <CheckCircle2 className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
                   <span>Recent Completed Tasks</span>
                 </h4>
-                
+
                 <div className="space-y-3 max-h-64 overflow-y-auto">
                   {groupedTasks.done.slice(0, 5).map((task, index) => (
                     <motion.div
@@ -897,7 +873,7 @@ const Tasks = () => {
           </div>
         </motion.div>
       </div>
-      
+
       <ToastContainer
         position="top-right"
         autoClose={3000}

@@ -1,24 +1,25 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  Home, 
-  Heart, 
-  CheckSquare, 
-  BookOpen, 
-  BarChart3, 
-  Mic, 
-  Users, 
+import {
+  Home,
+  Heart,
+  CheckSquare,
+  BookOpen,
+  BarChart3,
+  Mic,
+  Users,
   Settings as SettingsIcon,
   Brain,
   Activity
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import Settings from '../pages/Settings';
 
 const Layout = ({ children }) => {
   // Mock user for now - no auth needed
-  const user = { name: 'Dervaish Abbas', email: 'dervaishabbas@gmail.com' };
+  const { user } = useAuth();
   const location = useLocation();
 
   const navigationItems = [
@@ -37,9 +38,9 @@ const Layout = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--theme-background)' }}>
       {/* Header */}
-      <motion.header 
+      <motion.header
         className="shadow-sm border-b"
-        style={{ 
+        style={{
           backgroundColor: 'var(--theme-card)',
           borderColor: 'var(--theme-border)'
         }}
@@ -51,14 +52,14 @@ const Layout = ({ children }) => {
           <div className="flex justify-between items-center py-4">
             {/* Logo */}
             <div className="flex items-center space-x-3">
-              <motion.div 
+              <motion.div
                 className="h-10 w-10 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: 'var(--theme-primary)' }}
-                animate={{ 
+                animate={{
                   rotate: [0, 5, -5, 0],
                   scale: [1, 1.05, 1]
                 }}
-                transition={{ 
+                transition={{
                   duration: 2,
                   repeat: Infinity,
                   repeatDelay: 3
@@ -75,7 +76,7 @@ const Layout = ({ children }) => {
                 </p>
               </div>
             </div>
-            
+
             {/* User Info & Settings */}
             <div className="flex items-center space-x-4">
               <div className="text-right">
@@ -86,7 +87,16 @@ const Layout = ({ children }) => {
                   {user?.email || 'user@example.com'}
                 </p>
               </div>
-              <Settings />
+              <Link
+                to="/settings"
+                className="p-2 rounded-lg hover:bg-opacity-10 transition-colors"
+                style={{
+                  color: 'var(--theme-text)',
+                  backgroundColor: 'transparent'
+                }}
+              >
+                <SettingsIcon size={20} />
+              </Link>
             </div>
           </div>
         </div>
@@ -104,9 +114,9 @@ const Layout = ({ children }) => {
       </main>
 
       {/* Bottom Navigation */}
-      <motion.nav 
+      <motion.nav
         className="fixed bottom-0 left-0 right-0 border-t z-50"
-        style={{ 
+        style={{
           backgroundColor: 'var(--theme-card)',
           borderColor: 'var(--theme-border)'
         }}
@@ -119,11 +129,10 @@ const Layout = ({ children }) => {
             {navigationItems.map((item) => (
               <Link key={item.path} to={item.path}>
                 <motion.button
-                  className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-all duration-200 ${
-                    isActive(item.path) 
-                      ? 'text-white' 
-                      : 'opacity-70 hover:opacity-100'
-                  }`}
+                  className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-all duration-200 ${isActive(item.path)
+                    ? 'text-white'
+                    : 'opacity-70 hover:opacity-100'
+                    }`}
                   style={{
                     backgroundColor: isActive(item.path) ? 'var(--theme-primary)' : 'transparent',
                     color: isActive(item.path) ? 'white' : 'var(--theme-text)'

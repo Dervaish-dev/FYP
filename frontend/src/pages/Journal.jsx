@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   BookOpen,
   Plus,
   Edit3,
@@ -26,12 +26,12 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { buildUserContextString } from '../utils/userPreferences';
 import { useTheme } from '../context/ThemeContext';
-// Removed auth dependencies for now
+import { useAuth } from '../context/AuthContext';
+import { journalAPI } from '../utils/api';
 
 const Journal = () => {
   const { applyAdaptiveTheme } = useTheme();
-  // Mock user for now - no auth needed
-  const user = { id: 'test-user-id', name: 'Dervaish Abbas', email: 'dervaishabbas@gmail.com' };
+  const { user } = useAuth(); // Use authenticated user
   const [journalEntries, setJournalEntries] = useState([]);
   const [isWriting, setIsWriting] = useState(false);
   const [newEntry, setNewEntry] = useState('');
@@ -43,43 +43,36 @@ const Journal = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [showChatbotButton, setShowChatbotButton] = useState(false);
 
-  // Load journal entries from localStorage only
+  // Load journal entries from API
   useEffect(() => {
-    const loadJournalEntries = () => {
+    const loadJournalEntries = async () => {
+      if (!user?.id) return;
+
       try {
-        const savedEntries = localStorage.getItem('neurocompanion-journal');
-        if (savedEntries) {
-          setJournalEntries(JSON.parse(savedEntries));
-        }
+        const entries = await journalAPI.listByUser(user.id);
+        setJournalEntries(entries || []);
       } catch (error) {
         console.error('Error loading journal entries:', error);
-        setJournalEntries([]);
       }
     };
 
     loadJournalEntries();
-  }, []);
-
-  // Save journal entries to localStorage
-  const saveEntries = (entries) => {
-    localStorage.setItem('neurocompanion-journal', JSON.stringify(entries));
-    setJournalEntries(entries);
-  };
+  }, [user]);
 
   // AI Emotion Analysis using Gemini API with language detection
   const analyzeEmotion = async (text) => {
     const apiKey = "AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0";
-    
+
     // First check for critical negative keywords - bypass AI if found
     const lowerText = text.toLowerCase();
     const criticalKeywords = [
-      'kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 
+      'kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living',
       'useless', 'worthless', 'alone', 'lonely', 'hopeless',
       // Roman Urdu keywords
       'main mar jaon', 'khudkushi', 'zindagi se tang', 'bekar', 'akela', 'udaas', 'pareshan'
     ];
     const hasCriticalKeywords = criticalKeywords.some(keyword => lowerText.includes(keyword));
-    
+
     if (hasCriticalKeywords) {
       console.log('🚨 CRITICAL KEYWORDS DETECTED - Bypassing AI, returning depressed');
       // Detect if it's Roman Urdu
@@ -87,9 +80,9 @@ const Journal = () => {
       const isRomanUrdu = romanUrduKeywords.some(keyword => lowerText.includes(keyword));
       return { emotion: 'depressed', language: isRomanUrdu ? 'urdu' : 'english' };
     }
-    
-          const userContext = buildUserContextString();
-          const prompt = `You are an expert emotion detection AI. Analyze the following text and determine the primary emotion and language.\n${userContext ? `\nContext: ${userContext}. Respond empathetically with this context in mind.` : ''}
+
+    const userContext = buildUserContextString();
+    const prompt = `You are an expert emotion detection AI. Analyze the following text and determine the primary emotion and language.\n${userContext ? `\nContext: ${userContext}. Respond empathetically with this context in mind.` : ''}
 
 Text: "${text}"
 
@@ -134,11 +127,11 @@ Respond with ONLY this JSON format:
 
       const data = await response.json();
       console.log('Full API Response:', data);
-      
+
       const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '{"language":"english","emotion":"neutral"}';
-      
+
       console.log('AI Response Text:', responseText);
-      
+
       try {
         // Try to extract JSON from response if it's wrapped in other text
         let jsonText = responseText;
@@ -147,22 +140,22 @@ Respond with ONLY this JSON format:
           const jsonEnd = responseText.lastIndexOf('}') + 1;
           jsonText = responseText.substring(jsonStart, jsonEnd);
         }
-        
+
         const parsed = JSON.parse(jsonText);
         console.log('Parsed emotion:', parsed.emotion, 'Language:', parsed.language);
-        
+
         // Aggressive fallback check for clearly negative text
         const lowerText = text.toLowerCase();
         const suicidalKeywords = ['kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 'main mar jaon', 'khudkushi'];
         const depressionKeywords = ['depressed', 'depression', 'alone', 'lonely', 'useless', 'worthless', 'hopeless', 'empty', 'udaas', 'bekar', 'akela'];
         const anxietyKeywords = ['anxiety', 'anxious', 'panic', 'worried', 'stressed', 'overwhelmed', 'scared', 'pareshan', 'tension'];
-        
+
         const hasSuicidalKeywords = suicidalKeywords.some(keyword => lowerText.includes(keyword));
         const hasDepressionKeywords = depressionKeywords.some(keyword => lowerText.includes(keyword));
         const hasAnxietyKeywords = anxietyKeywords.some(keyword => lowerText.includes(keyword));
-        
+
         let finalEmotion = parsed.emotion?.toLowerCase() || 'neutral';
-        
+
         // Override AI decision if negative keywords are detected
         if (hasSuicidalKeywords) {
           console.log('🚨 SUICIDAL KEYWORDS DETECTED - Overriding to depressed');
@@ -177,7 +170,7 @@ Respond with ONLY this JSON format:
           console.log('😔 GENERAL NEGATIVE KEYWORDS DETECTED - Overriding to sad');
           finalEmotion = 'sad';
         }
-        
+
         return {
           emotion: finalEmotion,
           language: parsed.language?.toLowerCase() || 'english'
@@ -189,16 +182,16 @@ Respond with ONLY this JSON format:
     } catch (error) {
       console.error('Error analyzing emotion:', error);
       console.error('Error details:', error.message);
-      
+
       // Fallback to keyword detection if API fails
       const lowerText = text.toLowerCase();
       const criticalKeywords = ['kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 'useless', 'worthless', 'alone', 'lonely', 'hopeless', 'main mar jaon', 'khudkushi', 'udaas', 'bekar'];
       const depressionKeywords = ['depressed', 'depression', 'anxiety', 'anxious', 'panic', 'worried', 'stressed', 'overwhelmed', 'scared', 'pareshan', 'tension'];
-      
+
       // Detect Roman Urdu
       const romanUrduKeywords = ['main', 'app', 'kia', 'merai', 'sath', 'hua', 'hun', 'hai'];
       const isRomanUrdu = romanUrduKeywords.some(keyword => lowerText.includes(keyword));
-      
+
       if (criticalKeywords.some(keyword => lowerText.includes(keyword))) {
         console.log('🚨 API failed but critical keywords detected - returning depressed');
         return { emotion: 'depressed', language: isRomanUrdu ? 'urdu' : 'english' };
@@ -206,7 +199,7 @@ Respond with ONLY this JSON format:
         console.log('😢 API failed but depression keywords detected - returning depressed');
         return { emotion: 'depressed', language: isRomanUrdu ? 'urdu' : 'english' };
       }
-      
+
       return { emotion: 'neutral', language: 'english' };
     }
   };
@@ -222,9 +215,9 @@ Respond with ONLY this JSON format:
   // Get multilingual chatbot response using Gemini API
   const getChatbotResponse = async (userMessage, userLanguage = 'english') => {
     const apiKey = process.env.REACT_APP_GEMINI_API_KEY || "AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0";
-    
+
     console.log('🤖 Chatbot API call started:', { userMessage, userLanguage, apiKey: apiKey.substring(0, 10) + '...' });
-    
+
     const prompt = `You are a caring, empathetic AI friend. The user is chatting with you in ${userLanguage}. Respond in the SAME language they are using. Be supportive, understanding, and helpful. Keep responses conversational and warm (2-3 sentences max).
 
 IMPORTANT: 
@@ -244,7 +237,7 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: "POST",
-          headers: { 
+          headers: {
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*"
           },
@@ -274,9 +267,9 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
 
       const data = await response.json();
       console.log('📡 API response data:', data);
-      
+
       const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      
+
       if (generatedText.trim()) {
         console.log('✅ Generated response:', generatedText.trim());
         return generatedText.trim();
@@ -286,7 +279,7 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
       }
     } catch (error) {
       console.error('❌ Chatbot API error:', error);
-      
+
       // Fallback responses based on language
       const fallbackResponses = {
         'urdu': [
@@ -305,7 +298,7 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
           "Is something bothering you? I'm listening."
         ]
       };
-      
+
       const responses = fallbackResponses[userLanguage] || fallbackResponses['english'];
       const fallbackResponse = responses[Math.floor(Math.random() * responses.length)];
       console.log('🔄 Using fallback response:', fallbackResponse);
@@ -316,48 +309,38 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
   const handleSaveEntry = async () => {
     if (newEntry.trim()) {
       setIsAnalyzing(true);
-      
+
       console.log('🔍 Analyzing text:', newEntry);
-      
+
       try {
         // Analyze emotion and language using AI
         const analysis = await analyzeEmotion(newEntry);
         console.log('📊 Final analysis result:', analysis);
-        
+
         const entryData = {
-          userId: user?.id,
+          userId: user.id,
           content: newEntry.trim(),
           emotion: analysis.emotion,
-          emotionConfidence: Math.random() * 0.3 + 0.7,
+          emotionConfidence: 0.8, // Estimate or use analysis result if available
           language: analysis.language,
-          mood: 5, // Default mood, can be enhanced later
+          mood: 5, // Default mood
           tags: []
         };
 
-        // Save to localStorage only
-        const entry = {
-          id: Date.now(),
-          content: newEntry.trim(),
-          timestamp: new Date().toISOString(),
-          mood: analysis.emotion,
-          language: analysis.language,
-          wordCount: newEntry.trim().split(' ').length,
-          emotionConfidence: Math.random() * 0.3 + 0.7
-        };
+        const createdEntry = await journalAPI.create(entryData);
 
-        const updatedEntries = [entry, ...journalEntries];
-        saveEntries(updatedEntries);
+        setJournalEntries(prev => [createdEntry, ...prev]);
         setNewEntry('');
         setIsWriting(false);
-        
+
         // Show chatbot button if emotion is negative
         if (needsSupport(analysis.emotion)) {
           console.log('Negative emotion detected, showing chatbot button');
-          
+
           // Apply adaptive theme based on emotion
           console.log('🎨 Applying adaptive theme for emotion:', analysis.emotion);
           applyAdaptiveTheme(analysis.emotion);
-          
+
           setTimeout(() => {
             setShowChatbotButton(true);
             // Store the detected language for chatbot responses
@@ -368,18 +351,20 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
         }
       } catch (error) {
         console.error('Error analyzing emotion:', error);
-        // Fallback to neutral emotion
-        const entry = {
-          id: Date.now(),
-          content: newEntry.trim(),
-          timestamp: new Date().toISOString(),
-          mood: 'neutral',
-          language: 'english',
-          wordCount: newEntry.trim().split(' ').length,
-          emotionConfidence: 0.5
-        };
-        const updatedEntries = [entry, ...journalEntries];
-        saveEntries(updatedEntries);
+        // Fallback to neutral emotion but still save to API
+        try {
+          const entryData = {
+            userId: user.id,
+            content: newEntry.trim(),
+            emotion: 'neutral',
+            language: 'english',
+            mood: 5
+          };
+          const createdEntry = await journalAPI.create(entryData);
+          setJournalEntries(prev => [createdEntry, ...prev]);
+        } catch (saveError) {
+          console.error('Failed to save fallback entry:', saveError);
+        }
         setNewEntry('');
         setIsWriting(false);
       } finally {
@@ -391,50 +376,48 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
   const handleUpdateEntry = async () => {
     if (newEntry.trim() && editingEntry) {
       setIsAnalyzing(true);
-      
+
       try {
         const analysis = await analyzeEmotion(newEntry);
-        
-        const updatedEntries = journalEntries.map(entry => 
-          entry.id === editingEntry.id 
-            ? { 
-                ...entry, 
-                content: newEntry.trim(), 
-                wordCount: newEntry.trim().split(' ').length,
-                mood: analysis.emotion,
-                language: analysis.language,
-                emotionConfidence: Math.random() * 0.3 + 0.7
-              }
-            : entry
-        );
-        saveEntries(updatedEntries);
+
+        const updateData = {
+          content: newEntry.trim(),
+          emotion: analysis.emotion,
+          language: analysis.language,
+        };
+
+        const updatedEntry = await journalAPI.update(editingEntry.id || editingEntry._id, updateData);
+
+        setJournalEntries(prev => prev.map(entry =>
+          (entry.id === editingEntry.id || entry._id === editingEntry._id) ? updatedEntry : entry
+        ));
+
         setNewEntry('');
         setIsWriting(false);
         setEditingEntry(null);
-        
+
         // Show chatbot button if emotion is negative
         if (needsSupport(analysis.emotion)) {
           console.log('Negative emotion detected, showing chatbot button');
-          
-          // Apply adaptive theme based on emotion
-          console.log('🎨 Applying adaptive theme for emotion:', analysis.emotion);
           applyAdaptiveTheme(analysis.emotion);
-          
+
           setTimeout(() => {
             setShowChatbotButton(true);
             localStorage.setItem('neurocompanion-user-language', analysis.language);
           }, 2000);
-        } else {
-          console.log('Positive/neutral emotion, no chatbot needed');
         }
       } catch (error) {
-        console.error('Error analyzing emotion:', error);
-        const updatedEntries = journalEntries.map(entry => 
-          entry.id === editingEntry.id 
-            ? { ...entry, content: newEntry.trim(), wordCount: newEntry.trim().split(' ').length }
-            : entry
-        );
-        saveEntries(updatedEntries);
+        console.error('Error analyzing/updating:', error);
+        // Fallback update
+        try {
+          const updateData = { content: newEntry.trim() };
+          const updatedEntry = await journalAPI.update(editingEntry.id || editingEntry._id, updateData);
+          setJournalEntries(prev => prev.map(entry =>
+            (entry.id === editingEntry.id || entry._id === editingEntry._id) ? updatedEntry : entry
+          ));
+        } catch (e) {
+          console.error('Failed fallback update', e);
+        }
         setNewEntry('');
         setIsWriting(false);
         setEditingEntry(null);
@@ -444,9 +427,14 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
     }
   };
 
-  const handleDeleteEntry = (entryId) => {
-    const updatedEntries = journalEntries.filter(entry => entry.id !== entryId);
-    saveEntries(updatedEntries);
+  const handleDeleteEntry = async (entryId) => {
+    if (!window.confirm('Delete this entry?')) return;
+    try {
+      await journalAPI.delete(entryId);
+      setJournalEntries(prev => prev.filter(entry => entry.id !== entryId && entry._id !== entryId));
+    } catch (error) {
+      console.error('Failed to delete entry:', error);
+    }
   };
 
   const handleEditEntry = (entry) => {
@@ -467,7 +455,7 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
 
     // Store the input before clearing it
     const messageText = chatbotInput.trim();
-    
+
     setChatbotMessages(prev => [...prev, userMessage]);
     setChatbotInput('');
     setIsTyping(true);
@@ -476,10 +464,10 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
       // Get user's language from localStorage or detect from current message
       const storedLanguage = localStorage.getItem('neurocompanion-user-language') || 'english';
       console.log('Sending message to chatbot:', messageText, 'Language:', storedLanguage);
-      
+
       const response = await getChatbotResponse(messageText, storedLanguage);
       console.log('Received chatbot response:', response);
-      
+
       const botMessage = {
         id: Date.now() + 1,
         text: response,
@@ -493,7 +481,7 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
       }, 1500);
     } catch (error) {
       console.error('Error getting chatbot response:', error);
-      
+
       // Add fallback message
       const fallbackMessage = {
         id: Date.now() + 1,
@@ -501,7 +489,7 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
         sender: 'bot',
         timestamp: new Date()
       };
-      
+
       setTimeout(() => {
         setChatbotMessages(prev => [...prev, fallbackMessage]);
         setIsTyping(false);
@@ -512,10 +500,10 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
   const openChatbot = async () => {
     setShowChatbot(true);
     setShowChatbotButton(false);
-    
+
     // Get user's language for personalized greeting
     const userLanguage = localStorage.getItem('neurocompanion-user-language') || 'english';
-    
+
     const greetings = {
       'urdu': 'کیا سب کچھ ٹھیک ہے؟ آپ کیسے محسوس کر رہے ہیں؟ کیا آپ اس بارے میں بات کرنا چاہتے ہیں؟ میں یہاں ہوں۔ 💙',
       'arabic': 'هل كل شيء على ما يرام؟ كيف تشعر؟ هل تريد التحدث عن ذلك؟ أنا هنا. 💙',
@@ -523,9 +511,9 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
       'spanish': '¿Está todo bien? ¿Cómo te sientes? ¿Quieres hablar de ello? Estoy aquí para ti. 💙',
       'french': 'Est-ce que tout va bien? Comment te sens-tu? Veux-tu en parler? Je suis là pour toi. 💙'
     };
-    
+
     const greeting = greetings[userLanguage] || greetings['english'];
-    
+
     setChatbotMessages([
       {
         id: 1,
@@ -645,9 +633,9 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
     const positiveMoods = ['happy', 'calm', 'excited', 'grateful', 'hopeful', 'peaceful', 'content', 'optimistic'];
     const negativeMoods = ['sad', 'angry', 'stressed', 'anxious', 'depressed', 'worried', 'confused', 'lonely', 'frustrated', 'overwhelmed', 'nervous', 'pessimistic'];
 
-    const positiveCount = Object.keys(moodCounts).reduce((sum, mood) => 
+    const positiveCount = Object.keys(moodCounts).reduce((sum, mood) =>
       positiveMoods.includes(mood) ? sum + moodCounts[mood] : sum, 0);
-    const negativeCount = Object.keys(moodCounts).reduce((sum, mood) => 
+    const negativeCount = Object.keys(moodCounts).reduce((sum, mood) =>
       negativeMoods.includes(mood) ? sum + moodCounts[mood] : sum, 0);
 
     return {
@@ -665,20 +653,20 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
     });
 
     return last7Days.map(date => {
-      const dayEntries = journalEntries.filter(entry => 
+      const dayEntries = journalEntries.filter(entry =>
         entry.timestamp.split('T')[0] === date
       );
-      
-      const avgMood = dayEntries.length > 0 
+
+      const avgMood = dayEntries.length > 0
         ? dayEntries.reduce((sum, entry) => {
-            const moodScores = {
-              happy: 5, excited: 5, grateful: 5, hopeful: 5, peaceful: 5, content: 5, optimistic: 5,
-              calm: 4, neutral: 3,
-              sad: 2, anxious: 2, worried: 2, confused: 2, lonely: 2, nervous: 2, pessimistic: 2,
-              angry: 1, stressed: 1, depressed: 1, frustrated: 1, overwhelmed: 1
-            };
-            return sum + (moodScores[entry.mood] || 3);
-          }, 0) / dayEntries.length
+          const moodScores = {
+            happy: 5, excited: 5, grateful: 5, hopeful: 5, peaceful: 5, content: 5, optimistic: 5,
+            calm: 4, neutral: 3,
+            sad: 2, anxious: 2, worried: 2, confused: 2, lonely: 2, nervous: 2, pessimistic: 2,
+            angry: 1, stressed: 1, depressed: 1, frustrated: 1, overwhelmed: 1
+          };
+          return sum + (moodScores[entry.mood] || 3);
+        }, 0) / dayEntries.length
         : 3;
 
       return {
@@ -714,9 +702,9 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
 
           {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div 
+            <div
               className="rounded-2xl p-6 shadow-lg border"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-card)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -732,9 +720,9 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
               </div>
             </div>
 
-            <div 
+            <div
               className="rounded-2xl p-6 shadow-lg border"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-card)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -752,9 +740,9 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
               </div>
             </div>
 
-            <div 
+            <div
               className="rounded-2xl p-6 shadow-lg border"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-card)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -770,9 +758,9 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
               </div>
             </div>
 
-            <div 
+            <div
               className="rounded-2xl p-6 shadow-lg border"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-card)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -795,9 +783,9 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
           {journalEntries.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Weekly Mood Trend */}
-              <div 
+              <div
                 className="rounded-2xl p-6 shadow-lg border"
-                style={{ 
+                style={{
                   backgroundColor: 'var(--theme-card)',
                   borderColor: 'var(--theme-border)'
                 }}
@@ -812,18 +800,18 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
                     <XAxis dataKey="date" stroke="var(--theme-text)" opacity={0.7} />
                     <YAxis stroke="var(--theme-text)" opacity={0.7} />
                     <Tooltip
-                      contentStyle={{ 
-                        backgroundColor: 'var(--theme-card)', 
-                        borderColor: 'var(--theme-border)', 
-                        borderRadius: '0.75rem' 
+                      contentStyle={{
+                        backgroundColor: 'var(--theme-card)',
+                        borderColor: 'var(--theme-border)',
+                        borderRadius: '0.75rem'
                       }}
                       labelStyle={{ color: 'var(--theme-text)' }}
                       itemStyle={{ color: 'var(--theme-text)' }}
                     />
-                    <Line 
-                      type="monotone" 
-                      dataKey="mood" 
-                      stroke="var(--theme-primary)" 
+                    <Line
+                      type="monotone"
+                      dataKey="mood"
+                      stroke="var(--theme-primary)"
                       strokeWidth={3}
                       dot={{ fill: 'var(--theme-primary)', strokeWidth: 2, r: 6 }}
                     />
@@ -832,9 +820,9 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
               </div>
 
               {/* Mood Distribution - Fixed Pie Chart */}
-              <div 
+              <div
                 className="rounded-2xl p-6 shadow-lg border"
-                style={{ 
+                style={{
                   backgroundColor: 'var(--theme-card)',
                   borderColor: 'var(--theme-border)'
                 }}
@@ -876,9 +864,9 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
           )}
 
           {/* Writing Section */}
-          <div 
+          <div
             className="rounded-2xl p-8 shadow-lg border"
-            style={{ 
+            style={{
               backgroundColor: 'var(--theme-card)',
               borderColor: 'var(--theme-border)'
             }}
@@ -911,7 +899,7 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
                   onChange={(e) => setNewEntry(e.target.value)}
                   placeholder="How are you feeling today? What's on your mind? Write in any language..."
                   className="w-full h-32 p-4 border rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  style={{ 
+                  style={{
                     backgroundColor: 'var(--theme-card)',
                     borderColor: 'var(--theme-border)',
                     color: 'var(--theme-text)'
@@ -960,11 +948,11 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
           {/* Journal Entries */}
           <div className="space-y-6">
             <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text)' }}>Recent Entries</h2>
-            
+
             {journalEntries.length === 0 ? (
-              <div 
+              <div
                 className="rounded-2xl p-8 shadow-lg border text-center"
-                style={{ 
+                style={{
                   backgroundColor: 'var(--theme-card)',
                   borderColor: 'var(--theme-border)'
                 }}
@@ -985,7 +973,7 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
                 <motion.div
                   key={entry.id}
                   className="rounded-2xl p-6 shadow-lg border"
-                  style={{ 
+                  style={{
                     backgroundColor: 'var(--theme-card)',
                     borderColor: 'var(--theme-border)'
                   }}
@@ -1024,9 +1012,9 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
                       <span>{entry.wordCount} words</span>
                       {/* Language indicator */}
                       {entry.language && entry.language !== 'english' && (
-                        <div className="text-xs px-2 py-1 rounded-full" style={{ 
-                          backgroundColor: 'var(--theme-secondary)', 
-                          color: 'var(--theme-text)' 
+                        <div className="text-xs px-2 py-1 rounded-full" style={{
+                          backgroundColor: 'var(--theme-secondary)',
+                          color: 'var(--theme-text)'
                         }}>
                           {entry.language.charAt(0).toUpperCase() + entry.language.slice(1)}
                         </div>
@@ -1064,7 +1052,7 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.5 }}
               className="mb-2 px-4 py-2 rounded-2xl shadow-lg border max-w-xs"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-card)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -1076,12 +1064,12 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
                 I'm here if you want to talk
               </p>
             </motion.div>
-            
+
             {/* Chatbot Button - No Animation */}
             <motion.button
               onClick={openChatbot}
               className="w-16 h-16 rounded-full shadow-lg border flex items-center justify-center relative"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-primary)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -1102,7 +1090,7 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 100 }}
             className="fixed bottom-24 right-6 w-80 h-80 rounded-2xl shadow-2xl border z-50 flex flex-col"
-            style={{ 
+            style={{
               backgroundColor: 'var(--theme-card)',
               borderColor: 'var(--theme-border)'
             }}
@@ -1139,30 +1127,29 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
                   animate={{ opacity: 1, y: 0 }}
                   className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
-                    message.sender === 'user'
+                  <div className={`max-w-xs px-3 py-2 rounded-lg text-sm ${message.sender === 'user'
                       ? 'text-white'
                       : 'text-white'
-                  }`}
-                  style={{
-                    backgroundColor: message.sender === 'user' 
-                      ? 'var(--theme-primary)' 
-                      : 'rgba(255, 255, 255, 0.1)',
-                    borderColor: 'var(--theme-border)',
-                    border: '1px solid'
-                  }}>
+                    }`}
+                    style={{
+                      backgroundColor: message.sender === 'user'
+                        ? 'var(--theme-primary)'
+                        : 'rgba(255, 255, 255, 0.1)',
+                      borderColor: 'var(--theme-border)',
+                      border: '1px solid'
+                    }}>
                     {message.text}
                   </div>
                 </motion.div>
               ))}
-              
+
               {isTyping && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="flex justify-start"
                 >
-                  <div 
+                  <div
                     className="px-3 py-2 rounded-lg text-sm text-white"
                     style={{
                       backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -1189,7 +1176,7 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
                   onChange={(e) => setChatbotInput(e.target.value)}
                   placeholder="Type your message..."
                   className="flex-1 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  style={{ 
+                  style={{
                     backgroundColor: 'var(--theme-card)',
                     borderColor: 'var(--theme-border)',
                     color: 'var(--theme-text)'
