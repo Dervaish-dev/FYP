@@ -19,6 +19,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import NotificationCenter from './components/NotificationCenter';
 import EmojiMascot from './components/EmojiMascot';
 import WellnessNotificationCenter from './components/WellnessNotificationCenter';
+import EmotionPredictor from './components/EmotionPredictor';
 
 // Main App Routes
 const AppRoutes = () => {
@@ -29,6 +30,7 @@ const AppRoutes = () => {
         <Route path="/" element={<LandingPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/predictor" element={<EmotionPredictor />} />
 
         {/* Protected Routes */}
         <Route
