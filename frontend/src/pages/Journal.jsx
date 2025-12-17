@@ -23,7 +23,7 @@ import {
   AlertCircle,
   CheckCircle2
 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { buildUserContextString } from '../utils/userPreferences';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -33,6 +33,9 @@ const Journal = () => {
   const { applyAdaptiveTheme } = useTheme();
   const { user } = useAuth(); // Use authenticated user
   const [journalEntries, setJournalEntries] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const [isWriting, setIsWriting] = useState(false);
   const [newEntry, setNewEntry] = useState('');
   const [editingEntry, setEditingEntry] = useState(null);
@@ -45,162 +48,178 @@ const Journal = () => {
 
   // Load journal entries from API
   useEffect(() => {
+    let isMounted = true;
+
     const loadJournalEntries = async () => {
-      if (!user?.id) return;
+      if (!user?.id) {
+        setIsLoading(false);
+        return;
+      }
 
       try {
+        setIsLoading(true);
+        setError(null);
         const entries = await journalAPI.listByUser(user.id);
-        setJournalEntries(entries || []);
-      } catch (error) {
-        console.error('Error loading journal entries:', error);
+        if (isMounted) {
+          // Additional safety check for the data structure
+          console.log('Backend response:', entries);
+          setJournalEntries(Array.isArray(entries) ? entries : []);
+        }
+      } catch (err) {
+        console.error('Error loading journal entries:', err);
+        if (isMounted) {
+          setError('Failed to load your journal. Please check your connection.');
+          // Initialize with empty array to prevent map errors
+          setJournalEntries([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadJournalEntries();
+
+    return () => { isMounted = false; };
   }, [user]);
 
   // AI Emotion Analysis using Gemini API with language detection
   const analyzeEmotion = async (text) => {
-    const apiKey = "AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0";
-
-    // First check for critical negative keywords - bypass AI if found
-    const lowerText = text.toLowerCase();
-    const criticalKeywords = [
-      'kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living',
-      'useless', 'worthless', 'alone', 'lonely', 'hopeless',
-      // Roman Urdu keywords
-      'main mar jaon', 'khudkushi', 'zindagi se tang', 'bekar', 'akela', 'udaas', 'pareshan'
-    ];
-    const hasCriticalKeywords = criticalKeywords.some(keyword => lowerText.includes(keyword));
-
-    if (hasCriticalKeywords) {
-      console.log('🚨 CRITICAL KEYWORDS DETECTED - Bypassing AI, returning depressed');
-      // Detect if it's Roman Urdu
-      const romanUrduKeywords = ['main', 'app', 'kia', 'merai', 'sath', 'hua', 'hun', 'hai'];
-      const isRomanUrdu = romanUrduKeywords.some(keyword => lowerText.includes(keyword));
-      return { emotion: 'depressed', language: isRomanUrdu ? 'urdu' : 'english' };
-    }
-
-    const userContext = buildUserContextString();
-    const prompt = `You are an expert emotion detection AI. Analyze the following text and determine the primary emotion and language.\n${userContext ? `\nContext: ${userContext}. Respond empathetically with this context in mind.` : ''}
-
-Text: "${text}"
-
-Instructions:
-1. Detect the language (english, urdu, arabic, spanish, french, etc.)
-   - If text uses English alphabet but contains Urdu words like "mien", "app", "kia", "merai", "sath", "hua" → language: urdu
-   - If text contains Arabic script → language: arabic
-   - If text is pure English → language: english
-2. Identify the primary emotion from: happy, sad, angry, stressed, anxious, depressed, calm, excited, worried, confused, lonely, grateful, hopeful, frustrated, peaceful, overwhelmed, content, nervous, optimistic, pessimistic, neutral
-
-Examples:
-- "I am depressed" → {"language": "english", "emotion": "depressed"}
-- "mien app ko kia batao merai sath ajj kia hua" → {"language": "urdu", "emotion": "neutral"}
-- "I have anxiety" → {"language": "english", "emotion": "anxious"}
-- "main bahut pareshan hun" → {"language": "urdu", "emotion": "worried"}
-
-Respond with ONLY this JSON format:
-{"language": "detected_language", "emotion": "detected_emotion"}`;
-
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-lite:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: prompt }]
-              }
-            ],
-            generationConfig: {
-              temperature: 0.1,
-              topK: 1,
-              topP: 0.8,
-              maxOutputTokens: 100,
-            },
-          }),
-        }
-      );
-
-      const data = await response.json();
-      console.log('Full API Response:', data);
-
-      const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '{"language":"english","emotion":"neutral"}';
-
-      console.log('AI Response Text:', responseText);
-
-      try {
-        // Try to extract JSON from response if it's wrapped in other text
-        let jsonText = responseText;
-        if (responseText.includes('{') && responseText.includes('}')) {
-          const jsonStart = responseText.indexOf('{');
-          const jsonEnd = responseText.lastIndexOf('}') + 1;
-          jsonText = responseText.substring(jsonStart, jsonEnd);
-        }
-
-        const parsed = JSON.parse(jsonText);
-        console.log('Parsed emotion:', parsed.emotion, 'Language:', parsed.language);
-
-        // Aggressive fallback check for clearly negative text
-        const lowerText = text.toLowerCase();
-        const suicidalKeywords = ['kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 'main mar jaon', 'khudkushi'];
-        const depressionKeywords = ['depressed', 'depression', 'alone', 'lonely', 'useless', 'worthless', 'hopeless', 'empty', 'udaas', 'bekar', 'akela'];
-        const anxietyKeywords = ['anxiety', 'anxious', 'panic', 'worried', 'stressed', 'overwhelmed', 'scared', 'pareshan', 'tension'];
-
-        const hasSuicidalKeywords = suicidalKeywords.some(keyword => lowerText.includes(keyword));
-        const hasDepressionKeywords = depressionKeywords.some(keyword => lowerText.includes(keyword));
-        const hasAnxietyKeywords = anxietyKeywords.some(keyword => lowerText.includes(keyword));
-
-        let finalEmotion = parsed.emotion?.toLowerCase() || 'neutral';
-
-        // Override AI decision if negative keywords are detected
-        if (hasSuicidalKeywords) {
-          console.log('🚨 SUICIDAL KEYWORDS DETECTED - Overriding to depressed');
-          finalEmotion = 'depressed';
-        } else if (hasDepressionKeywords) {
-          console.log('😢 DEPRESSION KEYWORDS DETECTED - Overriding to depressed');
-          finalEmotion = 'depressed';
-        } else if (hasAnxietyKeywords) {
-          console.log('😰 ANXIETY KEYWORDS DETECTED - Overriding to anxious');
-          finalEmotion = 'anxious';
-        } else if (finalEmotion === 'neutral' && (lowerText.includes('sad') || lowerText.includes('bad') || lowerText.includes('terrible'))) {
-          console.log('😔 GENERAL NEGATIVE KEYWORDS DETECTED - Overriding to sad');
-          finalEmotion = 'sad';
-        }
-
-        return {
-          emotion: finalEmotion,
-          language: parsed.language?.toLowerCase() || 'english'
-        };
-      } catch (parseError) {
-        console.error('Error parsing emotion response:', parseError);
-        return { emotion: 'neutral', language: 'english' };
+      // Support both Vite and standard env vars safely
+      let apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey && typeof process !== 'undefined' && process.env) {
+        apiKey = process.env.REACT_APP_GEMINI_API_KEY;
       }
-    } catch (error) {
-      console.error('Error analyzing emotion:', error);
-      console.error('Error details:', error.message);
 
-      // Fallback to keyword detection if API fails
+      if (!apiKey) {
+        console.error("❌ API Key missing! Check .env file for VITE_GEMINI_API_KEY");
+      }
+
+      // First check for critical negative keywords - bypass AI if found
       const lowerText = text.toLowerCase();
-      const criticalKeywords = ['kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 'useless', 'worthless', 'alone', 'lonely', 'hopeless', 'main mar jaon', 'khudkushi', 'udaas', 'bekar'];
-      const depressionKeywords = ['depressed', 'depression', 'anxiety', 'anxious', 'panic', 'worried', 'stressed', 'overwhelmed', 'scared', 'pareshan', 'tension'];
+
+      // Comprehensive Keyword Check (Run this FIRST for speed and safety)
+      // NOTE: We only keep CRITICAL safety keywords here. For general emotions (happy, sad, etc),
+      // we rely entirely on the AI model as per user request for better nuance.
+      const keywords = {
+        critical: ['kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 'main mar jaon', 'khudkushi'],
+      };
 
       // Detect Roman Urdu
-      const romanUrduKeywords = ['main', 'app', 'kia', 'merai', 'sath', 'hua', 'hun', 'hai'];
+      const romanUrduKeywords = ['main', 'app', 'kia', 'merai', 'sath', 'hua', 'hun', 'hai', 'kya', 'kyun', 'kaise', 'gaya'];
       const isRomanUrdu = romanUrduKeywords.some(keyword => lowerText.includes(keyword));
+      const detectedLanguage = isRomanUrdu ? 'urdu' : 'english';
 
-      if (criticalKeywords.some(keyword => lowerText.includes(keyword))) {
-        console.log('🚨 API failed but critical keywords detected - returning depressed');
-        return { emotion: 'depressed', language: isRomanUrdu ? 'urdu' : 'english' };
-      } else if (depressionKeywords.some(keyword => lowerText.includes(keyword))) {
-        console.log('😢 API failed but depression keywords detected - returning depressed');
-        return { emotion: 'depressed', language: isRomanUrdu ? 'urdu' : 'english' };
+      // Priority check: If any HIGH SEVERITY keywords are found, return immediately without API
+      // This stops "Neutral" results for serious topics like "death" or "suicide"
+      const criticalList = [...keywords.critical];
+      for (const keyword of criticalList) {
+        if (lowerText.includes(keyword)) {
+          console.log(`🚨 CRITICAL SAFETY KEYWORD DETECTED: "${keyword}"`);
+          return { emotion: 'depressed', language: detectedLanguage, intensity: 95 };
+        }
       }
 
-      return { emotion: 'neutral', language: 'english' };
+      const userContext = buildUserContextString();
+
+      // Simple, direct prompt as requested
+      const prompt = `Analyze the following text: "${text}"
+
+      Identify:
+      1. Language (English, Urdu, Arabic, etc.)
+      2. Sentiment Category (Positive, Negative, Neutral)
+      3. Specific Emotion (e.g. happy, sad, angry, stressed, anxious, grateful, etc.)
+      4. Intensity (0-100)
+
+      Return ONLY JSON:
+      {
+        "language": "detected_language",
+        "sentiment": "positive/negative/neutral",
+        "emotion": "specific_emotion",
+        "intensity": number
+      }`;
+
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: "user",
+                  parts: [{ text: prompt }]
+                }
+              ],
+              generationConfig: {
+                temperature: 0.7, // Increased from 0.1 to allow more nuance/inference
+                topK: 40,
+                topP: 0.9,
+                maxOutputTokens: 100,
+                responseMimeType: "application/json"
+              },
+            }),
+          }
+        );
+
+        const data = await response.json();
+        console.log('Full API Response:', data);
+
+        const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '{"language":"english","emotion":"neutral"}';
+
+        console.log('AI Response Text:', responseText);
+
+        try {
+          // Try to extract JSON from response if it's wrapped in other text
+          let jsonText = responseText;
+          if (responseText.includes('{') && responseText.includes('}')) {
+            const jsonStart = responseText.indexOf('{');
+            const jsonEnd = responseText.lastIndexOf('}') + 1;
+            jsonText = responseText.substring(jsonStart, jsonEnd);
+          }
+
+          const parsed = JSON.parse(jsonText);
+          console.log('Parsed emotion:', parsed.emotion, 'Language:', parsed.language, 'Intensity:', parsed.intensity);
+
+          // Aggressive fallback check for clearly negative text
+          const lowerText = text.toLowerCase();
+          const suicidalKeywords = ['kill myself', 'suicide', 'suicidal', 'die', 'death', 'end it all', 'not worth living', 'main mar jaon', 'khudkushi'];
+          const depressionKeywords = ['depressed', 'depression', 'alone', 'lonely', 'useless', 'worthless', 'hopeless', 'empty', 'udaas', 'bekar', 'akela'];
+          let finalEmotion = parsed.emotion?.toLowerCase() || 'neutral';
+
+          return {
+            emotion: finalEmotion,
+            language: parsed.language?.toLowerCase() || 'english',
+            intensity: parsed.intensity || 80
+          };
+        } catch (parseError) {
+          console.error('Error parsing emotion response:', parseError);
+          return { emotion: 'neutral', language: 'english' };
+        }
+      } catch (error) {
+        console.error('Error analyzing emotion:', error);
+        console.error('Error details:', error.message);
+
+        // API FAILURE FALLBACK
+        // If API fails, we only check for CRITICAL safety keywords.
+        // Otherwise we return neutral to avoid false positives.
+        const lowerText = text.toLowerCase();
+
+        for (const k of keywords.critical) {
+          if (lowerText.includes(k)) {
+            return { emotion: 'depressed', language: 'english', intensity: 90 };
+          }
+        }
+
+        // Default fallback
+        return { emotion: 'neutral', language: 'english', intensity: 50 };
+      }
+    } catch (criticalError) {
+      console.error("Critical Safety Error in analyzeEmotion:", criticalError);
+      return { emotion: 'neutral', language: 'english', intensity: 50 };
     }
   };
 
@@ -214,7 +233,7 @@ Respond with ONLY this JSON format:
 
   // Get multilingual chatbot response using Gemini API
   const getChatbotResponse = async (userMessage, userLanguage = 'english') => {
-    const apiKey = process.env.REACT_APP_GEMINI_API_KEY || "AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0";
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.REACT_APP_GEMINI_API_KEY || "AIzaSyADqMDfILhOQvcWyAFFhpvRrxp_BQ_FSXY";
 
     console.log('🤖 Chatbot API call started:', { userMessage, userLanguage, apiKey: apiKey.substring(0, 10) + '...' });
 
@@ -307,69 +326,55 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
   };
 
   const handleSaveEntry = async () => {
-    if (newEntry.trim()) {
-      setIsAnalyzing(true);
+    if (!newEntry.trim()) return;
 
-      console.log('🔍 Analyzing text:', newEntry);
+    setIsAnalyzing(true);
+    console.log('🔍 Analyzing text:', newEntry);
 
+    try {
+      // Analyze emotion and language using AI
+      let analysis;
       try {
-        // Analyze emotion and language using AI
-        const analysis = await analyzeEmotion(newEntry);
-        console.log('📊 Final analysis result:', analysis);
+        analysis = await analyzeEmotion(newEntry);
+      } catch (aiError) {
+        console.warn('AI Analysis failed, falling back to neutral:', aiError);
+        analysis = { emotion: 'neutral', language: 'english', intensity: 50 };
+      }
 
-        const entryData = {
-          userId: user.id,
-          content: newEntry.trim(),
-          emotion: analysis.emotion,
-          emotionConfidence: 0.8, // Estimate or use analysis result if available
-          language: analysis.language,
-          mood: 5, // Default mood
-          tags: []
-        };
+      const entryData = {
+        userId: user.id,
+        content: newEntry.trim(),
+        emotion: analysis?.emotion || 'neutral',
+        emotionConfidence: (analysis?.intensity || 80) / 100,
+        language: analysis?.language || 'english',
+        mood: 5, // Default mood
+        tags: []
+      };
 
-        const createdEntry = await journalAPI.create(entryData);
+      const createdEntry = await journalAPI.create(entryData);
 
-        setJournalEntries(prev => [createdEntry, ...prev]);
+      if (createdEntry && (createdEntry.id || createdEntry._id)) {
+        setJournalEntries(prev => [createdEntry, ...(prev || [])]);
         setNewEntry('');
         setIsWriting(false);
 
         // Show chatbot button if emotion is negative
-        if (needsSupport(analysis.emotion)) {
-          console.log('Negative emotion detected, showing chatbot button');
-
-          // Apply adaptive theme based on emotion
-          console.log('🎨 Applying adaptive theme for emotion:', analysis.emotion);
+        if (analysis?.emotion && needsSupport(analysis.emotion)) {
           applyAdaptiveTheme(analysis.emotion);
-
           setTimeout(() => {
             setShowChatbotButton(true);
-            // Store the detected language for chatbot responses
-            localStorage.setItem('neurocompanion-user-language', analysis.language);
+            localStorage.setItem('neurocompanion-user-language', analysis.language || 'english');
           }, 2000);
-        } else {
-          console.log('Positive/neutral emotion, no chatbot needed');
         }
-      } catch (error) {
-        console.error('Error analyzing emotion:', error);
-        // Fallback to neutral emotion but still save to API
-        try {
-          const entryData = {
-            userId: user.id,
-            content: newEntry.trim(),
-            emotion: 'neutral',
-            language: 'english',
-            mood: 5
-          };
-          const createdEntry = await journalAPI.create(entryData);
-          setJournalEntries(prev => [createdEntry, ...prev]);
-        } catch (saveError) {
-          console.error('Failed to save fallback entry:', saveError);
-        }
-        setNewEntry('');
-        setIsWriting(false);
-      } finally {
-        setIsAnalyzing(false);
+      } else {
+        throw new Error('Invalid entry data returned from API');
       }
+
+    } catch (error) {
+      console.error('Error saving entry:', error);
+      toast.error('Failed to save journal entry. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -525,7 +530,10 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
   };
 
   const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'Invalid Date';
+    return d.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -534,7 +542,10 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
   };
 
   const formatTime = (date) => {
-    return new Date(date).toLocaleTimeString('en-US', {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit'
     });
@@ -625,7 +636,9 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
   // Calculate mood statistics
   const getMoodStats = () => {
     const moodCounts = journalEntries.reduce((acc, entry) => {
-      acc[entry.mood] = (acc[entry.mood] || 0) + 1;
+      // Use emotion for stats grouping, fallback to 'neutral'
+      const emotion = entry.emotion || 'neutral';
+      acc[emotion] = (acc[emotion] || 0) + 1;
       return acc;
     }, {});
 
@@ -653,19 +666,26 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
     });
 
     return last7Days.map(date => {
-      const dayEntries = journalEntries.filter(entry =>
-        entry.timestamp.split('T')[0] === date
-      );
+      const dayEntries = journalEntries.filter(entry => {
+        const entryDate = entry.createdAt || entry.timestamp;
+        if (!entryDate) return false;
+        const d = new Date(entryDate);
+        if (isNaN(d.getTime())) return false;
+        return d.toISOString().split('T')[0] === date;
+      });
 
       const avgMood = dayEntries.length > 0
         ? dayEntries.reduce((sum, entry) => {
+          // If mood is already a number (from DB), use it. otherwise map emotion string to score.
+          if (typeof entry.mood === 'number') return sum + entry.mood;
+
           const moodScores = {
             happy: 5, excited: 5, grateful: 5, hopeful: 5, peaceful: 5, content: 5, optimistic: 5,
             calm: 4, neutral: 3,
             sad: 2, anxious: 2, worried: 2, confused: 2, lonely: 2, nervous: 2, pessimistic: 2,
             angry: 1, stressed: 1, depressed: 1, frustrated: 1, overwhelmed: 1
           };
-          return sum + (moodScores[entry.mood] || 3);
+          return sum + (moodScores[entry.emotion || 'neutral'] || 3);
         }, 0) / dayEntries.length
         : 3;
 
@@ -682,360 +702,391 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
 
   return (
     <div className="min-h-screen p-6" style={{ backgroundColor: 'var(--theme-background)' }}>
-      <div className="max-w-6xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="space-y-8"
-        >
-          {/* Header */}
-          <div>
-            <h1 className="text-3xl font-bold mb-2 flex items-center space-x-3" style={{ color: 'var(--theme-text)' }}>
-              <BookOpen className="h-8 w-8" style={{ color: 'var(--theme-primary)' }} />
-              <span>Journal & AI Emotion Analysis</span>
-            </h1>
-            <p className="text-lg opacity-70" style={{ color: 'var(--theme-text)' }}>
-              Express your thoughts and get AI-powered emotional insights
-            </p>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div
-              className="rounded-2xl p-6 shadow-lg border"
-              style={{
-                backgroundColor: 'var(--theme-card)',
-                borderColor: 'var(--theme-border)'
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Total Entries</p>
-                  <p className="text-2xl font-bold" style={{ color: 'var(--theme-text)' }}>{journalEntries.length}</p>
-                </div>
-                <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)' }}>
-                  <BookOpen className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </div>
-
-            <div
-              className="rounded-2xl p-6 shadow-lg border"
-              style={{
-                backgroundColor: 'var(--theme-card)',
-                borderColor: 'var(--theme-border)'
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Words Written</p>
-                  <p className="text-2xl font-bold" style={{ color: 'var(--theme-text)' }}>
-                    {journalEntries.reduce((total, entry) => total + entry.wordCount, 0)}
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)' }}>
-                  <Edit3 className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </div>
-
-            <div
-              className="rounded-2xl p-6 shadow-lg border"
-              style={{
-                backgroundColor: 'var(--theme-card)',
-                borderColor: 'var(--theme-border)'
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Positive Mood</p>
-                  <p className="text-2xl font-bold text-green-500">{moodStats.positive}%</p>
-                </div>
-                <div className="h-12 w-12 rounded-lg flex items-center justify-center bg-green-100">
-                  <Smile className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-
-            <div
-              className="rounded-2xl p-6 shadow-lg border"
-              style={{
-                backgroundColor: 'var(--theme-card)',
-                borderColor: 'var(--theme-border)'
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>AI Analysis</p>
-                  <p className="text-2xl font-bold" style={{ color: 'var(--theme-primary)' }}>
-                    {journalEntries.length > 0 ? 'Active' : 'Ready'}
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)' }}>
-                  <Brain className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Mood Analytics */}
-          {journalEntries.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Weekly Mood Trend */}
-              <div
-                className="rounded-2xl p-6 shadow-lg border"
-                style={{
-                  backgroundColor: 'var(--theme-card)',
-                  borderColor: 'var(--theme-border)'
-                }}
-              >
-                <h3 className="text-lg font-bold mb-4 flex items-center space-x-2" style={{ color: 'var(--theme-text)' }}>
-                  <TrendingUp className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
-                  <span>Weekly Mood Trend</span>
-                </h3>
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={weeklyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--theme-border)" />
-                    <XAxis dataKey="date" stroke="var(--theme-text)" opacity={0.7} />
-                    <YAxis stroke="var(--theme-text)" opacity={0.7} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'var(--theme-card)',
-                        borderColor: 'var(--theme-border)',
-                        borderRadius: '0.75rem'
-                      }}
-                      labelStyle={{ color: 'var(--theme-text)' }}
-                      itemStyle={{ color: 'var(--theme-text)' }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="mood"
-                      stroke="var(--theme-primary)"
-                      strokeWidth={3}
-                      dot={{ fill: 'var(--theme-primary)', strokeWidth: 2, r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Mood Distribution - Fixed Pie Chart */}
-              <div
-                className="rounded-2xl p-6 shadow-lg border"
-                style={{
-                  backgroundColor: 'var(--theme-card)',
-                  borderColor: 'var(--theme-border)'
-                }}
-              >
-                <h3 className="text-lg font-bold mb-4 flex items-center space-x-2" style={{ color: 'var(--theme-text)' }}>
-                  <BarChart3 className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
-                  <span>Mood Distribution</span>
-                </h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: 'Positive', value: parseFloat(moodStats.positive), color: '#10B981' },
-                          { name: 'Neutral', value: parseFloat(moodStats.neutral), color: '#6B7280' },
-                          { name: 'Negative', value: parseFloat(moodStats.negative), color: '#EF4444' }
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {[
-                          { name: 'Positive', value: parseFloat(moodStats.positive), color: '#10B981' },
-                          { name: 'Neutral', value: parseFloat(moodStats.neutral), color: '#6B7280' },
-                          { name: 'Negative', value: parseFloat(moodStats.negative), color: '#EF4444' }
-                        ].map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Writing Section */}
-          <div
-            className="rounded-2xl p-8 shadow-lg border"
-            style={{
-              backgroundColor: 'var(--theme-card)',
-              borderColor: 'var(--theme-border)'
-            }}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center min-h-[50vh]">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-500 animate-pulse">Loading your journal...</p>
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
+          <h3 className="text-xl font-bold mb-2">Something went wrong</h3>
+          <p className="text-gray-500 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
           >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text)' }}>Write Your Thoughts</h2>
-              {!isWriting && (
-                <motion.button
-                  onClick={() => setIsWriting(true)}
-                  className="flex items-center space-x-2 px-4 py-2 rounded-lg text-white font-medium"
-                  style={{ backgroundColor: 'var(--theme-primary)' }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Plus size={18} />
-                  <span>New Entry</span>
-                </motion.button>
-              )}
+            Retry
+          </button>
+        </div>
+      ) : (
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="space-y-8"
+          >
+            {/* Header */}
+            <div>
+              <h1 className="text-3xl font-bold mb-2 flex items-center space-x-3" style={{ color: 'var(--theme-text)' }}>
+                <BookOpen className="h-8 w-8" style={{ color: 'var(--theme-primary)' }} />
+                <span>Journal & AI Emotion Analysis</span>
+              </h1>
+              <p className="text-lg opacity-70" style={{ color: 'var(--theme-text)' }}>
+                Express your thoughts and get AI-powered emotional insights
+              </p>
             </div>
 
-            {isWriting && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="space-y-4"
+            {/* Quick Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div
+                className="rounded-2xl p-6 shadow-lg border"
+                style={{
+                  backgroundColor: 'var(--theme-card)',
+                  borderColor: 'var(--theme-border)'
+                }}
               >
-                <textarea
-                  value={newEntry}
-                  onChange={(e) => setNewEntry(e.target.value)}
-                  placeholder="How are you feeling today? What's on your mind? Write in any language..."
-                  className="w-full h-32 p-4 border rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  style={{
-                    backgroundColor: 'var(--theme-card)',
-                    borderColor: 'var(--theme-border)',
-                    color: 'var(--theme-text)'
-                  }}
-                />
                 <div className="flex items-center justify-between">
-                  <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
-                    {newEntry.trim().split(' ').length} words
-                  </p>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => {
-                        setIsWriting(false);
-                        setNewEntry('');
-                        setEditingEntry(null);
-                      }}
-                      className="px-4 py-2 opacity-70 hover:opacity-100 transition-colors"
-                      style={{ color: 'var(--theme-text)' }}
-                    >
-                      <X size={18} />
-                    </button>
-                    <button
-                      onClick={editingEntry ? handleUpdateEntry : handleSaveEntry}
-                      disabled={isAnalyzing}
-                      className="flex items-center space-x-2 px-4 py-2 rounded-lg text-white font-medium disabled:opacity-50"
-                      style={{ backgroundColor: 'var(--theme-primary)' }}
-                    >
-                      {isAnalyzing ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span>Analyzing...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Save size={18} />
-                          <span>{editingEntry ? 'Update' : 'Save'}</span>
-                        </>
-                      )}
-                    </button>
+                  <div>
+                    <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Total Entries</p>
+                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text)' }}>{journalEntries.length}</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)' }}>
+                    <BookOpen className="h-6 w-6 text-white" />
                   </div>
                 </div>
-              </motion.div>
-            )}
-          </div>
+              </div>
 
-          {/* Journal Entries */}
-          <div className="space-y-6">
-            <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text)' }}>Recent Entries</h2>
-
-            {journalEntries.length === 0 ? (
               <div
-                className="rounded-2xl p-8 shadow-lg border text-center"
+                className="rounded-2xl p-6 shadow-lg border"
                 style={{
                   backgroundColor: 'var(--theme-card)',
                   borderColor: 'var(--theme-border)'
                 }}
               >
-                <BookOpen className="h-16 w-16 mx-auto mb-4 opacity-50" style={{ color: 'var(--theme-text)' }} />
-                <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--theme-text)' }}>No entries yet</h3>
-                <p className="opacity-70 mb-4" style={{ color: 'var(--theme-text)' }}>Start writing to track your thoughts and feelings</p>
-                <button
-                  onClick={() => setIsWriting(true)}
-                  className="px-6 py-3 rounded-lg text-white font-medium"
-                  style={{ backgroundColor: 'var(--theme-primary)' }}
-                >
-                  Write Your First Entry
-                </button>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Words Written</p>
+                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-text)' }}>
+                      {journalEntries.reduce((total, entry) => total + (entry.content?.trim().split(/\s+/).length || 0), 0)}
+                    </p>
+                  </div>
+                  <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)' }}>
+                    <Edit3 className="h-6 w-6 text-white" />
+                  </div>
+                </div>
               </div>
-            ) : (
-              journalEntries.map((entry, index) => (
-                <motion.div
-                  key={entry.id}
+
+              <div
+                className="rounded-2xl p-6 shadow-lg border"
+                style={{
+                  backgroundColor: 'var(--theme-card)',
+                  borderColor: 'var(--theme-border)'
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Positive Mood</p>
+                    <p className="text-2xl font-bold text-green-500">{moodStats.positive}%</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-lg flex items-center justify-center bg-green-100">
+                    <Smile className="h-6 w-6 text-green-600" />
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="rounded-2xl p-6 shadow-lg border"
+                style={{
+                  backgroundColor: 'var(--theme-card)',
+                  borderColor: 'var(--theme-border)'
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>AI Analysis</p>
+                    <p className="text-2xl font-bold" style={{ color: 'var(--theme-primary)' }}>
+                      {journalEntries.length > 0 ? 'Active' : 'Ready'}
+                    </p>
+                  </div>
+                  <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)' }}>
+                    <Brain className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Mood Analytics */}
+            {journalEntries.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Weekly Mood Trend */}
+                <div
                   className="rounded-2xl p-6 shadow-lg border"
                   style={{
                     backgroundColor: 'var(--theme-card)',
                     borderColor: 'var(--theme-border)'
                   }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-2xl">{getMoodEmoji(entry.mood)}</span>
-                      <div>
-                        <p className="font-semibold" style={{ color: 'var(--theme-text)' }}>{formatDate(entry.timestamp)}</p>
-                        <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>{formatTime(entry.timestamp)}</p>
-                      </div>
-                    </div>
+                  <h3 className="text-lg font-bold mb-4 flex items-center space-x-2" style={{ color: 'var(--theme-text)' }}>
+                    <TrendingUp className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
+                    <span>Weekly Mood Trend</span>
+                  </h3>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={weeklyData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--theme-border)" />
+                      <XAxis dataKey="date" stroke="var(--theme-text)" opacity={0.7} />
+                      <YAxis stroke="var(--theme-text)" opacity={0.7} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'var(--theme-card)',
+                          borderColor: 'var(--theme-border)',
+                          borderRadius: '0.75rem'
+                        }}
+                        labelStyle={{ color: 'var(--theme-text)' }}
+                        itemStyle={{ color: 'var(--theme-text)' }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="mood"
+                        stroke="var(--theme-primary)"
+                        strokeWidth={3}
+                        dot={{ fill: 'var(--theme-primary)', strokeWidth: 2, r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Mood Distribution - Fixed Pie Chart */}
+                <div
+                  className="rounded-2xl p-6 shadow-lg border"
+                  style={{
+                    backgroundColor: 'var(--theme-card)',
+                    borderColor: 'var(--theme-border)'
+                  }}
+                >
+                  <h3 className="text-lg font-bold mb-4 flex items-center space-x-2" style={{ color: 'var(--theme-text)' }}>
+                    <BarChart3 className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
+                    <span>Mood Distribution</span>
+                  </h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Positive', value: parseFloat(moodStats.positive), color: '#10B981' },
+                            { name: 'Neutral', value: parseFloat(moodStats.neutral), color: '#6B7280' },
+                            { name: 'Negative', value: parseFloat(moodStats.negative), color: '#EF4444' }
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {[
+                            { name: 'Positive', value: parseFloat(moodStats.positive), color: '#10B981' },
+                            { name: 'Neutral', value: parseFloat(moodStats.neutral), color: '#6B7280' },
+                            { name: 'Negative', value: parseFloat(moodStats.negative), color: '#EF4444' }
+                          ].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'var(--theme-card)',
+                            borderColor: 'var(--theme-border)',
+                            borderRadius: '0.75rem',
+                            color: 'var(--theme-text)'
+                          }}
+                        />
+                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="text-2xl font-bold" fill="var(--theme-primary)">
+                          {moodStats.positive}%
+                        </text>
+                        <legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Writing Section */}
+            <div
+              className="rounded-2xl p-8 shadow-lg border"
+              style={{
+                backgroundColor: 'var(--theme-card)',
+                borderColor: 'var(--theme-border)'
+              }}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text)' }}>Write Your Thoughts</h2>
+                {!isWriting && (
+                  <motion.button
+                    onClick={() => setIsWriting(true)}
+                    className="flex items-center space-x-2 px-4 py-2 rounded-lg text-white font-medium"
+                    style={{ backgroundColor: 'var(--theme-primary)' }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Plus size={18} />
+                    <span>New Entry</span>
+                  </motion.button>
+                )}
+              </div>
+
+              {isWriting && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-4"
+                >
+                  <textarea
+                    value={newEntry}
+                    onChange={(e) => setNewEntry(e.target.value)}
+                    placeholder="How are you feeling today? What's on your mind? Write in any language..."
+                    className="w-full h-32 p-4 border rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    style={{
+                      backgroundColor: 'var(--theme-card)',
+                      borderColor: 'var(--theme-border)',
+                      color: 'var(--theme-text)'
+                    }}
+                  />
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
+                      {newEntry.trim().split(' ').length} words
+                    </p>
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => handleEditEntry(entry)}
-                        className="p-2 opacity-70 hover:opacity-100 transition-colors"
+                        onClick={() => {
+                          setIsWriting(false);
+                          setNewEntry('');
+                          setEditingEntry(null);
+                        }}
+                        className="px-4 py-2 opacity-70 hover:opacity-100 transition-colors"
                         style={{ color: 'var(--theme-text)' }}
                       >
-                        <Edit3 size={16} />
+                        <X size={18} />
                       </button>
                       <button
-                        onClick={() => handleDeleteEntry(entry.id)}
-                        className="p-2 opacity-70 hover:opacity-100 transition-colors"
-                        style={{ color: 'var(--theme-text)' }}
+                        onClick={editingEntry ? handleUpdateEntry : handleSaveEntry}
+                        disabled={isAnalyzing}
+                        className="flex items-center space-x-2 px-4 py-2 rounded-lg text-white font-medium disabled:opacity-50"
+                        style={{ backgroundColor: 'var(--theme-primary)' }}
                       >
-                        <Trash2 size={16} />
+                        {isAnalyzing ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>Analyzing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save size={18} />
+                            <span>{editingEntry ? 'Update' : 'Save'}</span>
+                          </>
+                        )}
                       </button>
-                    </div>
-                  </div>
-                  <p className="opacity-90 leading-relaxed mb-3" style={{ color: 'var(--theme-text)' }}>{entry.content}</p>
-                  <div className="flex items-center justify-between text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
-                    <div className="flex items-center space-x-3">
-                      <span>{entry.wordCount} words</span>
-                      {/* Language indicator */}
-                      {entry.language && entry.language !== 'english' && (
-                        <div className="text-xs px-2 py-1 rounded-full" style={{
-                          backgroundColor: 'var(--theme-secondary)',
-                          color: 'var(--theme-text)'
-                        }}>
-                          {entry.language.charAt(0).toUpperCase() + entry.language.slice(1)}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {getMoodIcon(entry.mood)}
-                      <span className={`font-medium ${getMoodColor(entry.mood)}`}>
-                        {entry.mood.charAt(0).toUpperCase() + entry.mood.slice(1)}
-                      </span>
-                      <span className="text-xs opacity-50">
-                        ({(entry.emotionConfidence * 100).toFixed(0)}% confidence)
-                      </span>
                     </div>
                   </div>
                 </motion.div>
-              ))
-            )}
-          </div>
-        </motion.div>
-      </div>
+              )}
+            </div>
+
+            {/* Journal Entries */}
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text)' }}>Recent Entries</h2>
+
+              {journalEntries.length === 0 ? (
+                <div
+                  className="rounded-2xl p-8 shadow-lg border text-center"
+                  style={{
+                    backgroundColor: 'var(--theme-card)',
+                    borderColor: 'var(--theme-border)'
+                  }}
+                >
+                  <BookOpen className="h-16 w-16 mx-auto mb-4 opacity-50" style={{ color: 'var(--theme-text)' }} />
+                  <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--theme-text)' }}>No entries yet</h3>
+                  <p className="opacity-70 mb-4" style={{ color: 'var(--theme-text)' }}>Start writing to track your thoughts and feelings</p>
+                  <button
+                    onClick={() => setIsWriting(true)}
+                    className="px-6 py-3 rounded-lg text-white font-medium"
+                    style={{ backgroundColor: 'var(--theme-primary)' }}
+                  >
+                    Write Your First Entry
+                  </button>
+                </div>
+              ) : (
+                journalEntries.map((entry, index) => (
+                  <motion.div
+                    key={entry.id}
+                    className="rounded-2xl p-6 shadow-lg border"
+                    style={{
+                      backgroundColor: 'var(--theme-card)',
+                      borderColor: 'var(--theme-border)'
+                    }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        {/* Use emotion for emoji lookup, not numeric mood */}
+                        <span className="text-2xl">{getMoodEmoji(entry.emotion || 'neutral')}</span>
+                        <div>
+                          <p className="font-semibold" style={{ color: 'var(--theme-text)' }}>{formatDate(entry.createdAt || entry.timestamp)}</p>
+                          <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>{formatTime(entry.createdAt || entry.timestamp)}</p>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleEditEntry(entry)}
+                          className="p-2 opacity-70 hover:opacity-100 transition-colors"
+                          style={{ color: 'var(--theme-text)' }}
+                        >
+                          <Edit3 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEntry(entry.id)}
+                          className="p-2 opacity-70 hover:opacity-100 transition-colors"
+                          style={{ color: 'var(--theme-text)' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="opacity-90 leading-relaxed mb-3" style={{ color: 'var(--theme-text)' }}>{entry.content}</p>
+                    <div className="flex items-center justify-between text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
+                      <div className="flex items-center space-x-3">
+                        <span>{entry.content?.trim().split(/\s+/).length || 0} words</span>
+                        {/* Language indicator */}
+                        {entry.language && entry.language !== 'english' && (
+                          <div className="text-xs px-2 py-1 rounded-full" style={{
+                            backgroundColor: 'var(--theme-secondary)',
+                            color: 'var(--theme-text)'
+                          }}>
+                            {entry.language.charAt(0).toUpperCase() + entry.language.slice(1)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {getMoodIcon(entry.emotion || 'neutral')}
+                        <span className={`font-medium ${getMoodColor(entry.emotion || 'neutral')}`}>
+                          {(entry.emotion || 'neutral').charAt(0).toUpperCase() + (entry.emotion || 'neutral').slice(1)}
+                        </span>
+                        <span className="text-xs opacity-50">
+                          ({(entry.emotionConfidence * 100).toFixed(0)}% confidence)
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Floating Chatbot Button with Message */}
       <AnimatePresence>
@@ -1128,8 +1179,8 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
                   className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`max-w-xs px-3 py-2 rounded-lg text-sm ${message.sender === 'user'
-                      ? 'text-white'
-                      : 'text-white'
+                    ? 'text-white'
+                    : 'text-white'
                     }`}
                     style={{
                       backgroundColor: message.sender === 'user'

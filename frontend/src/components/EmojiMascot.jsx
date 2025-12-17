@@ -13,7 +13,7 @@ const EmojiMascot = () => {
 
   // Array of different emojis that can peek through
   const mascotEmojis = [
-    '😊', '🤗', '😄', '🥰', '😍', '🤩', '😘', '😉', 
+    '😊', '🤗', '😄', '🥰', '😍', '🤩', '😘', '😉',
     '🤔', '😋', '🥳', '😎', '🤠', '😇', '🙃', '😌',
     '🤗', '😊', '🥰', '😄', '🤩', '😘', '😉', '🤔'
   ];
@@ -21,7 +21,7 @@ const EmojiMascot = () => {
   // Generate AI-powered motivational content using Gemini
   const generateMotivationalContent = async () => {
     setIsGenerating(true);
-    
+
     try {
       const prompts = [
         "Give me a short 2-3 line motivational quote about perseverance and success. Make it inspiring and personal.",
@@ -37,8 +37,9 @@ const EmojiMascot = () => {
       ];
 
       const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
-      
-      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-lite:generateContent?key=AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0', {
+
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyADqMDfILhOQvcWyAFFhpvRrxp_BQ_FSXY";
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -68,11 +69,11 @@ const EmojiMascot = () => {
       if (generatedText.trim()) {
         // Clean up the response
         const cleanText = generatedText.trim().replace(/^["']|["']$/g, '');
-        
+
         // Determine notification type based on content
         let notificationType = NOTIFICATION_TYPES.MOTIVATION;
         let icon = '💪';
-        
+
         if (cleanText.toLowerCase().includes('story') || cleanText.toLowerCase().includes('once') || cleanText.toLowerCase().includes('person')) {
           notificationType = NOTIFICATION_TYPES.MOTIVATION;
           icon = '📖';
@@ -93,13 +94,13 @@ const EmojiMascot = () => {
           { text: '💡 Success is not final, failure is not fatal. It\'s the courage to continue that counts! ✨', type: NOTIFICATION_TYPES.SUPPORT, icon: '💡' },
           { text: '🌟 Your limitation is only your imagination. Dream big and take action! 🚀', type: NOTIFICATION_TYPES.CELEBRATION, icon: '🌟' }
         ];
-        
+
         const randomFallback = fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
         addNotification(randomFallback.text, randomFallback.type, randomFallback.icon);
       }
     } catch (error) {
       console.error('Error generating motivational content:', error);
-      
+
       // Fallback to predefined messages
       const fallbackMessages = [
         { text: '💪 Every expert was once a beginner. Every pro was once an amateur. Keep going! 🌟', type: NOTIFICATION_TYPES.MOTIVATION, icon: '💪' },
@@ -109,7 +110,7 @@ const EmojiMascot = () => {
         { text: '🌱 Growth happens outside your comfort zone. Embrace the challenge! 💫', type: NOTIFICATION_TYPES.MOTIVATION, icon: '🌱' },
         { text: '🎯 Focus on progress, not perfection. Every step forward counts! ✨', type: NOTIFICATION_TYPES.SUPPORT, icon: '🎯' }
       ];
-      
+
       const randomFallback = fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
       addNotification(randomFallback.text, randomFallback.type, randomFallback.icon);
     } finally {
@@ -129,7 +130,7 @@ const EmojiMascot = () => {
 
   const handleMascotClick = () => {
     if (isAnimating || isGenerating) return;
-    
+
     setIsAnimating(true);
     clickCountRef.current += 1;
 

@@ -35,30 +35,30 @@ const VoiceAssistant = () => {
       setSpeechSupported(true);
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
-      
+
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
       recognitionRef.current.lang = 'en-US';
-      
+
       recognitionRef.current.onstart = () => {
         setIsListening(true);
         toast.info('Listening... Speak now!');
       };
-      
+
       recognitionRef.current.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         console.log('Speech recognized:', transcript);
         setInputText(transcript);
-        
+
         // Don't auto-send, let user review and send manually
         toast.success('Speech converted to text! Review and send when ready.');
       };
-      
+
       recognitionRef.current.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
         setIsListening(false);
-        
-        switch(event.error) {
+
+        switch (event.error) {
           case 'no-speech':
             toast.error('No speech detected. Please try again.');
             break;
@@ -72,7 +72,7 @@ const VoiceAssistant = () => {
             toast.error('Speech recognition failed. Please try again.');
         }
       };
-      
+
       recognitionRef.current.onend = () => {
         setIsListening(false);
       };
@@ -92,8 +92,8 @@ const VoiceAssistant = () => {
   }, []);
 
   const getTherapeuticResponse = async (userMessage) => {
-    const apiKey = "AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0";
-    
+    const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
+
     // Enhanced therapeutic prompt
     const therapeuticPrompt = `You are Dr. Sarah, a compassionate and experienced mental health therapist and doctor. The user has shared: "${userMessage}"
 
@@ -113,8 +113,9 @@ Your response should be:
 Remember: You ARE the doctor/therapist they're talking to. Provide direct help and guidance, don't just refer them elsewhere unless absolutely necessary.`;
 
     try {
+      console.log('Sending request to Gemini API...');
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -135,8 +136,17 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
         }
       );
 
+      console.log('API Response Status:', response.status);
+
       const data = await response.json();
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || "I understand you're going through a difficult time. Remember, it's okay to feel this way, and reaching out for support is a sign of strength.";
+      console.log('API Response Data:', data);
+
+      if (!data.candidates || !data.candidates[0].content) {
+        console.error('No candidates in response');
+        throw new Error('Invalid API response');
+      }
+
+      return data?.candidates?.[0]?.content?.parts?.[0]?.text || "I understand you're going through a tough time.";
     } catch (error) {
       console.error('Error getting therapeutic response:', error);
       return "I'm here to listen and support you. Your feelings are valid, and it's important to take care of yourself. Would you like to talk more about what's on your mind?";
@@ -161,7 +171,7 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
 
     try {
       const response = await getTherapeuticResponse(textToSend);
-      
+
       const assistantMessage = {
         id: Date.now() + 1,
         text: response,
@@ -213,7 +223,7 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
       type: 'user'
     };
     setMessages(prev => [...prev, userMessage]);
-    
+
     setIsTyping(true);
     try {
       const aiResponse = await getTherapeuticResponse(response);
@@ -270,9 +280,9 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
           </div>
 
           {/* Voice Interface - Simplified */}
-          <div 
+          <div
             className="rounded-2xl p-6 shadow-lg border text-center"
-            style={{ 
+            style={{
               backgroundColor: 'var(--theme-card)',
               borderColor: 'var(--theme-border)'
             }}
@@ -282,7 +292,7 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
                 Voice Assistant & Therapeutic Support
               </h2>
               <p className="opacity-70" style={{ color: 'var(--theme-text)' }}>
-                {speechSupported 
+                {speechSupported
                   ? 'Speak or type your thoughts - I\'m here to listen and help'
                   : 'Type your thoughts below - I\'m here to listen and help'
                 }
@@ -306,38 +316,34 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
                     className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div className={`flex items-start space-x-2 max-w-xs lg:max-w-md ${message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        message.sender === 'user' 
-                          ? 'bg-blue-500' 
-                          : message.type === 'therapeutic' 
-                            ? 'bg-green-500' 
-                            : 'bg-gray-500'
-                      }`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${message.sender === 'user'
+                        ? 'bg-blue-500'
+                        : message.type === 'therapeutic'
+                          ? 'bg-green-500'
+                          : 'bg-gray-500'
+                        }`}>
                         {message.sender === 'user' ? (
                           <User className="h-4 w-4 text-white" />
                         ) : (
                           <Heart className="h-4 w-4 text-white" />
                         )}
                       </div>
-                      <div className={`rounded-lg p-3 ${
-                        message.sender === 'user'
-                          ? 'bg-blue-500 text-white'
-                          : message.type === 'therapeutic'
-                            ? 'bg-green-50 border border-green-200'
-                            : 'bg-gray-100'
-                      }`}>
-                        <p className={`text-sm ${
-                          message.sender === 'user' 
-                            ? 'text-white' 
-                            : message.type === 'therapeutic'
-                              ? 'text-green-800'
-                              : 'text-gray-800'
+                      <div className={`rounded-lg p-3 ${message.sender === 'user'
+                        ? 'bg-blue-500 text-white'
+                        : message.type === 'therapeutic'
+                          ? 'bg-green-50 border border-green-200'
+                          : 'bg-gray-100'
                         }`}>
+                        <p className={`text-sm ${message.sender === 'user'
+                          ? 'text-white'
+                          : message.type === 'therapeutic'
+                            ? 'text-green-800'
+                            : 'text-gray-800'
+                          }`}>
                           {message.text}
                         </p>
-                        <p className={`text-xs mt-1 ${
-                          message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
-                        }`}>
+                        <p className={`text-xs mt-1 ${message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
+                          }`}>
                           {formatTime(message.timestamp)}
                         </p>
                       </div>
@@ -345,7 +351,7 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
                   </motion.div>
                 ))}
               </AnimatePresence>
-              
+
               {isTyping && (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -379,7 +385,7 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
                     onChange={(e) => setInputText(e.target.value)}
                     placeholder="Share how you're feeling or what's on your mind..."
                     className="w-full px-4 py-2 pr-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    style={{ 
+                    style={{
                       backgroundColor: 'var(--theme-card)',
                       borderColor: 'var(--theme-border)',
                       color: 'var(--theme-text)'
@@ -387,18 +393,17 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                     disabled={isTyping}
                   />
-                  
+
                   {/* Small microphone icon */}
                   <button
                     onClick={isListening ? handleStopListening : handleStartListening}
                     disabled={!speechSupported || isTyping}
-                    className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 rounded-full transition-all duration-200 ${
-                      isListening 
-                        ? 'bg-red-500 text-white' 
-                        : speechSupported
-                          ? 'bg-gray-200 hover:bg-gray-300 text-gray-600 hover:text-gray-800'
-                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
+                    className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 rounded-full transition-all duration-200 ${isListening
+                      ? 'bg-red-500 text-white'
+                      : speechSupported
+                        ? 'bg-gray-200 hover:bg-gray-300 text-gray-600 hover:text-gray-800'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      }`}
                     title={isListening ? 'Stop listening' : 'Start voice input'}
                   >
                     {isListening ? (
@@ -407,7 +412,7 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
                       <Mic size={16} />
                     )}
                   </button>
-                  
+
                   {/* Listening indicator */}
                   {isListening && (
                     <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
@@ -415,7 +420,7 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
                     </div>
                   )}
                 </div>
-                
+
                 <motion.button
                   onClick={() => handleSendMessage()}
                   disabled={!inputText.trim() || isTyping}
@@ -431,9 +436,9 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
           </div>
 
           {/* Quick Responses */}
-          <div 
+          <div
             className="rounded-2xl p-6 shadow-lg border"
-            style={{ 
+            style={{
               backgroundColor: 'var(--theme-card)',
               borderColor: 'var(--theme-border)'
             }}
