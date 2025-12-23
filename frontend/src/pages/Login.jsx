@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { Brain, ArrowRight } from 'lucide-react';
+import { Brain, ArrowRight, Palette } from 'lucide-react';
 import AuthForm from '../components/AuthForm';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 const Login = () => {
   const { login, isLoading, error, clearError } = useAuth();
+  const { theme, setTheme, themes } = useTheme();
+  const [showThemeSelector, setShowThemeSelector] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (credentials) => {
@@ -71,7 +74,7 @@ const Login = () => {
             <p className="text-gray-600">
               Don't have an account?{' '}
               <Link 
-                to="/signup" 
+                to="/join" 
                 className="text-primary-600 hover:text-primary-700 font-medium inline-flex items-center space-x-1 transition-colors"
               >
                 <span>Sign up</span>
@@ -79,6 +82,64 @@ const Login = () => {
               </Link>
             </p>
           </div>
+        </motion.div>
+
+        {/* Theme Selector */}
+        <motion.div 
+          className="card p-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+        >
+          <button
+            onClick={() => setShowThemeSelector(!showThemeSelector)}
+            className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center space-x-2">
+              <Palette size={18} className="text-primary-600" />
+              <span className="text-sm font-medium text-gray-700">
+                Choose Theme: {themes[theme]?.name || 'Ocean'}
+              </span>
+            </div>
+            <motion.div
+              animate={{ rotate: showThemeSelector ? 180 : 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <ArrowRight size={16} />
+            </motion.div>
+          </button>
+          
+          {showThemeSelector && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-4 pt-4 border-t grid grid-cols-2 gap-3"
+            >
+              {Object.entries(themes)
+                .filter(([key]) => !key.startsWith('theme-')) // Hide emotion-based themes
+                .map(([key, themeData]) => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      setTheme(key);
+                      setShowThemeSelector(false);
+                    }}
+                    className="p-3 rounded-lg border-2 transition-all flex flex-col items-center space-y-2"
+                    style={{
+                      borderColor: theme === key ? 'var(--theme-primary)' : '#e5e7eb',
+                      backgroundColor: theme === key ? 'rgba(var(--primary-rgb), 0.05)' : 'transparent'
+                    }}
+                  >
+                    <div className="flex space-x-1">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeData.colors.primary }} />
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeData.colors.secondary }} />
+                    </div>
+                    <span className="text-xs font-medium text-gray-600">{themeData.name}</span>
+                  </button>
+                ))}
+            </motion.div>
+          )}
         </motion.div>
 
         {/* Footer */}

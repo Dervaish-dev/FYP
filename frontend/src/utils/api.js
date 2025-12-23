@@ -125,6 +125,42 @@ export const authAPI = {
   },
 };
 
+// Invite / OTP claim API
+export const inviteAPI = {
+  lookup: async ({ code }) => {
+    try {
+      const response = await api.post('/invites/claim/lookup', { code });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Invalid invite code' };
+    }
+  },
+  sendOtp: async ({ code, email }) => {
+    try {
+      const response = await api.post('/invites/claim/send-otp', { code, email });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to send OTP' };
+    }
+  },
+  verifyOtp: async ({ code, email, otp }) => {
+    try {
+      const response = await api.post('/invites/claim/verify-otp', { code, email, otp });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Verification failed' };
+    }
+  },
+  finalize: async ({ claimToken, password }) => {
+    try {
+      const response = await api.post('/invites/claim/finalize', { claimToken, password });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to create account' };
+    }
+  }
+};
+
 // Health check
 export const healthCheck = async () => {
   try {
@@ -147,10 +183,8 @@ export const taskAPI = {
       console.log('%c✓ TASK CREATED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
       return res.data.data;
     } catch (e) {
-      console.warn('%c⚠ TASK CREATE FAILED - Using Mock', 'color: #FF9800; font-weight: bold; font-size: 14px');
-      // Mock fallback
-      const mock = { _id: String(Date.now()), status: 'todo', nudgeCount: 0, ...task };
-      return mock;
+      console.error('%c✗ TASK CREATE FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e?.response?.data || e);
+      throw e.response?.data || { message: 'Failed to create task' };
     }
   },
   async update(id, update) {
@@ -160,8 +194,8 @@ export const taskAPI = {
       console.log('%c✓ TASK UPDATED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
       return res.data.data;
     } catch (e) {
-      console.warn('%c⚠ TASK UPDATE FAILED - Using Mock', 'color: #FF9800; font-weight: bold; font-size: 14px');
-      return { _id: id, ...update };
+      console.error('%c✗ TASK UPDATE FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e?.response?.data || e);
+      throw e.response?.data || { message: 'Failed to update task' };
     }
   },
   async listByUser(userId) {
@@ -171,8 +205,8 @@ export const taskAPI = {
       console.log('%c✓ TASKS RETRIEVED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
       return res.data.data.tasks;
     } catch (e) {
-      console.warn('%c⚠ TASK LIST FAILED - Using Empty Array', 'color: #FF9800; font-weight: bold; font-size: 14px');
-      return [];
+      console.error('%c✗ TASK LIST FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e?.response?.data || e);
+      throw e.response?.data || { message: 'Failed to fetch tasks' };
     }
   },
   async delete(id) {
@@ -271,6 +305,28 @@ export const journalAPI = {
       console.error('%c✗ JOURNAL LIST FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e);
       throw e;
     }
+  },
+  // Voice journal methods
+  async startVoiceCall(userId) {
+    console.log('%c🎙️ START VOICE CALL', 'color: #FF9800; font-weight: bold; font-size: 14px', userId);
+    try {
+      const res = await api.post('/journal/voice/start', { userId });
+      console.log('%c✓ VOICE CALL STARTED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
+      return res.data;
+    } catch (e) {
+      console.error('%c✗ VOICE CALL START FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e);
+      throw e;
+    }
+  },
+  async getVoiceCallStatus(callId) {
+    console.log('%c🔍 CHECK VOICE CALL STATUS', 'color: #FF9800; font-weight: bold; font-size: 14px', callId);
+    try {
+      const res = await api.get(`/journal/voice/status/${callId}`);
+      return res.data;
+    } catch (e) {
+      console.error('%c✗ VOICE STATUS CHECK FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e);
+      throw e;
+    }
   }
 };
 
@@ -299,3 +355,4 @@ export const wellnessAPI = {
     }
   }
 };
+

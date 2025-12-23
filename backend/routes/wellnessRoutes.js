@@ -5,7 +5,10 @@ import fetch from "node-fetch";
 const router = express.Router();
 
 // Gemini API configuration
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyCdXfMReLRX-hyc20BZ7wrO0Cw4mvVUJR0';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+  console.error('⚠️ GEMINI_API_KEY not configured in .env');
+}
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 // Analyze mood patterns using Gemini API

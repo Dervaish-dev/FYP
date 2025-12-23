@@ -92,61 +92,11 @@ const VoiceAssistant = () => {
   }, []);
 
   const getTherapeuticResponse = async (userMessage) => {
-    const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
-
-    // Enhanced therapeutic prompt
-    const therapeuticPrompt = `You are Dr. Sarah, a compassionate and experienced mental health therapist and doctor. The user has shared: "${userMessage}"
-
-As Dr. Sarah, respond with:
-1. Empathetic acknowledgment of their feelings
-2. Professional guidance and coping strategies
-3. Practical steps they can take right now
-4. Gentle encouragement and support
-5. Only recommend professional help if the situation is severe or dangerous
-
-Your response should be:
-- Warm and understanding (2-3 sentences)
-- Actionable and helpful
-- Professional but not clinical
-- Focused on immediate support and guidance
-
-Remember: You ARE the doctor/therapist they're talking to. Provide direct help and guidance, don't just refer them elsewhere unless absolutely necessary.`;
-
     try {
-      console.log('Sending request to Gemini API...');
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: therapeuticPrompt }]
-              }
-            ],
-            generationConfig: {
-              temperature: 0.7,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 200,
-            },
-          }),
-        }
-      );
-
-      console.log('API Response Status:', response.status);
-
-      const data = await response.json();
-      console.log('API Response Data:', data);
-
-      if (!data.candidates || !data.candidates[0].content) {
-        console.error('No candidates in response');
-        throw new Error('Invalid API response');
-      }
-
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || "I understand you're going through a tough time.";
+      const response = await api.post('/voice/therapeutic', { message: userMessage });
+      const reply = response?.data?.reply;
+      if (typeof reply === 'string' && reply.trim()) return reply;
+      throw new Error('No reply received');
     } catch (error) {
       console.error('Error getting therapeutic response:', error);
       return "I'm here to listen and support you. Your feelings are valid, and it's important to take care of yourself. Would you like to talk more about what's on your mind?";
@@ -188,6 +138,16 @@ Remember: You ARE the doctor/therapist they're talking to. Provide direct help a
     } catch (error) {
       console.error('Error:', error);
       setIsTyping(false);
+
+      // Always show *something* in the conversation on failure
+      const fallbackAssistantMessage = {
+        id: Date.now() + 2,
+        text: "I'm here with you — I had trouble generating a response just now. Please try again.",
+        sender: 'assistant',
+        timestamp: new Date(),
+        type: 'therapeutic'
+      };
+      setMessages(prev => [...prev, fallbackAssistantMessage]);
     }
   };
 

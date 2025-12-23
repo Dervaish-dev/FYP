@@ -1,424 +1,839 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
-  Calendar, 
-  Clock, 
-  Settings, 
-  Home, 
-  Heart, 
-  CheckSquare, 
-  BookOpen, 
-  Mic, 
-  Users, 
-  Activity,
-  TrendingUp,
-  TrendingDown,
-  AlertCircle,
-  CheckCircle,
-  Clock as ClockIcon,
-  BarChart3,
-  PieChart,
-  MessageSquare
+  Users, Heart, Activity, TrendingUp, TrendingDown, Clock, CheckCircle, 
+  AlertCircle, ChevronRight, Brain, RefreshCw, Minus, UserPlus,
+  ChevronUp, ChevronDown, BarChart3
 } from 'lucide-react';
-import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../context/AuthContext';
+import CaregiverLayout from '../components/CaregiverLayout';
 
 const CaregiverDashboard = () => {
-  const { currentTheme } = useTheme();
-  const { user } = useAuth();
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [selectedPeriod, setSelectedPeriod] = useState('week');
+  const navigate = useNavigate();
+  const [patients, setPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Update time every second
+  // Invites state
+  const [invites, setInvites] = useState([]);
+  const [invitesLoading, setInvitesLoading] = useState(false);
+  const [invitesError, setInvitesError] = useState('');
+  const [invitesExpanded, setInvitesExpanded] = useState(true);
+  const [inviteCodeById, setInviteCodeById] = useState({});
+  const [inviteCodeLoadingById, setInviteCodeLoadingById] = useState({});
+  const [inviteCodeErrorById, setInviteCodeErrorById] = useState({});
+
+  // Add patient (invite) modal state
+  const [showAddPatientModal, setShowAddPatientModal] = useState(false);
+  const [inviteForm, setInviteForm] = useState({
+    patientName: '',
+    patientEmail: '',
+    age: '',
+    neurotype: ''
+  });
+  const [inviteCreateLoading, setInviteCreateLoading] = useState(false);
+  const [inviteCreateError, setInviteCreateError] = useState('');
+  const [createdInvite, setCreatedInvite] = useState(null);
+  
+  // Patient details state
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [expandedPatient, setExpandedPatient] = useState(null);
+
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+    // Check if caregiver is logged in
+    const token = localStorage.getItem('caregiverToken');
+    const caregiverInfo = localStorage.getItem('caregiverInfo');
+    
+    if (!token || !caregiverInfo) {
+      navigate('/caregiver/login');
+      return;
+    }
 
-  // Mock data for caregiver dashboard
-  const mockData = {
-    emotions: [
-      { date: 'Oct 18', emotion: 'Sad', tasksCompleted: 2, totalTasks: 5, recommendation: 'Consider relaxation or therapist check-in.' },
-      { date: 'Oct 19', emotion: 'Calm', tasksCompleted: 5, totalTasks: 5, recommendation: 'Stable mood. Keep consistent schedule.' },
-      { date: 'Oct 20', emotion: 'Happy', tasksCompleted: 4, totalTasks: 6, recommendation: 'Great progress! Continue current routine.' },
-      { date: 'Oct 21', emotion: 'Stressed', tasksCompleted: 3, totalTasks: 5, recommendation: 'Consider stress management techniques.' },
-      { date: 'Oct 22', emotion: 'Calm', tasksCompleted: 6, totalTasks: 6, recommendation: 'Excellent day! Maintain this momentum.' },
-      { date: 'Oct 23', emotion: 'Happy', tasksCompleted: 5, totalTasks: 7, recommendation: 'Positive trend continues.' },
-      { date: 'Oct 24', emotion: 'Neutral', tasksCompleted: 4, totalTasks: 5, recommendation: 'Stable day. Monitor for changes.' }
-    ],
-    emotionBreakdown: [
-      { emotion: 'Happy', count: 15, percentage: 35, color: 'bg-green-500' },
-      { emotion: 'Calm', count: 12, percentage: 28, color: 'bg-blue-500' },
-      { emotion: 'Neutral', count: 8, percentage: 19, color: 'bg-gray-500' },
-      { emotion: 'Stressed', count: 5, percentage: 12, color: 'bg-red-500' },
-      { emotion: 'Sad', count: 3, percentage: 6, color: 'bg-purple-500' }
-    ],
-    taskCompletion: {
-      total: 156,
-      completed: 128,
-      percentage: 82
-    },
-    sleepData: [
-      { day: 'Mon', hours: 7.5 },
-      { day: 'Tue', hours: 8.0 },
-      { day: 'Wed', hours: 6.5 },
-      { day: 'Thu', hours: 7.8 },
-      { day: 'Fri', hours: 8.2 },
-      { day: 'Sat', hours: 9.0 },
-      { day: 'Sun', hours: 8.5 }
-    ],
-    aiRecommendations: [
-      {
-        type: 'warning',
-        message: 'Based on recent mood data, you may want to schedule a therapy session if low mood persists for more than 3 days.',
-        priority: 'high'
-      },
-      {
-        type: 'suggestion',
-        message: 'Consider implementing a consistent bedtime routine to improve sleep quality.',
-        priority: 'medium'
-      },
-      {
-        type: 'positive',
-        message: 'Great job maintaining task completion rates above 80% this week!',
-        priority: 'low'
+    fetchPatients();
+    fetchInvites();
+  }, [navigate]);
+
+  const fetchPatients = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('caregiverToken');
+      const response = await fetch('/api/caregiver/patients', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch patients');
       }
-    ]
-  };
 
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+      // Map emotion names to emojis (all 10 supported emotions)
+      const emotionEmojiMap = {
+        happy: '😊',
+        sad: '😔',
+        calm: '😌',
+        stressed: '😟',
+        angry: '😠',
+        neutral: '😐',
+        excited: '🤩',
+        worried: '😥',
+        confused: '🤔',
+        surprised: '😲',
+        // Legacy emotions (kept for backward compatibility)
+        anxious: '😰',
+        frustrated: '😤',
+        grateful: '🙏',
+        peaceful: '☮️',
+        content: '😊'
+      };
 
-  const getEmotionColor = (emotion) => {
-    const colors = {
-      'Happy': 'text-green-600',
-      'Calm': 'text-blue-600',
-      'Neutral': 'text-gray-600',
-      'Stressed': 'text-red-600',
-      'Sad': 'text-purple-600'
-    };
-    return colors[emotion] || colors.Neutral;
-  };
+      // Ensure recentEmotions have emoji field
+      const patientsWithEmoji = (data.patients || []).map(patient => ({
+        ...patient,
+        recentEmotions: (patient.recentEmotions || []).map(emotion => ({
+          ...emotion,
+          emoji: emotion.emoji || emotionEmojiMap[emotion.emotion?.toLowerCase()] || '😊'
+        }))
+      }));
 
-  const getEmotionBgColor = (emotion) => {
-    const colors = {
-      'Happy': 'bg-green-100',
-      'Calm': 'bg-blue-100',
-      'Neutral': 'bg-gray-100',
-      'Stressed': 'bg-red-100',
-      'Sad': 'bg-purple-100'
-    };
-    return colors[emotion] || colors.Neutral;
-  };
-
-  const getRecommendationIcon = (type) => {
-    switch (type) {
-      case 'warning':
-        return <AlertCircle className="h-5 w-5 text-red-500" />;
-      case 'suggestion':
-        return <ClockIcon className="h-5 w-5 text-yellow-500" />;
-      case 'positive':
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
-      default:
-        return <MessageSquare className="h-5 w-5 text-blue-500" />;
+      setPatients(patientsWithEmoji);
+      setError('');
+    } catch (err) {
+      console.error('Error fetching patients:', err);
+      setError(err.message || 'Failed to load patients');
+    } finally {
+      setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen" style={{ backgroundColor: currentTheme.colors.background.light }}>
-      {/* Header */}
-      <motion.header 
-        className="shadow-lg"
-        style={{ backgroundColor: currentTheme.colors.primary[600] }}
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-3">
-              <motion.div 
-                className="h-10 w-10 bg-white rounded-full flex items-center justify-center"
-                animate={{ 
-                  rotate: [0, 5, -5, 0],
-                  scale: [1, 1.05, 1]
-                }}
-                transition={{ 
-                  duration: 2,
-                  repeat: Infinity,
-                  repeatDelay: 3
-                }}
-              >
-                <Users className="h-6 w-6" style={{ color: currentTheme.colors.primary[600] }} />
-              </motion.div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">Caregiver Dashboard</h1>
-                <p className="text-white/80 text-sm">Monitor Progress & Provide Support</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="text-right text-white">
-                <p className="font-medium">{user?.name}</p>
-                <p className="text-white/80 text-sm">{formatDate(currentTime)}</p>
-                <p className="text-white/80 text-sm">{currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
-              </div>
-            </div>
+  const fetchInvites = async () => {
+    try {
+      setInvitesLoading(true);
+      setInvitesError('');
+      const token = localStorage.getItem('caregiverToken');
+
+      const res = await fetch('/api/invites', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to fetch invites');
+      }
+
+      setInvites(data.invites || []);
+    } catch (err) {
+      console.error('Error fetching invites:', err);
+      setInvitesError(err.message || 'Failed to load invites');
+    } finally {
+      setInvitesLoading(false);
+    }
+  };
+
+  const fetchPatientDetails = async (patientId) => {
+    try {
+      const token = localStorage.getItem('caregiverToken');
+      const response = await fetch(`/api/caregiver/patient/${patientId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch patient details');
+      }
+
+      setSelectedPatient(data);
+      setExpandedPatient(patientId);
+    } catch (err) {
+      console.error('Error fetching patient details:', err);
+      alert('Failed to load patient details');
+    }
+  };
+
+  const handleCreateInvite = async (e) => {
+    e?.preventDefault?.();
+    const token = localStorage.getItem('caregiverToken');
+
+    const patientName = String(inviteForm.patientName || '').trim();
+    const patientEmail = String(inviteForm.patientEmail || '').trim().toLowerCase();
+    const age = inviteForm.age === '' ? null : Number(inviteForm.age);
+    const neurotype = String(inviteForm.neurotype || '').trim();
+
+    if (!patientName || !patientEmail) {
+      setInviteCreateError('Patient name and email are required');
+      return;
+    }
+
+    try {
+      setInviteCreateLoading(true);
+      setInviteCreateError('');
+
+      const res = await fetch('/api/invites', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          patientName,
+          patientEmail,
+          age: Number.isFinite(age) ? age : null,
+          neurotype: neurotype || null
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to create invite');
+      }
+
+      setCreatedInvite(data.invite);
+      await fetchInvites();
+    } catch (err) {
+      console.error('Create invite error:', err);
+      setInviteCreateError(err.message || 'Failed to create invite');
+    } finally {
+      setInviteCreateLoading(false);
+    }
+  };
+
+  const handleRegenerateInvite = async (inviteId) => {
+    try {
+      const token = localStorage.getItem('caregiverToken');
+      const res = await fetch(`/api/invites/${inviteId}/regenerate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to regenerate invite');
+      alert(`New invite code: ${data.invite?.code}`);
+      setInviteCodeById((prev) => ({ ...prev, [inviteId]: data.invite?.code || '' }));
+      setInviteCodeErrorById((prev) => ({ ...prev, [inviteId]: '' }));
+      await fetchInvites();
+    } catch (err) {
+      alert(err.message || 'Failed to regenerate invite');
+    }
+  };
+
+  const handleToggleInviteCode = async (inviteId) => {
+    const existing = inviteCodeById[inviteId];
+    const isCurrentlyVisible = existing !== undefined;
+
+    if (isCurrentlyVisible) {
+      setInviteCodeById((prev) => {
+        const next = { ...prev };
+        delete next[inviteId];
+        return next;
+      });
+      setInviteCodeErrorById((prev) => ({ ...prev, [inviteId]: '' }));
+      return;
+    }
+
+    try {
+      setInviteCodeLoadingById((prev) => ({ ...prev, [inviteId]: true }));
+      setInviteCodeErrorById((prev) => ({ ...prev, [inviteId]: '' }));
+      const token = localStorage.getItem('caregiverToken');
+
+      const res = await fetch(`/api/invites/${inviteId}/code`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to fetch invite code');
+
+      setInviteCodeById((prev) => ({ ...prev, [inviteId]: data.invite?.code || '' }));
+    } catch (err) {
+      setInviteCodeErrorById((prev) => ({ ...prev, [inviteId]: err.message || 'Failed to fetch invite code' }));
+    } finally {
+      setInviteCodeLoadingById((prev) => ({ ...prev, [inviteId]: false }));
+    }
+  };
+
+  const handleRevokeInvite = async (inviteId) => {
+    try {
+      const token = localStorage.getItem('caregiverToken');
+      const res = await fetch(`/api/invites/${inviteId}/revoke`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to revoke invite');
+      await fetchInvites();
+    } catch (err) {
+      alert(err.message || 'Failed to revoke invite');
+    }
+  };
+
+  const getMoodTrendColor = (trend) => {
+    switch (trend) {
+      case 'improving':
+        return { color: 'var(--primary-600)' };
+      case 'declining':
+        return { color: 'var(--secondary-600)' };
+      default:
+        return { color: 'var(--text-color)', opacity: 0.8 };
+    }
+  };
+
+  const getMoodTrendIcon = (trend) => {
+    switch (trend) {
+      case 'improving':
+        return <TrendingUp className="h-5 w-5" style={{ color: 'var(--primary-600)' }} />;
+      case 'declining':
+        return <TrendingDown className="h-5 w-5" style={{ color: 'var(--secondary-600)' }} />;
+      default:
+        return <Activity className="h-5 w-5" style={{ color: 'var(--text-color)', opacity: 0.8 }} />;
+    }
+  };
+
+  const getActivityLevelColor = (level) => {
+    switch (level) {
+      case 'active':
+        return { backgroundColor: 'var(--primary-100)', color: 'var(--primary-600)' };
+      case 'moderate':
+        return { backgroundColor: 'var(--secondary-100)', color: 'var(--secondary-600)' };
+      case 'low':
+        return { backgroundColor: 'var(--theme-background)', color: 'var(--text-color)', opacity: 0.85 };
+      default:
+        return { backgroundColor: 'var(--theme-background)', color: 'var(--text-color)', opacity: 0.8 };
+    }
+  };
+
+  const calculateAverageWellness = () => {
+    if (patients.length === 0) return 0;
+    const total = patients.reduce((sum, p) => sum + (p.stats?.wellness || 0), 0);
+    return Math.round(total / patients.length);
+  };
+
+  const calculateTotalTasks = () => {
+    return patients.reduce((sum, p) => sum + (p.stats?.totalTasks || 0), 0);
+  };
+
+  const calculateCompletedTasks = () => {
+    return patients.reduce((sum, p) => sum + (p.stats?.completedTasks || 0), 0);
+  };
+
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  if (loading) {
+    return (
+      <CaregiverLayout>
+        <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--theme-background)' }}>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: 'var(--primary-500)' }}></div>
+            <p className="text-lg" style={{ color: 'var(--text-color)' }}>Loading dashboard...</p>
           </div>
         </div>
-      </motion.header>
+      </CaregiverLayout>
+    );
+  }
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Quick Stats */}
-        <motion.div 
-          className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center justify-between">
+  return (
+    <CaregiverLayout>
+      {showAddPatientModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-lg rounded-2xl shadow-xl border"
+            style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+          >
+            <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--border-color)' }}>
               <div>
-                <p className="text-gray-600 text-sm font-medium">Task Completion</p>
-                <p className="text-2xl font-bold text-gray-900">{mockData.taskCompletion.percentage}%</p>
-                <p className="text-sm text-gray-500">{mockData.taskCompletion.completed}/{mockData.taskCompletion.total} tasks</p>
+                <h3 className="text-lg font-bold" style={{ color: 'var(--text-color)' }}>Add Patient</h3>
+                <p className="text-sm opacity-70" style={{ color: 'var(--text-color)' }}>Create an invite code for your patient to complete signup.</p>
               </div>
-              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
+              <button
+                onClick={() => {
+                  setShowAddPatientModal(false);
+                  setInviteForm({ patientName: '', patientEmail: '', age: '', neurotype: '' });
+                  setInviteCreateError('');
+                  setCreatedInvite(null);
+                }}
+                className="px-3 py-2 rounded-lg border"
+                style={{ borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+              >
+                ×
+              </button>
             </div>
-          </div>
 
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm font-medium">Avg. Sleep</p>
-                <p className="text-2xl font-bold text-gray-900">7.8h</p>
-                <p className="text-sm text-gray-500">Last 7 days</p>
-              </div>
-              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <ClockIcon className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm font-medium">Mood Trend</p>
-                <p className="text-2xl font-bold text-gray-900">↗️</p>
-                <p className="text-sm text-gray-500">Improving</p>
-              </div>
-              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-purple-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm font-medium">Active Days</p>
-                <p className="text-2xl font-bold text-gray-900">6/7</p>
-                <p className="text-sm text-gray-500">This week</p>
-              </div>
-              <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Activity className="h-6 w-6 text-yellow-600" />
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Emotion Breakdown Chart */}
-        <motion.div 
-          className="bg-white rounded-2xl p-6 shadow-lg mb-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-        >
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Emotion Breakdown (Last 30 Days)</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              {mockData.emotionBreakdown.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`h-4 w-4 rounded-full ${item.color}`}></div>
-                    <span className="text-sm font-medium text-gray-700">{item.emotion}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-600">{item.count}</span>
-                    <span className="text-sm font-bold text-gray-900">{item.percentage}%</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-center">
-              <div className="relative w-32 h-32">
-                <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
-                  {mockData.emotionBreakdown.map((item, index) => {
-                    const cumulativePercentage = mockData.emotionBreakdown
-                      .slice(0, index)
-                      .reduce((sum, prev) => sum + prev.percentage, 0);
-                    const strokeDasharray = `${item.percentage} ${100 - item.percentage}`;
-                    const strokeDashoffset = 100 - cumulativePercentage;
-                    
-                    return (
-                      <circle
-                        key={index}
-                        cx="50"
-                        cy="50"
-                        r="40"
-                        fill="none"
-                        stroke={item.color.replace('bg-', '').replace('-500', '-500')}
-                        strokeWidth="8"
-                        strokeDasharray={strokeDasharray}
-                        strokeDashoffset={strokeDashoffset}
-                        className="transition-all duration-1000"
+            <div className="p-6 space-y-4">
+              {!createdInvite ? (
+                <form onSubmit={handleCreateInvite} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>Patient Name</label>
+                      <input
+                        value={inviteForm.patientName}
+                        onChange={(e) => setInviteForm((p) => ({ ...p, patientName: e.target.value }))}
+                        className="w-full px-4 py-2 rounded-lg border"
+                        style={{ backgroundColor: 'var(--theme-background)', borderColor: 'var(--border-color)', color: 'var(--text-color)', outline: 'none' }}
+                        placeholder="Patient name"
+                        required
                       />
-                    );
-                  })}
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-lg font-bold text-gray-900">43</span>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>Age (optional)</label>
+                      <input
+                        type="number"
+                        value={inviteForm.age}
+                        onChange={(e) => setInviteForm((p) => ({ ...p, age: e.target.value }))}
+                        className="w-full px-4 py-2 rounded-lg border"
+                        style={{ backgroundColor: 'var(--theme-background)', borderColor: 'var(--border-color)', color: 'var(--text-color)', outline: 'none' }}
+                        placeholder=""
+                        min="13"
+                        max="120"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>Patient Email</label>
+                    <input
+                      type="email"
+                      value={inviteForm.patientEmail}
+                      onChange={(e) => setInviteForm((p) => ({ ...p, patientEmail: e.target.value }))}
+                      placeholder="patient@example.com"
+                      className="w-full px-4 py-2 rounded-lg border"
+                      style={{ backgroundColor: 'var(--theme-background)', borderColor: 'var(--border-color)', color: 'var(--text-color)', outline: 'none' }}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>Neurotype (optional)</label>
+                    <select
+                      value={inviteForm.neurotype}
+                      onChange={(e) => setInviteForm((p) => ({ ...p, neurotype: e.target.value }))}
+                      className="w-full px-4 py-2 rounded-lg border"
+                      style={{ backgroundColor: 'var(--theme-background)', borderColor: 'var(--border-color)', color: 'var(--text-color)', outline: 'none' }}
+                    >
+                      <option value="">Select…</option>
+                      <option value="ADHD">ADHD</option>
+                      <option value="Autism">Autism</option>
+                      <option value="Anxiety">Anxiety</option>
+                      <option value="Dyslexia">Dyslexia</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  {inviteCreateError && (
+                    <div className="p-3 rounded-lg border" style={{ borderColor: 'var(--border-color)', color: 'var(--text-color)' }}>
+                      <div className="flex items-start space-x-2">
+                        <AlertCircle className="h-5 w-5" style={{ color: 'var(--primary-500)' }} />
+                        <p className="text-sm">{inviteCreateError}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full px-4 py-2 rounded-lg text-white font-medium disabled:opacity-50"
+                    style={{ backgroundColor: 'var(--primary-500)' }}
+                    disabled={inviteCreateLoading}
+                  >
+                    {inviteCreateLoading ? 'Creating…' : 'Create Invite Code'}
+                  </button>
+                </form>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl border" style={{ borderColor: 'var(--border-color)' }}>
+                    <p className="text-sm opacity-70" style={{ color: 'var(--text-color)' }}>Invite created for</p>
+                    <p className="font-semibold" style={{ color: 'var(--text-color)' }}>{createdInvite.patientDetails?.name}</p>
+                    <p className="text-sm opacity-70" style={{ color: 'var(--text-color)' }}>{createdInvite.patientEmail || createdInvite.maskedEmail}</p>
+                    <div className="mt-4">
+                      <p className="text-sm opacity-70" style={{ color: 'var(--text-color)' }}>Invite code</p>
+                      <div className="mt-1 flex items-center justify-between gap-3 p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-background)' }}>
+                        <p className="font-mono text-lg" style={{ color: 'var(--text-color)' }}>{createdInvite.code}</p>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(createdInvite.code);
+                              alert('Copied');
+                            } catch {
+                              alert('Copy failed');
+                            }
+                          }}
+                          className="px-3 py-2 rounded-lg border"
+                          style={{ borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      <p className="text-xs mt-2 opacity-70" style={{ color: 'var(--text-color)' }}>
+                        Patient uses this code at /join, then verifies email with OTP.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setShowAddPatientModal(false);
+                      setInviteForm({ patientName: '', patientEmail: '', age: '', neurotype: '' });
+                      setInviteCreateError('');
+                      setCreatedInvite(null);
+                    }}
+                    className="w-full px-4 py-2 rounded-lg text-white font-medium"
+                    style={{ backgroundColor: 'var(--primary-500)' }}
+                  >
+                    Done
+                  </button>
                 </div>
-              </div>
+              )}
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
+      )}
 
-        {/* Daily Progress Table */}
-        <motion.div 
-          className="bg-white rounded-2xl p-6 shadow-lg mb-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-        >
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Daily Progress Report</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Emotion</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Tasks Completed</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Recommendation</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mockData.emotions.map((day, index) => (
-                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 text-sm text-gray-900">{day.date}</td>
-                    <td className="py-3 px-4">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getEmotionBgColor(day.emotion)} ${getEmotionColor(day.emotion)}`}>
-                        {day.emotion}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-900">
-                      {day.tasksCompleted}/{day.totalTasks}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-600">{day.recommendation}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-
-        {/* AI Recommendations */}
-        <motion.div 
-          className="bg-white rounded-2xl p-6 shadow-lg mb-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.8 }}
-        >
-          <h3 className="text-lg font-bold text-gray-900 mb-4">AI Recommendations</h3>
-          <div className="space-y-4">
-            {mockData.aiRecommendations.map((recommendation, index) => (
-              <div key={index} className="flex items-start space-x-3 p-4 rounded-lg border border-gray-200">
-                {getRecommendationIcon(recommendation.type)}
-                <div className="flex-1">
-                  <p className="text-sm text-gray-700">{recommendation.message}</p>
-                  <span className={`inline-block mt-2 px-2 py-1 rounded-full text-xs font-medium ${
-                    recommendation.priority === 'high' ? 'bg-red-100 text-red-700' :
-                    recommendation.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-green-100 text-green-700'
-                  }`}>
-                    {recommendation.priority} priority
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Sleep Chart */}
-        <motion.div 
-          className="bg-white rounded-2xl p-6 shadow-lg"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 1.0 }}
-        >
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Sleep Quality Trend</h3>
-          <div className="flex items-end space-x-2 h-32">
-            {mockData.sleepData.map((day, index) => (
-              <div key={index} className="flex flex-col items-center space-y-2">
-                <div 
-                  className="bg-blue-500 rounded-t-lg transition-all duration-1000"
-                  style={{ 
-                    height: `${(day.hours / 10) * 100}px`,
-                    width: '24px'
-                  }}
-                ></div>
-                <span className="text-xs text-gray-600">{day.day}</span>
-                <span className="text-xs font-medium text-gray-900">{day.hours}h</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
+      {/* Page Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold" style={{ color: 'var(--text-color)' }}>Patient Dashboard</h1>
+        <p className="mt-2 opacity-70" style={{ color: 'var(--text-color)' }}>Monitor progress and provide support to your patients</p>
       </div>
 
-      {/* Bottom Navigation */}
-      <motion.nav 
-        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200"
-        initial={{ opacity: 0, y: 100 }}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 rounded-lg border"
+          style={{
+            backgroundColor: 'rgba(var(--primary-rgb), 0.10)',
+            borderColor: 'var(--primary-500)',
+            color: 'var(--text-color)'
+          }}
+        >
+          {error}
+        </motion.div>
+      )}
+
+      {/* Quick Stats */}
+      <motion.div 
+        className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 1.2 }}
+        transition={{ duration: 0.6, delay: 0.2 }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-around py-4">
-            <button className="flex flex-col items-center space-y-1 text-gray-400 hover:text-gray-600 transition-colors">
-              <Home size={20} />
-              <span className="text-xs">Home</span>
-            </button>
-            <button className="flex flex-col items-center space-y-1 text-gray-400 hover:text-gray-600 transition-colors">
-              <Heart size={20} />
-              <span className="text-xs">Emotions</span>
-            </button>
-            <button className="flex flex-col items-center space-y-1 text-gray-400 hover:text-gray-600 transition-colors">
-              <CheckSquare size={20} />
-              <span className="text-xs">Tasks</span>
-            </button>
-            <button className="flex flex-col items-center space-y-1 text-gray-400 hover:text-gray-600 transition-colors">
-              <BookOpen size={20} />
-              <span className="text-xs">Journal</span>
-            </button>
-            <button className="flex flex-col items-center space-y-1 text-blue-600">
-              <Users size={20} />
-              <span className="text-xs">Caregiver</span>
-            </button>
+        <div className="rounded-2xl p-6 shadow-lg" style={{ backgroundColor: 'var(--card-bg)' }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium mb-1 opacity-70" style={{ color: 'var(--text-color)' }}>Total Patients</p>
+              <p className="text-3xl font-bold" style={{ color: 'var(--text-color)' }}>{patients.length}</p>
+            </div>
+            <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--primary-100)' }}>
+              <Users className="h-6 w-6" style={{ color: 'var(--primary-600)' }} />
+            </div>
           </div>
         </div>
-      </motion.nav>
-    </div>
+
+        <div className="rounded-2xl p-6 shadow-lg" style={{ backgroundColor: 'var(--card-bg)' }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium mb-1 opacity-70" style={{ color: 'var(--text-color)' }}>Avg Wellness</p>
+              <p className="text-3xl font-bold" style={{ color: 'var(--text-color)' }}>{calculateAverageWellness()}%</p>
+            </div>
+            <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--primary-100)' }}>
+              <Heart className="h-6 w-6" style={{ color: 'var(--primary-600)' }} />
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl p-6 shadow-lg" style={{ backgroundColor: 'var(--card-bg)' }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium mb-1 opacity-70" style={{ color: 'var(--text-color)' }}>Total Tasks</p>
+              <p className="text-3xl font-bold" style={{ color: 'var(--text-color)' }}>{calculateTotalTasks()}</p>
+              <p className="text-sm opacity-60" style={{ color: 'var(--text-color)' }}>{calculateCompletedTasks()} completed</p>
+            </div>
+            <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--primary-100)' }}>
+              <CheckCircle className="h-6 w-6" style={{ color: 'var(--primary-600)' }} />
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl p-6 shadow-lg" style={{ backgroundColor: 'var(--card-bg)' }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium mb-1 opacity-70" style={{ color: 'var(--text-color)' }}>Completion Rate</p>
+              <p className="text-3xl font-bold" style={{ color: 'var(--text-color)' }}>
+                {calculateTotalTasks() > 0 ? Math.round((calculateCompletedTasks() / calculateTotalTasks()) * 100) : 0}%
+              </p>
+            </div>
+            <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--primary-100)' }}>
+              <BarChart3 className="h-6 w-6" style={{ color: 'var(--primary-600)' }} />
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Add Patient Button */}
+      <motion.div
+        className="mb-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.3 }}
+      >
+        <button
+          onClick={() => setShowAddPatientModal(true)}
+          className="flex items-center space-x-2 px-6 py-3 rounded-lg text-white font-medium shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+          style={{ backgroundColor: 'var(--primary-500)' }}
+        >
+          <UserPlus className="h-5 w-5" />
+          <span>Add Patient</span>
+        </button>
+      </motion.div>
+
+      {/* Invites Section */}
+      <motion.div
+        className="mb-8"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.35 }}
+      >
+        <div className="rounded-2xl p-6 shadow-lg" style={{ backgroundColor: 'var(--card-bg)' }}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setInvitesExpanded((v) => !v)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border"
+                style={{ borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+              >
+                {invitesExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                <span className="font-semibold">Patient Invites</span>
+                <span className="text-sm opacity-70">({invites.length})</span>
+              </button>
+
+              <button
+                onClick={fetchInvites}
+                className="flex items-center space-x-2 px-4 py-2 rounded-lg border hover:shadow-md transition-all"
+                style={{ borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span>{invitesLoading ? 'Refreshing…' : 'Refresh'}</span>
+              </button>
+            </div>
+          </div>
+
+          {invitesExpanded && (
+            <>
+              {invitesError && (
+                <div className="mb-4 p-3 rounded-lg border" style={{ borderColor: 'var(--border-color)', color: 'var(--text-color)' }}>
+                  {invitesError}
+                </div>
+              )}
+
+              {invites.length === 0 ? (
+                <p className="text-sm opacity-70" style={{ color: 'var(--text-color)' }}>No invites yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {invites.map((inv) => (
+                    <div key={inv.id} className="p-4 rounded-xl border" style={{ borderColor: 'var(--border-color)' }}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold" style={{ color: 'var(--text-color)' }}>{inv.patientDetails?.name || 'Patient'}</p>
+                          <p className="text-sm opacity-70" style={{ color: 'var(--text-color)' }}>{inv.patientEmail || inv.maskedEmail}</p>
+                          <p className="text-xs opacity-70 mt-1" style={{ color: 'var(--text-color)' }}>
+                            Status: {inv.status} • Expires: {formatDate(inv.expiresAt)}
+                          </p>
+
+                          {inviteCodeErrorById[inv.id] && (
+                            <p className="text-xs mt-2" style={{ color: 'var(--text-color)', opacity: 0.85 }}>
+                              {inviteCodeErrorById[inv.id]}
+                            </p>
+                          )}
+
+                          {inviteCodeById[inv.id] !== undefined && (
+                            <div className="mt-2 flex items-center justify-between gap-3 p-2 rounded-lg" style={{ backgroundColor: 'var(--theme-background)' }}>
+                              <p className="font-mono" style={{ color: 'var(--text-color)' }}>{inviteCodeById[inv.id]}</p>
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(inviteCodeById[inv.id] || '');
+                                    alert('Invite code copied');
+                                  } catch {
+                                    alert('Could not copy invite code');
+                                  }
+                                }}
+                                className="px-3 py-1 rounded-lg border text-sm"
+                                style={{ borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {(inv.status === 'PENDING' || inv.status === 'EXPIRED') && (
+                            <button
+                              onClick={() => handleToggleInviteCode(inv.id)}
+                              className="px-3 py-2 rounded-lg border text-sm"
+                              style={{ borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                              disabled={inviteCodeLoadingById[inv.id]}
+                            >
+                              {inviteCodeLoadingById[inv.id]
+                                ? 'Loading…'
+                                : inviteCodeById[inv.id] !== undefined
+                                  ? 'Hide Code'
+                                  : 'View Code'}
+                            </button>
+                          )}
+
+                          {(inv.status === 'PENDING' || inv.status === 'EXPIRED') && (
+                            <button
+                              onClick={() => handleRegenerateInvite(inv.id)}
+                              className="px-3 py-2 rounded-lg text-white text-sm"
+                              style={{ backgroundColor: 'var(--primary-500)' }}
+                            >
+                              Regenerate
+                            </button>
+                          )}
+
+                          {inv.status === 'PENDING' && (
+                            <button
+                              onClick={() => handleRevokeInvite(inv.id)}
+                              className="px-3 py-2 rounded-lg border text-sm"
+                              style={{ borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                            >
+                              Revoke
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Patient List */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.4 }}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold" style={{ color: 'var(--text-color)' }}>
+            Patients ({patients.length})
+          </h2>
+          <button
+            onClick={fetchPatients}
+            className="flex items-center space-x-2 px-4 py-2 rounded-lg border hover:shadow-md transition-all"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span>Refresh</span>
+          </button>
+        </div>
+
+        {patients.length === 0 ? (
+          <div className="text-center py-12 rounded-lg" style={{ backgroundColor: 'var(--card-bg)' }}>
+            <Users className="h-16 w-16 mx-auto mb-4 opacity-50" style={{ color: 'var(--text-color)' }} />
+            <p className="text-lg font-medium mb-2" style={{ color: 'var(--text-color)' }}>No patients yet</p>
+            <p className="opacity-70" style={{ color: 'var(--text-color)' }}>Create an invite code so patients can complete signup</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6">
+            {patients.map((patient) => (
+              <motion.div
+                key={patient.id}
+                className="rounded-xl shadow-lg overflow-hidden cursor-pointer"
+                style={{ backgroundColor: 'var(--card-bg)', borderLeft: '4px solid var(--primary-500)' }}
+                whileHover={{ scale: 1.01 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => navigate(`/caregiver/patient/${patient.id}`)}
+              >
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="h-12 w-12 rounded-full flex items-center justify-center text-white text-lg font-bold" style={{ backgroundColor: 'var(--primary-500)' }}>
+                        {patient.name?.charAt(0) || 'P'}
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold" style={{ color: 'var(--text-color)' }}>{patient.name}</h3>
+                        <p className="text-sm opacity-70" style={{ color: 'var(--text-color)' }}>{patient.email}</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-6 w-6" style={{ color: 'var(--primary-500)' }} />
+                  </div>
+
+                  {/* Patient Stats Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                    <div>
+                      <p className="text-xs opacity-70 mb-1" style={{ color: 'var(--text-color)' }}>Wellness Score</p>
+                      <p className="text-2xl font-bold" style={{ color: 'var(--primary-500)' }}>{patient.wellnessScore || 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs opacity-70 mb-1" style={{ color: 'var(--text-color)' }}>Mood Trend</p>
+                      <div className="flex items-center space-x-1">
+                        {patient.moodTrend === 'improving' ? (
+                          <TrendingUp className="h-5 w-5" style={{ color: 'var(--primary-600)' }} />
+                        ) : patient.moodTrend === 'declining' ? (
+                          <TrendingDown className="h-5 w-5" style={{ color: 'var(--secondary-600)' }} />
+                        ) : (
+                          <Minus className="h-5 w-5" style={{ color: 'var(--text-color)', opacity: 0.6 }} />
+                        )}
+                        <span className="text-sm font-medium capitalize">{patient.moodTrend || 'stable'}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs opacity-70 mb-1" style={{ color: 'var(--text-color)' }}>Tasks</p>
+                      <p className="text-lg font-bold" style={{ color: 'var(--text-color)' }}>
+                        {patient.totalTasks > 0 ? Math.round((patient.tasksCompleted / patient.totalTasks) * 100) : 0}%
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs opacity-70 mb-1" style={{ color: 'var(--text-color)' }}>Entries</p>
+                      <p className="text-lg font-bold" style={{ color: 'var(--text-color)' }}>
+                        {patient.journalCount || 0}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs opacity-70 mb-1" style={{ color: 'var(--text-color)' }}>Last Active</p>
+                      <p className="text-sm font-medium" style={{ color: 'var(--text-color)' }}>
+                        {patient.lastActive ? formatDate(patient.lastActive) : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Recent Emotions - 7 emoji grid */}
+                  {patient.recentEmotions && patient.recentEmotions.length > 0 && (
+                    <div className="pt-4 border-t" style={{ borderColor: 'var(--border-color)' }}>
+                      <p className="text-xs font-semibold mb-2 opacity-70" style={{ color: 'var(--text-color)' }}>RECENT EMOTIONS</p>
+                      <div className="flex items-center gap-2">
+                        {patient.recentEmotions.slice(0, 7).map((emotion, idx) => (
+                          <div
+                            key={idx}
+                            className="flex-1 aspect-square rounded-lg flex items-center justify-center text-2xl hover:scale-110 transition-transform"
+                            style={{ backgroundColor: 'var(--theme-background)' }}
+                            title={`${emotion.emotion} (${emotion.intensity}/10)`}
+                          >
+                            {emotion.emoji || '😊'}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+    </CaregiverLayout>
   );
 };
 

@@ -49,7 +49,7 @@ const register = async (req, res) => {
       });
     }
 
-    const { name, email, password } = req.body;
+    const { name, email, password, age, neurotype } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -60,11 +60,13 @@ const register = async (req, res) => {
       });
     }
 
-    // Create new user
+    // Create new user with age and neurotype
     const user = await User.create({
       name,
       email,
-      password
+      password,
+      age: age ? parseInt(age) : null,
+      neurotype: neurotype || null
     });
 
     // Generate token
@@ -77,7 +79,9 @@ const register = async (req, res) => {
         user: {
           id: user._id,
           name: user.name,
-          email: user.email
+          email: user.email,
+          age: user.age,
+          neurotype: user.neurotype
         },
         token
       }

@@ -14,6 +14,8 @@ const AuthForm = ({
     name: '',
     email: '',
     password: '',
+    age: '',
+    neurotype: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
@@ -89,15 +91,48 @@ const AuthForm = ({
       transition={{ duration: 0.5 }}
     >
       {!isLogin && (
-        <InputField
-          label="Full Name"
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
-          error={formErrors.name}
-          placeholder="Enter your full name"
-          required
-        />
+        <>
+          <InputField
+            label="Full Name"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            error={formErrors.name}
+            placeholder="Enter your full name"
+            required
+          />
+          
+          <div className="grid grid-cols-2 gap-4">
+            <InputField
+              label="Age"
+              type="number"
+              name="age"
+              value={formData.age}
+              onChange={handleChange}
+              error={formErrors.age}
+              placeholder="Enter your age"
+              min="13"
+              max="120"
+            />
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Neurotype</label>
+              <select
+                name="neurotype"
+                value={formData.neurotype}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="">Select neurotype...</option>
+                <option value="ADHD">ADHD</option>
+                <option value="Autism">Autism</option>
+                <option value="Anxiety">Anxiety</option>
+                <option value="Dyslexia">Dyslexia</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+        </>
       )}
 
       <InputField

@@ -106,7 +106,7 @@ const CaregiverPortal = () => {
   const averageTaskCompletion = (taskCompletionData.reduce((sum, day) => sum + (day.completed / day.total), 0) / taskCompletionData.length * 100).toFixed(0);
 
   return (
-    <div className="min-h-screen p-6" style={{ backgroundColor: 'var(--bg-color)' }}>
+    <div className="min-h-screen p-6" style={{ backgroundColor: 'var(--theme-background)' }}>
       <div className="max-w-7xl mx-auto">
         <motion.div
           variants={containerVariants}
@@ -136,7 +136,7 @@ const CaregiverPortal = () => {
                         : 'opacity-70 hover:opacity-100'
                     }`}
                     style={{
-                      backgroundColor: selectedTimeframe === timeframe ? 'var(--accent-color)' : 'transparent',
+                      backgroundColor: selectedTimeframe === timeframe ? 'var(--primary-500)' : 'transparent',
                       color: selectedTimeframe === timeframe ? 'white' : 'var(--text-color)'
                     }}
                   >
@@ -252,7 +252,7 @@ const CaregiverPortal = () => {
                 }}
               >
                 <h3 className="text-lg font-bold mb-4 flex items-center space-x-2" style={{ color: 'var(--text-color)' }}>
-                  <BarChart3 className="h-5 w-5" style={{ color: 'var(--accent-color)' }} />
+                  <BarChart3 className="h-5 w-5" style={{ color: 'var(--primary-500)' }} />
                   <span>Emotion Trend Analysis</span>
                 </h3>
                 <ResponsiveContainer width="100%" height={250}>
@@ -287,7 +287,7 @@ const CaregiverPortal = () => {
                 }}
               >
                 <h3 className="text-lg font-bold mb-4 flex items-center space-x-2" style={{ color: 'var(--text-color)' }}>
-                  <Target className="h-5 w-5" style={{ color: 'var(--accent-color)' }} />
+                  <Target className="h-5 w-5" style={{ color: 'var(--primary-500)' }} />
                   <span>Task Completion Rate</span>
                 </h3>
                 <ResponsiveContainer width="100%" height={250}>
@@ -304,7 +304,7 @@ const CaregiverPortal = () => {
                       labelStyle={{ color: 'var(--text-color)' }}
                       itemStyle={{ color: 'var(--text-color)' }}
                     />
-                    <Bar dataKey="completed" fill="var(--accent-color)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="completed" fill="var(--primary-500)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -321,7 +321,7 @@ const CaregiverPortal = () => {
               }}
             >
               <h3 className="text-lg font-bold mb-4 flex items-center space-x-2" style={{ color: 'var(--text-color)' }}>
-                <PieChart className="h-5 w-5" style={{ color: 'var(--accent-color)' }} />
+                <PieChart className="h-5 w-5" style={{ color: 'var(--primary-500)' }} />
                 <span>Emotion Distribution</span>
               </h3>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -379,7 +379,7 @@ const CaregiverPortal = () => {
               }}
             >
               <h3 className="text-lg font-bold mb-4 flex items-center space-x-2" style={{ color: 'var(--text-color)' }}>
-                <MessageSquare className="h-5 w-5" style={{ color: 'var(--accent-color)' }} />
+                <MessageSquare className="h-5 w-5" style={{ color: 'var(--primary-500)' }} />
                 <span>Recent Care Reports</span>
               </h3>
               <div className="space-y-4">
@@ -447,7 +447,7 @@ const CaregiverPortal = () => {
               }}
             >
               <h3 className="text-lg font-bold mb-4 flex items-center space-x-2" style={{ color: 'var(--text-color)' }}>
-                <Brain className="h-5 w-5" style={{ color: 'var(--accent-color)' }} />
+                <Brain className="h-5 w-5" style={{ color: 'var(--primary-500)' }} />
                 <span>AI Recommendations</span>
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

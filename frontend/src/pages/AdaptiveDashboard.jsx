@@ -63,10 +63,11 @@ const AdaptiveDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50">
+    <div style={{ backgroundColor: 'var(--theme-background)' }} className="min-h-screen">
       {/* Header */}
       <motion.div
-        className="bg-white shadow-sm"
+        style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}
+        className="shadow-sm"
         variants={itemVariants}
         initial="hidden"
         animate="visible"
@@ -75,12 +76,12 @@ const AdaptiveDashboard = () => {
           <div className="flex justify-between items-center py-6">
             {/* Time and Status */}
             <div className="flex items-center space-x-4">
-              <div className="text-2xl font-bold text-gray-900">
+              <div style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold">
                 {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-sm text-gray-600">LIVE</span>
+                <span style={{ color: 'var(--theme-muted-text)' }} className="text-sm">LIVE</span>
               </div>
             </div>
 
@@ -149,7 +150,7 @@ const AdaptiveDashboard = () => {
         >
           {/* Live Status Card */}
           <motion.div variants={itemVariants}>
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <div style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }} className="rounded-2xl p-6 shadow-lg border">
               <div className="flex items-center space-x-4">
                 <div className="h-16 w-16 bg-gradient-to-r from-orange-400 to-yellow-500 rounded-2xl flex items-center justify-center">
                   <Brain className="h-8 w-8 text-white" />
@@ -159,11 +160,11 @@ const AdaptiveDashboard = () => {
                     <div className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
                       LIVE
                     </div>
-                    <span className="text-lg font-semibold text-gray-900">
+                    <span style={{ color: 'var(--theme-text)' }} className="text-lg font-semibold">
                       {user?.name ? `${user.name} is` : 'User is'} focused and calm
                     </span>
                   </div>
-                  <div className="flex items-center space-x-4 text-sm text-gray-600">
+                  <div style={{ color: 'var(--theme-muted-text)' }} className="flex items-center space-x-4 text-sm">
                     <span>{currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                     <span>•</span>
                     <span>Emotion: Calm</span>
@@ -181,17 +182,17 @@ const AdaptiveDashboard = () => {
 
           {/* Key Metrics Grid */}
           <motion.div variants={itemVariants}>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Today's Overview</h2>
+            <h2 style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold mb-6">Today's Overview</h2>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Emotion Recognition */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+              <div style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }} className="rounded-2xl p-6 shadow-lg border">
                 <div className="flex items-center justify-between mb-4">
                   <div className="h-12 w-12 bg-orange-100 rounded-xl flex items-center justify-center">
                     <Heart className="h-6 w-6 text-orange-600" />
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">38%</div>
-                    <div className="text-sm text-gray-600">Emotion Stability</div>
+                    <div style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold">38%</div>
+                    <div style={{ color: 'var(--theme-muted-text)' }} className="text-sm">Emotion Stability</div>
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -205,14 +206,14 @@ const AdaptiveDashboard = () => {
               </div>
 
               {/* Task Completion */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+              <div style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }} className="rounded-2xl p-6 shadow-lg border">
                 <div className="flex items-center justify-between mb-4">
                   <div className="h-12 w-12 bg-green-100 rounded-xl flex items-center justify-center">
                     <Target className="h-6 w-6 text-green-600" />
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">62%</div>
-                    <div className="text-sm text-gray-600">Task Completion</div>
+                    <div style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold">62%</div>
+                    <div style={{ color: 'var(--theme-muted-text)' }} className="text-sm">Task Completion</div>
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -226,14 +227,14 @@ const AdaptiveDashboard = () => {
               </div>
 
               {/* Sleep Quality */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+              <div style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }} className="rounded-2xl p-6 shadow-lg border">
                 <div className="flex items-center justify-between mb-4">
                   <div className="h-12 w-12 bg-purple-100 rounded-xl flex items-center justify-center">
                     <Moon className="h-6 w-6 text-purple-600" />
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">87%</div>
-                    <div className="text-sm text-gray-600">Sleep Quality</div>
+                    <div style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold">87%</div>
+                    <div style={{ color: 'var(--theme-muted-text)' }} className="text-sm">Sleep Quality</div>
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -247,14 +248,14 @@ const AdaptiveDashboard = () => {
               </div>
 
               {/* Wellness Index */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+              <div style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }} className="rounded-2xl p-6 shadow-lg border">
                 <div className="flex items-center justify-between mb-4">
                   <div className="h-12 w-12 bg-pink-100 rounded-xl flex items-center justify-center">
                     <Activity className="h-6 w-6 text-pink-600" />
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">76%</div>
-                    <div className="text-sm text-gray-600">Wellness Index</div>
+                    <div style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold">76%</div>
+                    <div style={{ color: 'var(--theme-muted-text)' }} className="text-sm">Wellness Index</div>
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -271,11 +272,11 @@ const AdaptiveDashboard = () => {
 
           {/* Behavior Tracking */}
           <motion.div variants={itemVariants}>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Behavior Patterns</h2>
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <h2 style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold mb-6">Behavior Patterns</h2>
+            <div style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }} className="rounded-2xl p-6 shadow-lg border">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Today's Patterns</h3>
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <h3 style={{ color: 'var(--theme-text)' }} className="text-lg font-semibold">Today's Patterns</h3>
+                <div style={{ color: 'var(--theme-muted-text)' }} className="flex items-center space-x-2 text-sm">
                   <span>2 New Insights</span>
                   <ChevronRight size={16} />
                 </div>
@@ -311,10 +312,10 @@ const AdaptiveDashboard = () => {
 
           {/* AI Insights */}
           <motion.div variants={itemVariants}>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">AI Insights</h2>
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <h2 style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold mb-6">AI Insights</h2>
+            <div style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }} className="rounded-2xl p-6 shadow-lg border">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">INSIGHTS</h3>
+                <h3 style={{ color: 'var(--theme-text)' }} className="text-lg font-semibold">INSIGHTS</h3>
                 <div className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">
                   2 New Notifications
                 </div>

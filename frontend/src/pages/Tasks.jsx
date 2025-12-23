@@ -21,7 +21,6 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
   CheckSquare,
-  Clock,
   Plus,
   Calendar,
   AlertCircle,
@@ -72,7 +71,6 @@ const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'done': return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-      case 'in-progress': return <Clock className="h-5 w-5 text-blue-500" />;
       default: return <Circle className="h-5 w-5 text-gray-400" />;
     }
   };
@@ -465,7 +463,7 @@ const Tasks = () => {
     if (!activeTask) return;
 
     // Check if dropped on a column (status change)
-    if (over.id === 'todo' || over.id === 'in-progress' || over.id === 'done') {
+    if (over.id === 'todo' || over.id === 'done') {
       const newStatus = over.id;
       if (newStatus !== activeTask.status) {
         const taskId = activeTask._id || activeTask.id;
@@ -487,8 +485,8 @@ const Tasks = () => {
   }, [tasks, handleTaskUpdate]);
 
   const groupedTasks = useMemo(() => ({
-    todo: tasks.filter(task => task.status === 'todo'),
-    'in-progress': tasks.filter(task => task.status === 'in-progress'),
+    // Treat legacy 'in-progress' tasks as 'todo' now that the UI only shows Todo/Done.
+    todo: tasks.filter(task => task.status === 'todo' || task.status === 'in-progress'),
     done: tasks.filter(task => task.status === 'done')
   }), [tasks]);
 
@@ -592,7 +590,7 @@ const Tasks = () => {
           onDragEnd={handleDragEnd}
         >
           <motion.div
-            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
@@ -601,15 +599,6 @@ const Tasks = () => {
               title="To Do"
               tasks={groupedTasks.todo}
               status="todo"
-              onTaskUpdate={handleTaskUpdate}
-              onTaskDelete={handleTaskDelete}
-              onTaskNudge={handleTaskNudge}
-            />
-
-            <TaskColumn
-              title="In Progress"
-              tasks={groupedTasks['in-progress']}
-              status="in-progress"
               onTaskUpdate={handleTaskUpdate}
               onTaskDelete={handleTaskDelete}
               onTaskNudge={handleTaskNudge}

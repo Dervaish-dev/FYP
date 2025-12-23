@@ -48,10 +48,11 @@ const EmotionRecognition = () => {
   const maxValue = Math.max(...emotionData.map(d => Math.max(d.happy, d.calm, d.stressed, d.sad)));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-rose-50">
+    <div style={{ backgroundColor: 'var(--theme-background)' }} className="min-h-screen">
       {/* Header */}
       <motion.div 
-        className="bg-white shadow-sm"
+        style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}
+        className="shadow-sm"
         variants={itemVariants}
         initial="hidden"
         animate="visible"
@@ -60,23 +61,23 @@ const EmotionRecognition = () => {
           <div className="flex justify-between items-center py-6">
             {/* Time and Back Button */}
             <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-600 hover:text-gray-900 transition-colors">
+              <button style={{ color: 'var(--theme-text)' }} className="p-2 hover:opacity-70 transition-opacity">
                 <ChevronLeft size={20} />
               </button>
-              <div className="text-2xl font-bold text-gray-900">9:41</div>
+              <div style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold">9:41</div>
             </div>
             
             {/* Title */}
             <div className="text-center">
-              <h1 className="text-xl font-bold text-gray-900">EMOTION RECOGNITION</h1>
+              <h1 style={{ color: 'var(--theme-text)' }} className="text-xl font-bold">EMOTION RECOGNITION</h1>
             </div>
 
             {/* Share and Notifications */}
             <div className="flex items-center space-x-3">
-              <button className="p-2 text-gray-600 hover:text-gray-900 transition-colors">
+              <button style={{ color: 'var(--theme-text)' }} className="p-2 hover:opacity-70 transition-opacity">
                 <Share2 size={20} />
               </button>
-              <button className="p-2 text-gray-600 hover:text-gray-900 transition-colors">
+              <button style={{ color: 'var(--theme-text)' }} className="p-2 hover:opacity-70 transition-opacity">
                 <Bell size={20} />
               </button>
             </div>
@@ -86,7 +87,8 @@ const EmotionRecognition = () => {
 
       {/* Date Selector */}
       <motion.div 
-        className="bg-white border-b border-gray-100"
+        style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}
+        className="border-b"
         variants={itemVariants}
         initial="hidden"
         animate="visible"
@@ -96,14 +98,13 @@ const EmotionRecognition = () => {
             <div className="flex space-x-6">
               {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day, index) => (
                 <div key={day} className="text-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    day === 'THU' 
-                      ? 'bg-gray-900 text-white' 
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}>
+                  <div style={{
+                    backgroundColor: day === 'THU' ? 'var(--theme-primary)' : 'transparent',
+                    color: day === 'THU' ? 'white' : 'var(--theme-text)',
+                  }} className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium">
                     {day}
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div style={{ color: 'var(--theme-muted-text)' }} className="text-xs mt-1">
                     {15 + index}
                   </div>
                 </div>
@@ -123,15 +124,15 @@ const EmotionRecognition = () => {
         >
           {/* Current Emotion Status */}
           <motion.div variants={itemVariants}>
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <div style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }} className="rounded-2xl p-6 shadow-lg border">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-4">
                   <div className="h-16 w-16 bg-gradient-to-r from-pink-400 to-rose-500 rounded-2xl flex items-center justify-center">
                     <Heart className="h-8 w-8 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">76% EMOTION STABILITY</h2>
-                    <p className="text-sm text-gray-600">Current emotional state: Calm & Focused</p>
+                    <h2 style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold">76% EMOTION STABILITY</h2>
+                    <p style={{ color: 'var(--theme-muted-text)' }} className="text-sm">Current emotional state: Calm & Focused</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -154,17 +155,17 @@ const EmotionRecognition = () => {
 
           {/* Emotion Breakdown */}
           <motion.div variants={itemVariants}>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Today's Emotions</h2>
+            <h2 style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold mb-6">Today's Emotions</h2>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Happy */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+              <div style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }} className="rounded-2xl p-6 shadow-lg border">
                 <div className="flex items-center justify-between mb-4">
                   <div className="h-12 w-12 bg-yellow-100 rounded-xl flex items-center justify-center">
                     <Smile className="h-6 w-6 text-yellow-600" />
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">82%</div>
-                    <div className="text-sm text-gray-600">Happy</div>
+                    <div style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold">82%</div>
+                    <div style={{ color: 'var(--theme-muted-text)' }} className="text-sm">Happy</div>
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -178,14 +179,14 @@ const EmotionRecognition = () => {
               </div>
 
               {/* Calm */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+              <div style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }} className="rounded-2xl p-6 shadow-lg border">
                 <div className="flex items-center justify-between mb-4">
                   <div className="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center">
                     <Brain className="h-6 w-6 text-blue-600" />
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">72%</div>
-                    <div className="text-sm text-gray-600">Calm</div>
+                    <div style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold">72%</div>
+                    <div style={{ color: 'var(--theme-muted-text)' }} className="text-sm">Calm</div>
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -199,14 +200,14 @@ const EmotionRecognition = () => {
               </div>
 
               {/* Stressed */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+              <div style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }} className="rounded-2xl p-6 shadow-lg border">
                 <div className="flex items-center justify-between mb-4">
                   <div className="h-12 w-12 bg-red-100 rounded-xl flex items-center justify-center">
                     <Frown className="h-6 w-6 text-red-600" />
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">18%</div>
-                    <div className="text-sm text-gray-600">Stressed</div>
+                    <div style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold">18%</div>
+                    <div style={{ color: 'var(--theme-muted-text)' }} className="text-sm">Stressed</div>
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -220,14 +221,14 @@ const EmotionRecognition = () => {
               </div>
 
               {/* Sad */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+              <div style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }} className="rounded-2xl p-6 shadow-lg border">
                 <div className="flex items-center justify-between mb-4">
                   <div className="h-12 w-12 bg-gray-100 rounded-xl flex items-center justify-center">
                     <Meh className="h-6 w-6 text-gray-600" />
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">6%</div>
-                    <div className="text-sm text-gray-600">Sad</div>
+                    <div style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold">6%</div>
+                    <div style={{ color: 'var(--theme-muted-text)' }} className="text-sm">Sad</div>
                   </div>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -244,10 +245,10 @@ const EmotionRecognition = () => {
 
           {/* Weekly Emotion Chart */}
           <motion.div variants={itemVariants}>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Weekly Emotion Trends</h2>
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <h2 style={{ color: 'var(--theme-text)' }} className="text-2xl font-bold mb-6">Weekly Emotion Trends</h2>
+            <div style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }} className="rounded-2xl p-6 shadow-lg border">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Emotion Analysis</h3>
+                <h3 style={{ color: 'var(--theme-text)' }} className="text-lg font-semibold">Emotion Analysis</h3>
                 <div className="flex space-x-2">
                   <button className="px-3 py-1 text-sm bg-gray-100 text-gray-600 rounded-lg">DAILY</button>
                   <button className="px-3 py-1 text-sm bg-pink-100 text-pink-800 rounded-lg font-medium">WEEKLY</button>
@@ -386,7 +387,8 @@ const EmotionRecognition = () => {
 
       {/* Bottom Navigation */}
       <motion.div 
-        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200"
+        style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}
+        className="fixed bottom-0 left-0 right-0 border-t"
         variants={itemVariants}
         initial="hidden"
         animate="visible"
@@ -402,11 +404,11 @@ const EmotionRecognition = () => {
             ].map((item, index) => (
               <Link key={index} to={item.path}>
                 <motion.button
-                  className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
-                    item.active 
-                      ? 'bg-pink-100 text-pink-600' 
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                  style={{
+                    backgroundColor: item.active ? 'var(--theme-primary)' : 'transparent',
+                    color: item.active ? 'white' : 'var(--theme-text)',
+                  }}
+                  className="flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors hover:opacity-70"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >

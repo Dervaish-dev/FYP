@@ -1,405 +1,663 @@
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
-import { 
-  Target, 
-  CheckCircle,
-  Clock,
-  Calendar,
-  TrendingUp,
-  BarChart3,
-  ChevronLeft,
-  Share2,
-  Bell,
-  Plus,
-  Play
-} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { BarChart3, Calendar, CheckCircle, ChevronLeft, Clock, Plus, Target, X } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useNotifications, NOTIFICATION_TYPES } from '../components/NotificationCenter';
+import { taskAPI } from '../utils/api';
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.06 } }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0 }
+};
+
+const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+const isInRange = (date, start, end) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
+  return date.getTime() >= start.getTime() && date.getTime() < end.getTime();
+};
 
 const TaskScheduling = () => {
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { addNotification } = useNotifications();
+
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newTask, setNewTask] = useState({
+    title: '',
+    description: '',
+    category: 'General',
+    priority: 'medium',
+    dueTime: '',
+    repeat: 'once',
+    customInterval: '',
+    stepsText: ''
+  });
+
+  const fetchTasks = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setLoading(true);
+      setError('');
+      const list = await taskAPI.listByUser(user.id);
+      setTasks(Array.isArray(list) ? list : []);
+    } catch (e) {
+      setError(e?.message || 'Failed to fetch tasks');
+      setTasks([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
+
+  const stats = useMemo(() => {
+    const now = new Date();
+    const todayStart = startOfDay(now);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+
+    const next24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    const dueTodayCount = tasks.filter((t) => {
+      const due = new Date(t.dueTime);
+      return isInRange(due, todayStart, todayEnd);
+    }).length;
+
+    const completedTodayCount = tasks.filter((t) => {
+      if (t.status !== 'done' || !t.completedAt) return false;
+      const doneAt = new Date(t.completedAt);
+      return isInRange(doneAt, todayStart, todayEnd);
+    }).length;
+
+    const overdueCount = tasks.filter((t) => {
+      if (t.status === 'done') return false;
+      const due = new Date(t.dueTime);
+      return due.getTime() < now.getTime();
+    }).length;
+
+    const upcomingCount = tasks.filter((t) => {
+      if (t.status === 'done') return false;
+      const due = new Date(t.dueTime);
+      return due.getTime() >= now.getTime() && due.getTime() <= next24h.getTime();
+    }).length;
+
+    const categories = tasks.reduce((acc, t) => {
+      const name = String(t.category || 'General').trim() || 'General';
+      acc[name] = (acc[name] || 0) + 1;
+      return acc;
+    }, {});
+
+    const byDay = Array.from({ length: 7 }).map((_, idx) => {
+      const day = new Date(todayStart);
+      day.setDate(day.getDate() - (6 - idx));
+      const dayEnd = new Date(day);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+
+      const total = tasks.filter((t) => isInRange(new Date(t.dueTime), day, dayEnd)).length;
+      const completed = tasks.filter((t) => t.status === 'done' && isInRange(new Date(t.completedAt), day, dayEnd)).length;
+
+      return {
+        label: day.toLocaleDateString([], { weekday: 'short' }),
+        completed,
+        total
+      };
+    });
+
+    return { dueTodayCount, completedTodayCount, overdueCount, upcomingCount, categories, byDay };
+  }, [tasks]);
+
+  const maxTasks = Math.max(1, ...stats.byDay.map((d) => d.total), ...stats.byDay.map((d) => d.completed));
+
+  const upcomingTasks = useMemo(() => {
+    return tasks
+      .filter((t) => t.status !== 'done')
+      .slice()
+      .sort((a, b) => new Date(a.dueTime).getTime() - new Date(b.dueTime).getTime())
+      .slice(0, 8);
+  }, [tasks]);
+
+  const onCreate = async (e) => {
+    e.preventDefault();
+    if (!user?.id) return;
+
+    try {
+      setCreating(true);
+      setError('');
+
+      const steps = String(newTask.stepsText || '')
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((text) => ({ id: `${Date.now()}-${Math.random()}`, text, done: false }));
+
+      const customInterval =
+        newTask.repeat === 'custom' && newTask.customInterval !== ''
+          ? Number(newTask.customInterval)
+          : null;
+
+      await taskAPI.create({
+        userId: user.id,
+        title: newTask.title,
+        description: newTask.description,
+        category: newTask.category,
+        priority: newTask.priority,
+        dueTime: newTask.dueTime,
+        repeat: newTask.repeat,
+        customInterval: customInterval && customInterval > 0 ? customInterval : null,
+        steps
+      });
+
+      addNotification({
+        type: NOTIFICATION_TYPES.SUCCESS,
+        title: 'Task created',
+        message: 'Added to your schedule.'
+      });
+
+      setShowCreate(false);
+      setNewTask({
+        title: '',
+        description: '',
+        category: 'General',
+        priority: 'medium',
+        dueTime: '',
+        repeat: 'once',
+        customInterval: '',
+        stepsText: ''
+      });
+
+      fetchTasks();
+    } catch (e2) {
+      setError(e2?.message || 'Failed to create task');
+    } finally {
+      setCreating(false);
     }
   };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5 }
-    }
-  };
-
-  const taskData = [
-    { day: 'F', completed: 8, total: 10 },
-    { day: 'S', completed: 9, total: 10 },
-    { day: 'S', completed: 6, total: 10 },
-    { day: 'M', completed: 7, total: 10 },
-    { day: 'T', completed: 9, total: 10 },
-    { day: 'W', completed: 8, total: 10 },
-    { day: 'T', completed: 7, total: 10 }
-  ];
-
-  const maxTasks = Math.max(...taskData.map(d => d.total));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
-      {/* Header */}
-      <motion.div 
-        className="bg-white shadow-sm"
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--theme-background)' }}>
+      <motion.div
+        className="shadow-sm"
         variants={itemVariants}
         initial="hidden"
         animate="visible"
+        style={{ backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)' }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
-            {/* Time and Back Button */}
             <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-600 hover:text-gray-900 transition-colors">
+              <button
+                onClick={() => navigate('/tasks')}
+                className="p-2 transition-colors"
+                style={{ color: 'var(--text-color)' }}
+              >
                 <ChevronLeft size={20} />
               </button>
-              <div className="text-2xl font-bold text-gray-900">9:41</div>
-            </div>
-            
-            {/* Title */}
-            <div className="text-center">
-              <h1 className="text-xl font-bold text-gray-900">TASK SCHEDULING</h1>
+              <div className="text-2xl font-bold" style={{ color: 'var(--text-color)' }}>
+                Task Scheduling
+              </div>
             </div>
 
-            {/* Share and Notifications */}
-            <div className="flex items-center space-x-3">
-              <button className="p-2 text-gray-600 hover:text-gray-900 transition-colors">
-                <Share2 size={20} />
-              </button>
-              <button className="p-2 text-gray-600 hover:text-gray-900 transition-colors">
-                <Bell size={20} />
-              </button>
-            </div>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-white"
+              style={{ backgroundColor: 'var(--primary-500)' }}
+            >
+              <Plus size={18} />
+              New
+            </button>
           </div>
         </div>
       </motion.div>
 
-      {/* Date Selector */}
-      <motion.div 
-        className="bg-white border-b border-gray-100"
-        variants={itemVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex space-x-6">
-              {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day, index) => (
-                <div key={day} className="text-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    day === 'THU' 
-                      ? 'bg-gray-900 text-white' 
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}>
-                    {day}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {15 + index}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="space-y-8"
-        >
-          {/* Task Completion Status */}
+        {error && (
+          <div
+            className="mb-6 p-4 rounded-lg border"
+            style={{
+              backgroundColor: 'rgba(var(--primary-rgb), 0.10)',
+              borderColor: 'var(--primary-500)',
+              color: 'var(--text-color)'
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8">
           <motion.div variants={itemVariants}>
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <div
+              className="rounded-2xl p-6 shadow-lg border"
+              style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+            >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-4">
-                  <div className="h-16 w-16 bg-gradient-to-r from-green-400 to-emerald-500 rounded-2xl flex items-center justify-center">
+                  <div
+                    className="h-16 w-16 rounded-2xl flex items-center justify-center"
+                    style={{ backgroundColor: 'var(--primary-500)' }}
+                  >
                     <Target className="h-8 w-8 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">7 TASKS COMPLETED</h2>
-                    <p className="text-sm text-gray-600">Today's task completion rate</p>
+                    <h2 className="text-2xl font-bold" style={{ color: 'var(--text-color)' }}>
+                      {loading ? 'Loading…' : `${stats.completedTodayCount} TASKS COMPLETED`}
+                    </h2>
+                    <p className="text-sm opacity-70" style={{ color: 'var(--text-color)' }}>
+                      Today (based on completedAt)
+                    </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                    ON TRACK
-                  </div>
+                <div
+                  className="px-3 py-1 rounded-full text-sm font-medium"
+                  style={{ backgroundColor: 'var(--primary-100)', color: 'var(--primary-600)' }}
+                >
+                  {stats.overdueCount > 0 ? 'NEEDS ATTENTION' : 'ON TRACK'}
                 </div>
               </div>
-              
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <motion.div 
-                  className="bg-gradient-to-r from-green-400 to-emerald-500 h-3 rounded-full"
+
+              <div className="w-full rounded-full h-3" style={{ backgroundColor: 'var(--border-color)' }}>
+                <motion.div
+                  className="h-3 rounded-full"
                   initial={{ width: 0 }}
-                  animate={{ width: '70%' }}
-                  transition={{ duration: 1, delay: 0.5 }}
+                  animate={{
+                    width: `${
+                      stats.dueTodayCount === 0
+                        ? 0
+                        : Math.min(100, Math.round((stats.completedTodayCount / stats.dueTodayCount) * 100))
+                    }%`
+                  }}
+                  transition={{ duration: 0.9, delay: 0.2 }}
+                  style={{ backgroundColor: 'var(--primary-500)' }}
                 />
               </div>
-              <div className="flex justify-between text-sm text-gray-600 mt-2">
-                <span>Goal: 10 tasks</span>
-                <span>70% complete</span>
+              <div className="flex justify-between text-sm mt-2" style={{ color: 'var(--text-color)', opacity: 0.75 }}>
+                <span>Due today: {stats.dueTodayCount}</span>
+                <span>
+                  {stats.dueTodayCount === 0
+                    ? '—'
+                    : `${Math.min(100, Math.round((stats.completedTodayCount / stats.dueTodayCount) * 100))}% complete`}
+                </span>
               </div>
             </div>
           </motion.div>
 
-          {/* Task Categories */}
           <motion.div variants={itemVariants}>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Today's Tasks</h2>
+            <h2 className="text-2xl font-bold mb-6" style={{ color: 'var(--text-color)' }}>
+              Overview
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Work Tasks */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="h-12 w-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <Calendar className="h-6 w-6 text-blue-600" />
+              <div
+                className="rounded-2xl p-6 shadow-lg border"
+                style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm opacity-70" style={{ color: 'var(--text-color)' }}>
+                      Due Today
+                    </div>
+                    <div className="text-3xl font-bold" style={{ color: 'var(--text-color)' }}>
+                      {stats.dueTodayCount}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">3</div>
-                    <div className="text-sm text-gray-600">Work Tasks</div>
+                  <div
+                    className="h-12 w-12 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: 'var(--primary-100)' }}
+                  >
+                    <Calendar className="h-6 w-6" style={{ color: 'var(--primary-600)' }} />
                   </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <motion.div 
-                    className="bg-blue-500 h-2 rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: '100%' }}
-                    transition={{ duration: 1, delay: 0.5 }}
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-2">All completed</p>
               </div>
 
-              {/* Personal Tasks */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="h-12 w-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                    <CheckCircle className="h-6 w-6 text-purple-600" />
+              <div
+                className="rounded-2xl p-6 shadow-lg border"
+                style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm opacity-70" style={{ color: 'var(--text-color)' }}>
+                      Overdue
+                    </div>
+                    <div className="text-3xl font-bold" style={{ color: 'var(--text-color)' }}>
+                      {stats.overdueCount}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">2</div>
-                    <div className="text-sm text-gray-600">Personal Tasks</div>
+                  <div
+                    className="h-12 w-12 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: 'var(--primary-100)' }}
+                  >
+                    <CheckCircle className="h-6 w-6" style={{ color: 'var(--primary-600)' }} />
                   </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <motion.div 
-                    className="bg-purple-500 h-2 rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: '100%' }}
-                    transition={{ duration: 1, delay: 0.7 }}
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-2">All completed</p>
               </div>
 
-              {/* Health Tasks */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="h-12 w-12 bg-green-100 rounded-xl flex items-center justify-center">
-                    <Clock className="h-6 w-6 text-green-600" />
+              <div
+                className="rounded-2xl p-6 shadow-lg border"
+                style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm opacity-70" style={{ color: 'var(--text-color)' }}>
+                      Next 24h
+                    </div>
+                    <div className="text-3xl font-bold" style={{ color: 'var(--text-color)' }}>
+                      {stats.upcomingCount}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">2</div>
-                    <div className="text-sm text-gray-600">Health Tasks</div>
+                  <div
+                    className="h-12 w-12 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: 'var(--primary-100)' }}
+                  >
+                    <Clock className="h-6 w-6" style={{ color: 'var(--primary-600)' }} />
                   </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <motion.div 
-                    className="bg-green-500 h-2 rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: '100%' }}
-                    transition={{ duration: 1, delay: 0.9 }}
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-2">All completed</p>
               </div>
             </div>
           </motion.div>
 
-          {/* Weekly Task Chart */}
           <motion.div variants={itemVariants}>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Weekly Task Progress</h2>
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <h2 className="text-2xl font-bold mb-6" style={{ color: 'var(--text-color)' }}>
+              Weekly Progress
+            </h2>
+            <div
+              className="rounded-2xl p-6 shadow-lg border"
+              style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+            >
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Task Completion Trends</h3>
-                <div className="flex space-x-2">
-                  <button className="px-3 py-1 text-sm bg-gray-100 text-gray-600 rounded-lg">DAILY</button>
-                  <button className="px-3 py-1 text-sm bg-green-100 text-green-800 rounded-lg font-medium">WEEKLY</button>
-                  <button className="px-3 py-1 text-sm bg-gray-100 text-gray-600 rounded-lg">MONTHLY</button>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-color)' }}>
+                  Completion by Day
+                </h3>
+                <div className="flex items-center gap-2" style={{ color: 'var(--text-color)', opacity: 0.8 }}>
+                  <BarChart3 size={18} />
+                  <span className="text-sm">Last 7 days</span>
                 </div>
               </div>
-              
+
               <div className="h-48 flex items-end justify-between space-x-2">
-                {taskData.map((day, index) => (
+                {stats.byDay.map((day, index) => (
                   <motion.div
-                    key={day.day}
+                    key={`${day.label}-${index}`}
                     className="flex flex-col items-center space-y-2"
                     initial={{ opacity: 0, scaleY: 0 }}
                     animate={{ opacity: 1, scaleY: 1 }}
-                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    transition={{ duration: 0.4, delay: index * 0.06 }}
                   >
-                    <div className="text-xs text-gray-500">{day.completed}/{day.total}</div>
+                    <div className="text-xs" style={{ color: 'var(--text-color)', opacity: 0.75 }}>
+                      {day.completed}/{day.total}
+                    </div>
                     <div
-                      className="w-8 bg-gradient-to-t from-green-400 to-emerald-500 rounded-t"
-                      style={{ 
-                        height: `${(day.completed / maxTasks) * 120}px`,
+                      className="w-8 rounded-t"
+                      style={{
+                        backgroundColor: 'var(--primary-500)',
+                        height: `${(day.total === 0 ? 0 : (day.completed / maxTasks)) * 120}px`,
                         minHeight: '20px'
                       }}
                     />
-                    <div className="text-xs font-medium text-gray-700">{day.day}</div>
+                    <div className="text-sm font-medium" style={{ color: 'var(--text-color)' }}>
+                      {day.label}
+                    </div>
                   </motion.div>
                 ))}
               </div>
-              
-              <div className="mt-4 flex items-center justify-center">
-                <div className="w-full h-px bg-gray-200 relative">
-                  <div className="absolute left-1/2 top-0 w-16 h-px bg-green-400 transform -translate-x-1/2" />
-                  <div className="absolute left-1/2 -top-2 transform -translate-x-1/2 text-xs text-gray-500">
-                    Target: 8 tasks/day
-                  </div>
-                </div>
+
+              <div className="mt-6 flex items-center justify-between" style={{ color: 'var(--text-color)', opacity: 0.8 }}>
+                <div>Total tasks: {tasks.length}</div>
+                <div>Recurring: {tasks.filter((t) => t.repeat && t.repeat !== 'once').length}</div>
               </div>
             </div>
           </motion.div>
 
-          {/* Task Management */}
           <motion.div variants={itemVariants}>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Task Management</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Quick Add Task */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Quick Add Task</h3>
-                  <button className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition-colors">
-                    <Plus size={20} />
-                  </button>
-                </div>
-                
+            <h2 className="text-2xl font-bold mb-6" style={{ color: 'var(--text-color)' }}>
+              Upcoming
+            </h2>
+            <div
+              className="rounded-2xl p-6 shadow-lg border"
+              style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+            >
+              {upcomingTasks.length === 0 ? (
+                <div style={{ color: 'var(--text-color)', opacity: 0.8 }}>No upcoming tasks.</div>
+              ) : (
                 <div className="space-y-3">
-                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                    <input type="checkbox" className="w-4 h-4 text-green-600 rounded" />
-                    <span className="text-sm text-gray-700">Complete morning routine</span>
-                    <span className="text-xs text-gray-500 ml-auto">9:00 AM</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                    <input type="checkbox" className="w-4 h-4 text-green-600 rounded" />
-                    <span className="text-sm text-gray-700">Review weekly goals</span>
-                    <span className="text-xs text-gray-500 ml-auto">2:00 PM</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                    <input type="checkbox" className="w-4 h-4 text-gray-400 rounded" />
-                    <span className="text-sm text-gray-500">Evening reflection</span>
-                    <span className="text-xs text-gray-500 ml-auto">8:00 PM</span>
-                  </div>
+                  {upcomingTasks.map((t) => (
+                    <div
+                      key={t._id || t.id}
+                      className="flex items-center justify-between p-3 rounded-lg border"
+                      style={{ borderColor: 'var(--border-color)' }}
+                    >
+                      <div>
+                        <div className="font-medium" style={{ color: 'var(--text-color)' }}>
+                          {t.title}
+                        </div>
+                        <div className="text-sm" style={{ color: 'var(--text-color)', opacity: 0.75 }}>
+                          {new Date(t.dueTime).toLocaleString()} · {t.category || 'General'}
+                          {t.repeat && t.repeat !== 'once' ? ` · ${t.repeat}` : ''}
+                        </div>
+                      </div>
+                      <div className="text-sm" style={{ color: 'var(--text-color)', opacity: 0.8 }}>
+                        {t.priority}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
+            </div>
+          </motion.div>
 
-              {/* Task Insights */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Task Insights</h3>
-                  <div className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                    +12% This Week
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="p-4 bg-green-50 rounded-xl">
-                    <div className="flex items-start space-x-3">
-                      <div className="h-8 w-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <TrendingUp className="h-4 w-4 text-green-600" />
+          <motion.div variants={itemVariants}>
+            <h2 className="text-2xl font-bold mb-6" style={{ color: 'var(--text-color)' }}>
+              Categories
+            </h2>
+            <div
+              className="rounded-2xl p-6 shadow-lg border"
+              style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {Object.keys(stats.categories).length === 0 ? (
+                  <div style={{ color: 'var(--text-color)', opacity: 0.8 }}>No tasks yet.</div>
+                ) : (
+                  Object.entries(stats.categories)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 9)
+                    .map(([name, count]) => (
+                      <div key={name} className="p-4 rounded-xl border" style={{ borderColor: 'var(--border-color)' }}>
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium" style={{ color: 'var(--text-color)' }}>
+                            {name}
+                          </div>
+                          <div className="text-sm" style={{ color: 'var(--text-color)', opacity: 0.7 }}>
+                            {count}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-gray-700">
-                          <span className="font-medium">Productivity Boost:</span> Your task completion rate has improved by 12% this week. 
-                          Keep up the excellent work!
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 bg-blue-50 rounded-xl">
-                    <div className="flex items-start space-x-3">
-                      <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Clock className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-700">
-                          <span className="font-medium">Time Management:</span> You're completing tasks 15 minutes faster on average. 
-                          Your routine optimization is working!
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 bg-purple-50 rounded-xl">
-                    <div className="flex items-start space-x-3">
-                      <div className="h-8 w-8 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Play className="h-4 w-4 text-purple-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-700">
-                          <span className="font-medium">Recommendation:</span> Consider adding a 5-minute break between tasks 
-                          to maintain focus and prevent burnout.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                    ))
+                )}
               </div>
             </div>
           </motion.div>
         </motion.div>
       </div>
 
-      {/* Bottom Navigation */}
-      <motion.div 
-        className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200"
-        variants={itemVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-around py-4">
-            {[
-              { icon: BarChart3, label: 'Dashboard', active: false, path: '/adaptive' },
-              { icon: BarChart3, label: 'Emotions', active: false, path: '/emotions' },
-              { icon: Target, label: 'Tasks', active: true, path: '/tasks' },
-              { icon: Calendar, label: 'Journal', active: false, path: '/insights' },
-              { icon: BarChart3, label: 'Analytics', active: false, path: '/wellness' }
-            ].map((item, index) => (
-              <Link key={index} to={item.path}>
-                <motion.button
-                  className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
-                    item.active 
-                      ? 'bg-green-100 text-green-600' 
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+      {showCreate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.35)' }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="w-full max-w-2xl rounded-2xl border shadow-xl p-6"
+            style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold" style={{ color: 'var(--text-color)' }}>
+                Create Task / Routine
+              </h2>
+              <button
+                onClick={() => setShowCreate(false)}
+                className="p-2 rounded-lg border"
+                style={{ borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={onCreate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>
+                  Title
+                </label>
+                <input
+                  value={newTask.title}
+                  onChange={(e) => setNewTask((p) => ({ ...p, title: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-lg border"
+                  style={{ backgroundColor: 'var(--theme-background)', borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>
+                  Description
+                </label>
+                <textarea
+                  value={newTask.description}
+                  onChange={(e) => setNewTask((p) => ({ ...p, description: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-lg border"
+                  style={{ backgroundColor: 'var(--theme-background)', borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>
+                    Category
+                  </label>
+                  <input
+                    value={newTask.category}
+                    onChange={(e) => setNewTask((p) => ({ ...p, category: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-lg border"
+                    style={{ backgroundColor: 'var(--theme-background)', borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                    placeholder="General"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>
+                    Priority
+                  </label>
+                  <select
+                    value={newTask.priority}
+                    onChange={(e) => setNewTask((p) => ({ ...p, priority: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-lg border"
+                    style={{ backgroundColor: 'var(--theme-background)', borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>
+                    Due
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={newTask.dueTime}
+                    onChange={(e) => setNewTask((p) => ({ ...p, dueTime: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-lg border"
+                    style={{ backgroundColor: 'var(--theme-background)', borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>
+                    Repeat
+                  </label>
+                  <select
+                    value={newTask.repeat}
+                    onChange={(e) => setNewTask((p) => ({ ...p, repeat: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-lg border"
+                    style={{ backgroundColor: 'var(--theme-background)', borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                  >
+                    <option value="once">Once</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="custom">Custom (days)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>
+                    Custom Interval (days)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    disabled={newTask.repeat !== 'custom'}
+                    value={newTask.customInterval}
+                    onChange={(e) => setNewTask((p) => ({ ...p, customInterval: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-lg border"
+                    style={{ backgroundColor: 'var(--theme-background)', borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                    placeholder="e.g. 3"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>
+                  Steps (one per line)
+                </label>
+                <textarea
+                  value={newTask.stepsText}
+                  onChange={(e) => setNewTask((p) => ({ ...p, stepsText: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-lg border"
+                  style={{ backgroundColor: 'var(--theme-background)', borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                  rows={4}
+                  placeholder={'1) First step\n2) Second step\n3) Third step'}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreate(false)}
+                  className="px-4 py-2 rounded-lg border"
+                  style={{ borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
                 >
-                  <item.icon size={20} />
-                  <span className="text-xs font-medium">{item.label}</span>
-                </motion.button>
-              </Link>
-            ))}
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white disabled:opacity-60"
+                  style={{ backgroundColor: 'var(--primary-500)' }}
+                >
+                  {creating ? 'Creating…' : 'Create'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </motion.div>
+      )}
     </div>
   );
 };

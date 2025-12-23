@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import LandingPage from './pages/LandingPage';
-import SignupPage from './pages/SignupPage';
+import JoinPage from './pages/JoinPage';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import Emotions from './pages/Emotions';
@@ -11,11 +11,16 @@ import Tasks from './pages/Tasks';
 import Journal from './pages/Journal';
 import Analytics from './pages/Analytics';
 import VoiceAssistant from './pages/VoiceAssistant';
-import CaregiverPortal from './pages/CaregiverPortal';
+import TaskScheduling from './pages/TaskScheduling';
+import CaregiverLogin from './pages/CaregiverLogin';
+import CaregiverDashboard from './pages/CaregiverDashboard';
+import PatientDetail from './pages/PatientDetail';
+import CaregiverSettings from './pages/CaregiverSettings';
 import Settings from './pages/Settings';
 import Wellness from './pages/Wellness';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import CaregiverProtectedRoute from './components/CaregiverProtectedRoute';
 import NotificationCenter from './components/NotificationCenter';
 import EmojiMascot from './components/EmojiMascot';
 import WellnessNotificationCenter from './components/WellnessNotificationCenter';
@@ -27,7 +32,8 @@ const AppRoutes = () => {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
-        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/join" element={<JoinPage />} />
+        <Route path="/signup" element={<Navigate to="/join" replace />} />
         <Route path="/login" element={<LoginPage />} />
 
         {/* Protected Routes */}
@@ -62,6 +68,16 @@ const AppRoutes = () => {
           }
         />
         <Route
+          path="/task-scheduling"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <TaskScheduling />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/journal"
           element={
             <ProtectedRoute>
@@ -91,14 +107,37 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
+        <Route path="/caregiver/login" element={<CaregiverLogin />} />
+        <Route
+          path="/caregiver/dashboard"
+          element={
+            <CaregiverProtectedRoute>
+              <CaregiverDashboard />
+            </CaregiverProtectedRoute>
+          }
+        />
+        <Route
+          path="/caregiver/patient/:patientId"
+          element={
+            <CaregiverProtectedRoute>
+              <PatientDetail />
+            </CaregiverProtectedRoute>
+          }
+        />
+        <Route
+          path="/caregiver/settings"
+          element={
+            <CaregiverProtectedRoute>
+              <CaregiverSettings />
+            </CaregiverProtectedRoute>
+          }
+        />
         <Route
           path="/caregiver"
           element={
-            <ProtectedRoute>
-              <Layout>
-                <CaregiverPortal />
-              </Layout>
-            </ProtectedRoute>
+            <CaregiverProtectedRoute>
+              <CaregiverDashboard />
+            </CaregiverProtectedRoute>
           }
         />
         <Route

@@ -21,13 +21,19 @@ import {
   Meh,
   Activity,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Tag,
+  TrendingDown,
+  Zap,
+  Target,
+  Mic
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { buildUserContextString } from '../utils/userPreferences';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { journalAPI } from '../utils/api';
+import VoiceJournalButton from '../components/VoiceJournalButton';
 
 const Journal = () => {
   const { applyAdaptiveTheme } = useTheme();
@@ -46,42 +52,33 @@ const Journal = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [showChatbotButton, setShowChatbotButton] = useState(false);
 
-  // Load journal entries from API
+  // Load journal entries from API - extracted as reusable function
+  const loadJournalEntries = async () => {
+    if (!user?.id) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      const entries = await journalAPI.listByUser(user.id);
+      // Additional safety check for the data structure
+      console.log('Backend response:', entries);
+      setJournalEntries(Array.isArray(entries) ? entries : []);
+    } catch (err) {
+      console.error('Error loading journal entries:', err);
+      setError('Failed to load your journal. Please check your connection.');
+      // Initialize with empty array to prevent map errors
+      setJournalEntries([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load journal entries on mount
   useEffect(() => {
-    let isMounted = true;
-
-    const loadJournalEntries = async () => {
-      if (!user?.id) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setError(null);
-        const entries = await journalAPI.listByUser(user.id);
-        if (isMounted) {
-          // Additional safety check for the data structure
-          console.log('Backend response:', entries);
-          setJournalEntries(Array.isArray(entries) ? entries : []);
-        }
-      } catch (err) {
-        console.error('Error loading journal entries:', err);
-        if (isMounted) {
-          setError('Failed to load your journal. Please check your connection.');
-          // Initialize with empty array to prevent map errors
-          setJournalEntries([]);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
     loadJournalEntries();
-
-    return () => { isMounted = false; };
   }, [user]);
 
   // AI Emotion Analysis using Gemini API with language detection
@@ -223,6 +220,41 @@ const Journal = () => {
     }
   };
 
+  // Fallback keyword-based emotion detection when AI analysis fails
+  const detectEmotionFromKeywords = (text) => {
+    const lowerText = text.toLowerCase();
+    
+    const emotionKeywords = {
+      happy: ['happy', 'joyful', 'great', 'wonderful', 'amazing', 'excellent', 'fantastic', 'good day', 'blessed', 'thankful', 'love', 'enjoyed'],
+      sad: ['sad', 'unhappy', 'down', 'blue', 'upset', 'miserable', 'depressed', 'sorry', 'lonely', 'alone'],
+      stressed: ['stressed', 'stressed out', 'pressure', 'overwhelmed', 'burden', 'anxiety', 'anxious', 'worried', 'concerned'],
+      angry: ['angry', 'furious', 'mad', 'irritated', 'annoyed', 'frustrated', 'rage', 'hate'],
+      calm: ['calm', 'peaceful', 'relaxed', 'serene', 'at peace', 'meditated', 'mindful'],
+      excited: ['excited', 'thrilled', 'energized', 'pumped', 'enthusiastic', 'looking forward'],
+      grateful: ['grateful', 'thankful', 'appreciate', 'blessed', 'grateful for'],
+      hopeful: ['hopeful', 'positive', 'optimistic', 'believe', 'will improve', 'getting better']
+    };
+
+    let detectedEmotion = 'neutral';
+    let maxMatches = 0;
+
+    for (const [emotion, keywords] of Object.entries(emotionKeywords)) {
+      const matches = keywords.filter(keyword => lowerText.includes(keyword)).length;
+      if (matches > maxMatches) {
+        maxMatches = matches;
+        detectedEmotion = emotion;
+      }
+    }
+
+    console.log(`🔍 Keyword detection: "${text.substring(0, 40)}..." → ${detectedEmotion}`);
+    
+    return {
+      emotion: detectedEmotion,
+      language: 'english',
+      intensity: maxMatches > 0 ? Math.min(95, 50 + (maxMatches * 15)) : 50
+    };
+  };
+
   // Check if emotion needs chatbot intervention
   const needsSupport = (emotion) => {
     const negativeEmotions = ['sad', 'angry', 'stressed', 'anxious', 'depressed', 'worried', 'confused', 'lonely', 'frustrated', 'overwhelmed', 'nervous', 'pessimistic'];
@@ -329,41 +361,42 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
     if (!newEntry.trim()) return;
 
     setIsAnalyzing(true);
-    console.log('🔍 Analyzing text:', newEntry);
+    console.log('� Saving entry to backend for AI analysis:', newEntry.substring(0, 50) + '...');
 
     try {
-      // Analyze emotion and language using AI
-      let analysis;
-      try {
-        analysis = await analyzeEmotion(newEntry);
-      } catch (aiError) {
-        console.warn('AI Analysis failed, falling back to neutral:', aiError);
-        analysis = { emotion: 'neutral', language: 'english', intensity: 50 };
-      }
-
+      // ✅ Let backend do the emotion analysis with detailed AI prompt
+      // Frontend just sends the raw content, no emotion detection here
       const entryData = {
         userId: user.id,
         content: newEntry.trim(),
-        emotion: analysis?.emotion || 'neutral',
-        emotionConfidence: (analysis?.intensity || 80) / 100,
-        language: analysis?.language || 'english',
-        mood: 5, // Default mood
+        // Removed: emotion (let backend analyze)
+        // Removed: emotionConfidence (let backend detect)
+        // Removed: analyzeEmotion() call (too unreliable on frontend)
+        language: 'english',
+        mood: 5, // Default mood scale
         tags: []
       };
 
+      console.log('📤 Sending entry to backend:', entryData);
       const createdEntry = await journalAPI.create(entryData);
 
       if (createdEntry && (createdEntry.id || createdEntry._id)) {
+        console.log('✅ Entry saved with backend emotion analysis:', {
+          emotion: createdEntry.emotion,
+          confidence: createdEntry.emotionConfidence,
+          stressLevel: createdEntry.stressLevel
+        });
+
         setJournalEntries(prev => [createdEntry, ...(prev || [])]);
         setNewEntry('');
         setIsWriting(false);
 
-        // Show chatbot button if emotion is negative
-        if (analysis?.emotion && needsSupport(analysis.emotion)) {
-          applyAdaptiveTheme(analysis.emotion);
+        // Show chatbot button if backend detected negative emotion
+        if (createdEntry.emotion && needsSupport(createdEntry.emotion)) {
+          applyAdaptiveTheme(createdEntry.emotion);
           setTimeout(() => {
             setShowChatbotButton(true);
-            localStorage.setItem('neurocompanion-user-language', analysis.language || 'english');
+            localStorage.setItem('neurocompanion-user-language', 'english');
           }, 2000);
         }
       } else {
@@ -383,14 +416,14 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
       setIsAnalyzing(true);
 
       try {
-        const analysis = await analyzeEmotion(newEntry);
-
+        // ✅ Let backend re-analyze emotion with detailed AI prompt
         const updateData = {
           content: newEntry.trim(),
-          emotion: analysis.emotion,
-          language: analysis.language,
+          // Removed: emotion (let backend analyze)
+          // Removed: language (backend will detect)
         };
 
+        console.log('📝 Updating entry, backend will re-analyze emotion');
         const updatedEntry = await journalAPI.update(editingEntry.id || editingEntry._id, updateData);
 
         setJournalEntries(prev => prev.map(entry =>
@@ -401,18 +434,18 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
         setIsWriting(false);
         setEditingEntry(null);
 
-        // Show chatbot button if emotion is negative
-        if (needsSupport(analysis.emotion)) {
+        // Show chatbot button if backend detected negative emotion
+        if (updatedEntry.emotion && needsSupport(updatedEntry.emotion)) {
           console.log('Negative emotion detected, showing chatbot button');
-          applyAdaptiveTheme(analysis.emotion);
+          applyAdaptiveTheme(updatedEntry.emotion);
 
           setTimeout(() => {
             setShowChatbotButton(true);
-            localStorage.setItem('neurocompanion-user-language', analysis.language);
+            localStorage.setItem('neurocompanion-user-language', 'english');
           }, 2000);
         }
       } catch (error) {
-        console.error('Error analyzing/updating:', error);
+        console.error('Error updating:', error);
         // Fallback update
         try {
           const updateData = { content: newEntry.trim() };
@@ -642,6 +675,13 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
       return acc;
     }, {});
 
+    // Debug: Log emotion distribution
+    console.log('📊 Mood Distribution Debug:', {
+      totalEntries: journalEntries.length,
+      emotions: moodCounts,
+      sampleEntries: journalEntries.slice(0, 3).map(e => ({ emotion: e.emotion, content: e.content?.substring(0, 30) }))
+    });
+
     const totalEntries = journalEntries.length;
     const positiveMoods = ['happy', 'calm', 'excited', 'grateful', 'hopeful', 'peaceful', 'content', 'optimistic'];
     const negativeMoods = ['sad', 'angry', 'stressed', 'anxious', 'depressed', 'worried', 'confused', 'lonely', 'frustrated', 'overwhelmed', 'nervous', 'pessimistic'];
@@ -651,11 +691,14 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
     const negativeCount = Object.keys(moodCounts).reduce((sum, mood) =>
       negativeMoods.includes(mood) ? sum + moodCounts[mood] : sum, 0);
 
-    return {
+    const result = {
       positive: totalEntries > 0 ? (positiveCount / totalEntries * 100).toFixed(1) : 0,
       negative: totalEntries > 0 ? (negativeCount / totalEntries * 100).toFixed(1) : 0,
       neutral: totalEntries > 0 ? ((totalEntries - positiveCount - negativeCount) / totalEntries * 100).toFixed(1) : 0
     };
+
+    console.log('📈 Mood Stats Result:', result);
+    return result;
   };
 
   const getWeeklyMoodData = () => {
@@ -923,16 +966,22 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text)' }}>Write Your Thoughts</h2>
                 {!isWriting && (
-                  <motion.button
-                    onClick={() => setIsWriting(true)}
-                    className="flex items-center space-x-2 px-4 py-2 rounded-lg text-white font-medium"
-                    style={{ backgroundColor: 'var(--theme-primary)' }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Plus size={18} />
-                    <span>New Entry</span>
-                  </motion.button>
+                  <div className="flex items-center gap-3">
+                    <VoiceJournalButton 
+                      userId={user.id}
+                      onCallComplete={loadJournalEntries}
+                    />
+                    <motion.button
+                      onClick={() => setIsWriting(true)}
+                      className="flex items-center space-x-2 px-4 py-2 rounded-lg text-white font-medium"
+                      style={{ backgroundColor: 'var(--theme-primary)' }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Plus size={18} />
+                      <span>New Entry</span>
+                    </motion.button>
+                  </div>
                 )}
               </div>
 
@@ -1035,8 +1084,36 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
                         {/* Use emotion for emoji lookup, not numeric mood */}
                         <span className="text-2xl">{getMoodEmoji(entry.emotion || 'neutral')}</span>
                         <div>
-                          <p className="font-semibold" style={{ color: 'var(--theme-text)' }}>{formatDate(entry.createdAt || entry.timestamp)}</p>
-                          <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>{formatTime(entry.createdAt || entry.timestamp)}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold" style={{ color: 'var(--theme-text)' }}>
+                              {formatDate(entry.createdAt || entry.timestamp)}
+                            </p>
+                            {/* Voice entry indicator */}
+                            {entry.isVoiceEntry && (
+                              <span 
+                                className="flex items-center gap-1 text-xs px-2 py-1 rounded-full"
+                                style={{
+                                  backgroundColor: 'var(--theme-primary)',
+                                  color: 'white',
+                                  opacity: 0.9
+                                }}
+                              >
+                                <Mic size={12} />
+                                <span>Voice</span>
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
+                              {formatTime(entry.createdAt || entry.timestamp)}
+                            </p>
+                            {/* Voice duration */}
+                            {entry.isVoiceEntry && entry.voiceDuration && (
+                              <span className="text-xs opacity-50" style={{ color: 'var(--theme-text)' }}>
+                                • {Math.floor(entry.voiceDuration / 60)}:{String(entry.voiceDuration % 60).padStart(2, '0')}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="flex space-x-2">
@@ -1056,7 +1133,117 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
                         </button>
                       </div>
                     </div>
-                    <p className="opacity-90 leading-relaxed mb-3" style={{ color: 'var(--theme-text)' }}>{entry.content}</p>
+                    <p className="opacity-90 leading-relaxed mb-4" style={{ color: 'var(--theme-text)' }}>{entry.content}</p>
+                    
+                    {/* AI Analysis Section */}
+                    {entry.aiAnalysis && (
+                      <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                        <div className="flex items-start space-x-2">
+                          <Brain size={16} className="mt-1 opacity-70" style={{ color: 'var(--theme-text)' }} />
+                          <p className="text-sm opacity-80" style={{ color: 'var(--theme-text)' }}>{entry.aiAnalysis}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Topics */}
+                    {entry.topics && entry.topics.length > 0 && (
+                      <div className="mb-3">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <Tag size={14} className="opacity-70" style={{ color: 'var(--theme-text)' }} />
+                          <span className="text-xs font-semibold opacity-70" style={{ color: 'var(--theme-text)' }}>Topics</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {entry.topics.slice(0, 6).map((topic, idx) => (
+                            <span
+                              key={idx}
+                              className="text-xs px-2 py-1 rounded-full"
+                              style={{
+                                backgroundColor: 'var(--theme-primary)',
+                                color: 'white',
+                                opacity: 0.9
+                              }}
+                            >
+                              {topic}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Keywords */}
+                    {entry.keywords && entry.keywords.length > 0 && (
+                      <div className="mb-3">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <Target size={14} className="opacity-70" style={{ color: 'var(--theme-text)' }} />
+                          <span className="text-xs font-semibold opacity-70" style={{ color: 'var(--theme-text)' }}>Key Insights</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {entry.keywords.slice(0, 5).map((kw, idx) => (
+                            <span
+                              key={idx}
+                              className="text-xs px-2 py-1 rounded-full border"
+                              style={{
+                                borderColor: 'var(--theme-border)',
+                                color: 'var(--theme-text)',
+                                opacity: 0.7 + (kw.relevance || 0.5) * 0.3
+                              }}
+                            >
+                              {kw.word} <span className="opacity-50">•</span> {((kw.relevance || 0) * 100).toFixed(0)}%
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Stress Indicators */}
+                    {(entry.stressLevel || entry.stressTriggers?.length > 0) && (
+                      <div className="mb-3 p-3 rounded-lg" style={{
+                        backgroundColor: entry.stressLevel === 'high' ? 'rgba(239, 68, 68, 0.1)' :
+                                       entry.stressLevel === 'medium' ? 'rgba(251, 191, 36, 0.1)' :
+                                       'rgba(34, 197, 94, 0.1)'
+                      }}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            <Activity size={14} style={{
+                              color: entry.stressLevel === 'high' ? '#ef4444' :
+                                     entry.stressLevel === 'medium' ? '#f59e0b' : '#22c55e'
+                            }} />
+                            <span className="text-xs font-semibold" style={{
+                              color: entry.stressLevel === 'high' ? '#ef4444' :
+                                     entry.stressLevel === 'medium' ? '#f59e0b' : '#22c55e'
+                            }}>
+                              Stress: {entry.stressLevel || 'low'} {entry.stressScore !== undefined && `(${entry.stressScore}/10)`}
+                            </span>
+                          </div>
+                          {entry.emotionalIntensity !== undefined && (
+                            <div className="flex items-center space-x-1">
+                              <Zap size={12} className="opacity-70" style={{ color: 'var(--theme-text)' }} />
+                              <span className="text-xs opacity-70" style={{ color: 'var(--theme-text)' }}>
+                                Intensity: {entry.emotionalIntensity}/10
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        {entry.stressTriggers && entry.stressTriggers.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {entry.stressTriggers.slice(0, 4).map((trigger, idx) => (
+                              <span
+                                key={idx}
+                                className="text-xs px-2 py-0.5 rounded"
+                                style={{
+                                  backgroundColor: 'rgba(0,0,0,0.2)',
+                                  color: 'var(--theme-text)',
+                                  opacity: 0.8
+                                }}
+                              >
+                                {trigger}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
                       <div className="flex items-center space-x-3">
                         <span>{entry.content?.trim().split(/\s+/).length || 0} words</span>

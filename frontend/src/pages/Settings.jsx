@@ -25,7 +25,7 @@ const SettingsSection = ({ title, icon: Icon, children }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    className="bg-white rounded-2xl p-6 shadow-sm border mb-6"
+    className="rounded-2xl p-6 shadow-sm border mb-6"
     style={{
       backgroundColor: 'var(--theme-card)',
       borderColor: 'var(--theme-border)'
@@ -206,8 +206,12 @@ const Settings = () => {
                   <button
                     key={key}
                     onClick={() => setTheme(key)}
-                    className={`p-3 rounded-xl border-2 transition-all ${theme === key ? 'ring-2 ring-blue-500 border-transparent' : 'border-gray-200'}`}
-                    style={{ backgroundColor: key === theme ? `${themeData.colors.primary}10` : 'transparent' }}
+                    className="p-3 rounded-xl border-2 transition-all"
+                    style={{
+                      borderColor: theme === key ? 'var(--theme-primary)' : 'var(--theme-border)',
+                      backgroundColor: theme === key ? 'rgba(var(--primary-rgb), 0.10)' : 'transparent',
+                      boxShadow: theme === key ? `0 0 0 2px rgba(var(--primary-rgb), 0.25)` : 'none'
+                    }}
                   >
                     <div className="flex items-center space-x-2">
                       <div className="w-4 h-4 rounded-full" style={{ backgroundColor: themeData.colors.primary }} />
@@ -226,12 +230,16 @@ const Settings = () => {
                   <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Automatically adjust theme based on mood</p>
                 </div>
               </div>
-              <button
-                onClick={() => setAdaptiveMode(!adaptiveMode)}
-                className={`relative w-12 h-6 rounded-full transition-colors ${adaptiveMode ? 'bg-green-500' : 'bg-gray-300'}`}
-              >
+                  <button
+                    onClick={() => setAdaptiveMode(!adaptiveMode)}
+                    className="relative w-12 h-6 rounded-full transition-colors"
+                    style={{
+                      backgroundColor: adaptiveMode ? 'var(--theme-primary)' : 'var(--theme-border)'
+                    }}
+                  >
                 <motion.div
-                  className="absolute top-1 left-1 bg-white w-4 h-4 rounded-full shadow"
+                  style={{ backgroundColor: 'var(--theme-card)' }}
+                  className="absolute top-1 left-1 w-4 h-4 rounded-full shadow"
                   animate={{ x: adaptiveMode ? 24 : 0 }}
                 />
               </button>
@@ -242,14 +250,15 @@ const Settings = () => {
                 <Type className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
                 <label className="font-medium" style={{ color: 'var(--theme-text)' }}>Font Size ({fontSize}px)</label>
               </div>
-              <input
-                type="range"
-                min="12"
-                max="20"
-                value={fontSize}
-                onChange={(e) => setFontSize(parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              />
+                 <input
+                   type="range"
+                   min="12"
+                   max="20"
+                   value={fontSize}
+                   onChange={(e) => setFontSize(parseInt(e.target.value))}
+                   className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                   style={{ backgroundColor: 'var(--theme-border)' }}
+                 />
             </div>
           </div>
         </SettingsSection>
@@ -261,16 +270,27 @@ const Settings = () => {
               <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Push Notifications</p>
               <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Receive updates about tasks and wellness nudges</p>
             </div>
-            <button
-              onClick={() => setNotifications(!notifications)}
-              className={`relative w-12 h-6 rounded-full transition-colors ${notifications ? 'bg-green-500' : 'bg-gray-300'}`}
-            >
+                   <button
+                     onClick={() => setNotifications(!notifications)}
+                     className="relative w-12 h-6 rounded-full transition-colors"
+                     style={{
+                       backgroundColor: notifications ? 'var(--theme-primary)' : 'var(--theme-border)'
+                     }}
+                   >
               <motion.div
-                className="absolute top-1 left-1 bg-white w-4 h-4 rounded-full shadow"
+                style={{ backgroundColor: 'var(--theme-card)' }}
+                className="absolute top-1 left-1 w-4 h-4 rounded-full shadow"
                 animate={{ x: notifications ? 24 : 0 }}
               />
             </button>
           </div>
+        </SettingsSection>
+
+        {/* Privacy & Data Access */}
+        <SettingsSection title="Privacy & Data Access" icon={Shield}>
+          <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
+            Privacy settings are managed within your account and device preferences.
+          </p>
         </SettingsSection>
 
         {/* Action Buttons */}

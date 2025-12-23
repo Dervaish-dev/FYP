@@ -22,66 +22,73 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { buildUserContextString } from '../utils/userPreferences';
 import { useNotifications, NOTIFICATION_TYPES } from '../components/NotificationCenter';
 
 const Emotions = () => {
   const { adaptiveMode, applyAdaptiveTheme } = useTheme();
+  const { user } = useAuth();
   const { addNotification } = useNotifications();
+  const userId = user?._id || user?.id;
   const [currentEmotion, setCurrentEmotion] = useState('neutral');
   const [emotionIntensity, setEmotionIntensity] = useState(5);
   const [selectedEmotion, setSelectedEmotion] = useState('');
   const [detectedEmotion, setDetectedEmotion] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
-  const [emotionHistory, setEmotionHistory] = useState(() => {
-    const saved = localStorage.getItem('neurocompanion-emotion-history');
-    return saved ? JSON.parse(saved) : [
-      { 
-        id: Date.now() - 7, 
-        date: '2024-01-15', 
-        emotion: 'happy', 
-        intensity: 8, 
-        confidence: 0.85,
-        note: 'Great day at work!',
-        timestamp: new Date('2024-01-15').toISOString(),
-        source: 'manual'
-      },
-      { 
-        id: Date.now() - 6, 
-        date: '2024-01-14', 
-        emotion: 'calm', 
-        intensity: 6, 
-        confidence: 0.78,
-        note: 'Peaceful evening',
-        timestamp: new Date('2024-01-14').toISOString(),
-        source: 'manual'
-      },
-      { 
-        id: Date.now() - 5, 
-        date: '2024-01-13', 
-        emotion: 'stressed', 
-        intensity: 7, 
-        confidence: 0.82,
-        note: 'Busy day',
-        timestamp: new Date('2024-01-13').toISOString(),
-        source: 'manual'
-      }
-    ];
-  });
+  const [emotionHistory, setEmotionHistory] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [aiInsights, setAiInsights] = useState([
     "Your mood tends to be higher on weekends. Consider incorporating more relaxation activities during weekdays.",
     "Stress levels correlate with work days. Try implementing better work-life balance strategies.",
     "Meditation and mindfulness activities show positive correlation with your emotional well-being."
   ]);
 
-  // Sync emotion history to localStorage
+  // Fetch emotion history from backend
   useEffect(() => {
-    localStorage.setItem('neurocompanion-emotion-history', JSON.stringify(emotionHistory));
-  }, [emotionHistory]);
+    if (userId) {
+      fetchEmotionHistory();
+    }
+  }, [userId]);
+
+  const fetchEmotionHistory = async () => {
+    try {
+      setIsLoadingHistory(true);
+      const response = await api.get(`/emotions/history/${userId}?limit=20`);
+      if (response.data.success && response.data.data.emotions) {
+        setEmotionHistory(response.data.data.emotions);
+      }
+    } catch (error) {
+      console.error('Error fetching emotion history:', error);
+      // Fallback to localStorage if API fails
+      const saved = localStorage.getItem('neurocompanion-emotion-history');
+      if (saved) {
+        setEmotionHistory(JSON.parse(saved));
+      }
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  // Save emotion to backend
+  const saveEmotionToBackend = async (emotionData) => {
+    try {
+      await api.post('/emotions/history', {
+        userId,
+        ...emotionData
+      });
+    } catch (error) {
+      console.error('Error saving emotion to backend:', error);
+      // Still save to localStorage as fallback
+      const current = JSON.parse(localStorage.getItem('neurocompanion-emotion-history') || '[]');
+      localStorage.setItem('neurocompanion-emotion-history', JSON.stringify([emotionData, ...current]));
+    }
+  };
 
   const emotions = [
     { key: 'happy', label: 'Happy', emoji: '😊', color: '#10b981', icon: Smile },
@@ -176,7 +183,8 @@ const Emotions = () => {
       });
 
       const detectedEmotionResult = response.data.emotion;
-      const confidence = Math.random() * 0.3 + 0.7; // Mock confidence score
+      const intensityFromGemini = response.data.intensity;
+      const confidenceFromGemini = response.data.confidence;
       
       setDetectedEmotion(detectedEmotionResult);
       setUploadSuccess(true);
@@ -191,13 +199,18 @@ const Emotions = () => {
         id: Date.now(),
         date: new Date().toISOString().split('T')[0],
         emotion: detectedEmotionResult.toLowerCase(),
-        intensity: emotionIntensity,
-        confidence: confidence,
+        intensity: Number.isFinite(intensityFromGemini) ? intensityFromGemini : emotionIntensity,
+        confidence: Number.isFinite(confidenceFromGemini) ? confidenceFromGemini : 0.75,
         note: `AI detected: ${detectedEmotionResult}`,
         timestamp: new Date().toISOString(),
         source: 'ai-analysis'
       };
-      setEmotionHistory(prev => [newEntry, ...prev.slice(0, 9)]); // Keep last 10 entries
+      
+      // Save to backend
+      await saveEmotionToBackend(newEntry);
+      
+      // Update local state and refresh from backend
+      await fetchEmotionHistory();
 
       // Trigger emotion-based notifications
       if (detectedEmotionResult.toLowerCase() === 'sad' || detectedEmotionResult.toLowerCase() === 'depressed') {
@@ -231,62 +244,99 @@ const Emotions = () => {
 
     } catch (error) {
       console.error('Emotion analysis error:', error);
-      setUploadError(error.response?.data?.error || 'Failed to analyze emotion. Please try again.');
+      const data = error.response?.data;
+      const message =
+        data?.message ||
+        data?.error ||
+        'Failed to analyze emotion. Please try again.';
+      const details = data?.details ? `\n\n${data.details}` : '';
+      setUploadError(`${message}${details}`);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const handleManualEmotionSelect = (emotion) => {
-    setSelectedEmotion(emotion);
-    setDetectedEmotion('');
-    setUploadError('');
-    setUploadSuccess(false);
-    setPreviewImage(null);
+  const handleManualEmotionSelect = async (emotion) => {
+    if (!emotion) return;
     
-    // Apply adaptive theme if enabled
-    if (adaptiveMode) {
-      applyAdaptiveTheme(emotion.toLowerCase());
-    }
+    try {
+      setIsSaving(true);
+      setDetectedEmotion('');
+      setUploadError('');
+      setUploadSuccess(false);
+      setPreviewImage(null);
+      
+      // Apply adaptive theme if enabled
+      if (adaptiveMode) {
+        applyAdaptiveTheme(emotion.toLowerCase());
+      }
 
-    // Add to emotion history with enhanced data
-    const newEntry = {
-      id: Date.now(),
-      date: new Date().toISOString().split('T')[0],
-      emotion: emotion.toLowerCase(),
-      intensity: emotionIntensity,
-      confidence: 1.0, // Manual selection has 100% confidence
-      note: `Manually selected: ${emotion}`,
-      timestamp: new Date().toISOString(),
-      source: 'manual'
-    };
-    setEmotionHistory(prev => [newEntry, ...prev.slice(0, 9)]); // Keep last 10 entries
+      // Add to emotion history with enhanced data
+      const newEntry = {
+        id: Date.now(),
+        date: new Date().toISOString().split('T')[0],
+        emotion: emotion.toLowerCase(),
+        intensity: emotionIntensity,
+        confidence: 1.0, // Manual selection has 100% confidence
+        note: `Manually selected: ${emotion}`,
+        timestamp: new Date().toISOString(),
+        source: 'manual'
+      };
+      
+      // Save to backend
+      await saveEmotionToBackend(newEntry);
+      
+      // Update local state and refresh from backend
+      await fetchEmotionHistory();
 
-    // Trigger emotion-based notifications for manual selection
-    if (emotion.toLowerCase() === 'sad' || emotion.toLowerCase() === 'depressed') {
+      // Show success notification
       addNotification(
-        '🌿 Thanks for sharing how you feel. Remember, it\'s okay to not be okay sometimes! 💙',
-        NOTIFICATION_TYPES.SUPPORT,
-        '🌿'
+        '✅ Emotion saved successfully!',
+        NOTIFICATION_TYPES.SUCCESS,
+        '✅'
       );
-    } else if (emotion.toLowerCase() === 'stressed' || emotion.toLowerCase() === 'anxious') {
+
+      // Trigger emotion-based notifications for manual selection
+      if (emotion.toLowerCase() === 'sad' || emotion.toLowerCase() === 'depressed') {
+        addNotification(
+          '🌿 Thanks for sharing how you feel. Remember, it\'s okay to not be okay sometimes! 💙',
+          NOTIFICATION_TYPES.SUPPORT,
+          '🌿'
+        );
+      } else if (emotion.toLowerCase() === 'stressed' || emotion.toLowerCase() === 'anxious') {
+        addNotification(
+          '🌸 Acknowledging stress is the first step! Try some gentle breathing exercises! 💫',
+          NOTIFICATION_TYPES.SUPPORT,
+          '🌸'
+        );
+      } else if (emotion.toLowerCase() === 'happy' || emotion.toLowerCase() === 'excited') {
+        addNotification(
+          '😄 Wonderful! Your positive energy is contagious! Keep shining! ✨',
+          NOTIFICATION_TYPES.CELEBRATION,
+          '😄'
+        );
+      } else if (emotion.toLowerCase() === 'angry' || emotion.toLowerCase() === 'frustrated') {
+        addNotification(
+          '🤗 It\'s healthy to recognize anger. Try some deep breathing or gentle movement! 🌿',
+          NOTIFICATION_TYPES.SUPPORT,
+          '🤗'
+        );
+      }
+      
+      // Reset selection after successful save
+      setTimeout(() => {
+        setSelectedEmotion('');
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Error saving emotion:', error);
       addNotification(
-        '🌸 Acknowledging stress is the first step! Try some gentle breathing exercises! 💫',
-        NOTIFICATION_TYPES.SUPPORT,
-        '🌸'
+        '❌ Failed to save emotion. Please try again.',
+        NOTIFICATION_TYPES.ERROR,
+        '❌'
       );
-    } else if (emotion.toLowerCase() === 'happy' || emotion.toLowerCase() === 'excited') {
-      addNotification(
-        '😄 Wonderful! Your positive energy is contagious! Keep shining! ✨',
-        NOTIFICATION_TYPES.CELEBRATION,
-        '😄'
-      );
-    } else if (emotion.toLowerCase() === 'angry' || emotion.toLowerCase() === 'frustrated') {
-      addNotification(
-        '🤗 It\'s healthy to recognize anger. Try some deep breathing or gentle movement! 🌿',
-        NOTIFICATION_TYPES.SUPPORT,
-        '🤗'
-      );
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -365,19 +415,19 @@ const Emotions = () => {
                       color: 'var(--theme-text)'
                     }}
                     value={selectedEmotion}
-                    onChange={(e) => handleManualEmotionSelect(e.target.value)}
+                    onChange={(e) => setSelectedEmotion(e.target.value)}
                   >
                     <option value="">Choose your current emotion</option>
-                    <option value="Happy">Happy</option>
-                    <option value="Sad">Sad</option>
-                    <option value="Calm">Calm</option>
-                    <option value="Stressed">Stressed</option>
-                    <option value="Angry">Angry</option>
-                    <option value="Neutral">Neutral</option>
-                    <option value="Excited">Excited</option>
-                    <option value="Worried">Worried</option>
-                    <option value="Confused">Confused</option>
-                    <option value="Surprised">Surprised</option>
+                    <option value="Happy">😊 Happy</option>
+                    <option value="Sad">😔 Sad</option>
+                    <option value="Calm">😌 Calm</option>
+                    <option value="Stressed">😟 Stressed</option>
+                    <option value="Angry">😠 Angry</option>
+                    <option value="Neutral">😐 Neutral</option>
+                    <option value="Excited">🤩 Excited</option>
+                    <option value="Worried">😥 Worried</option>
+                    <option value="Confused">🤔 Confused</option>
+                    <option value="Surprised">😲 Surprised</option>
                   </select>
 
                   {/* Intensity Slider */}
@@ -402,10 +452,32 @@ const Emotions = () => {
                     </div>
                   </div>
 
+                  {/* Save Button */}
+                  <button
+                    onClick={() => handleManualEmotionSelect(selectedEmotion)}
+                    disabled={!selectedEmotion || isSaving}
+                    className="w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg"
+                    style={{ 
+                      backgroundColor: selectedEmotion ? 'var(--theme-primary)' : 'var(--theme-border)'
+                    }}
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-5 w-5" />
+                        <span>Save Emotion</span>
+                      </>
+                    )}
+                  </button>
+
                   {/* Manual Selection Result */}
-                  {selectedEmotion && (
+                  {selectedEmotion && !isSaving && (
                     <motion.div
-                      className="p-4 rounded-lg border"
+                      className="p-3 rounded-lg border mt-4"
                       style={{ 
                         borderColor: 'var(--theme-primary)',
                         backgroundColor: 'var(--theme-primary-50)'
@@ -414,14 +486,14 @@ const Emotions = () => {
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.3 }}
                     >
-                      <div className="flex items-center space-x-3">
-                        <CheckCircle className="h-6 w-6" style={{ color: 'var(--theme-primary)' }} />
+                      <div className="flex items-center space-x-2">
+                        <Heart className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
                         <div>
-                          <p className="font-semibold" style={{ color: 'var(--theme-text)' }}>
+                          <p className="text-sm font-semibold" style={{ color: 'var(--theme-text)' }}>
                             Selected: {selectedEmotion}
                           </p>
-                          <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
-                            Intensity: {emotionIntensity}/10
+                          <p className="text-xs opacity-70" style={{ color: 'var(--theme-text)' }}>
+                            Intensity: {emotionIntensity}/10 • Click "Save Emotion" to record
                           </p>
                         </div>
                       </div>

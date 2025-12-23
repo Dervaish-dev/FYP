@@ -78,7 +78,7 @@ const LandingPage = () => {
                 Sign In
               </Link>
               <Link
-                to="/signup"
+                to="/join"
                 className="btn-primary"
               >
                 Get Started
@@ -119,7 +119,7 @@ const LandingPage = () => {
               transition={{ duration: 0.8, delay: 0.4 }}
             >
               <Link
-                to="/signup"
+                to="/join"
                 className="btn-primary text-lg px-8 py-4 flex items-center justify-center space-x-2"
               >
                 <span>Start Your Journey</span>
@@ -227,7 +227,7 @@ const LandingPage = () => {
             Join thousands of users who have discovered a new way to support their mental health
           </p>
           <Link
-            to="/signup"
+            to="/join"
             className="bg-white text-primary-600 hover:bg-gray-50 font-semibold px-8 py-4 rounded-lg text-lg transition-colors inline-flex items-center space-x-2"
           >
             <span>Get Started Today</span>

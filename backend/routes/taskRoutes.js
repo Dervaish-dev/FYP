@@ -1,7 +1,19 @@
 import express from "express";
 import mongoose from "mongoose";
+import { computeNextDueTime, resetSteps, shouldCreateNextOccurrence } from "../utils/taskRecurrence.js";
 
 const router = express.Router();
+
+// Fail fast if database is not connected so the frontend doesn't silently degrade.
+router.use((req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      message: 'Database not connected. Task module requires MongoDB.'
+    });
+  }
+  next();
+});
 
 // Task Schema
 const taskSchema = new mongoose.Schema({
@@ -20,6 +32,12 @@ const taskSchema = new mongoose.Schema({
     type: String,
     trim: true,
     maxlength: 1000
+  },
+  category: {
+    type: String,
+    trim: true,
+    maxlength: 50,
+    default: 'General'
   },
   priority: {
     type: String,
@@ -43,6 +61,24 @@ const taskSchema = new mongoose.Schema({
   customInterval: {
     type: Number, // days
     default: null
+  },
+  steps: {
+    type: [
+      {
+        id: { type: String, required: true },
+        text: { type: String, required: true, trim: true, maxlength: 200 },
+        done: { type: Boolean, default: false }
+      }
+    ],
+    default: []
+  },
+  parentTaskId: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null
+  },
+  occurrenceIndex: {
+    type: Number,
+    default: 0
   },
   completedAt: {
     type: Date,
@@ -82,10 +118,12 @@ router.post("/create", async (req, res) => {
       userId, 
       title, 
       description, 
+      category,
       priority, 
       dueTime, 
       repeat, 
-      customInterval 
+      customInterval,
+      steps
     } = req.body;
 
     // Validate required fields
@@ -101,10 +139,12 @@ router.post("/create", async (req, res) => {
       userId,
       title: title.trim(),
       description: description?.trim() || '',
+      category: (category || 'General').trim(),
       priority: priority || 'medium',
       dueTime: new Date(dueTime),
       repeat: repeat || 'once',
-      customInterval: customInterval || null
+      customInterval: customInterval || null,
+      steps: resetSteps(steps)
     });
 
     await task.save();
@@ -173,6 +213,14 @@ router.put("/:id", async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
 
+    const existing = await Task.findById(id);
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Task not found'
+      });
+    }
+
     // Remove fields that shouldn't be updated directly
     delete updateData._id;
     delete updateData.userId;
@@ -183,23 +231,53 @@ router.put("/:id", async (req, res) => {
       updateData.completedAt = new Date();
     }
 
-    const task = await Task.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true, runValidators: true }
-    );
+    if (updateData.steps !== undefined) {
+      // Allow updating steps, but normalize
+      updateData.steps = Array.isArray(updateData.steps)
+        ? updateData.steps.map((s) => ({
+            id: String(s?.id || ''),
+            text: String(s?.text || '').trim(),
+            done: Boolean(s?.done)
+          })).filter((s) => s.id && s.text)
+        : [];
+    }
 
-    if (!task) {
-      return res.status(404).json({
-        success: false,
-        message: 'Task not found'
-      });
+    const shouldCreateNext = shouldCreateNextOccurrence(existing, updateData);
+
+    const task = await Task.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
+
+    let nextTask = null;
+    if (shouldCreateNext) {
+      const repeat = updateData.repeat ?? existing.repeat;
+      const customIntervalDays = updateData.customInterval ?? existing.customInterval;
+      const nextDue = computeNextDueTime(task.dueTime, repeat, customIntervalDays);
+
+      if (nextDue) {
+        nextTask = await Task.create({
+          userId: task.userId,
+          title: task.title,
+          description: task.description,
+          category: task.category,
+          priority: task.priority,
+          status: 'todo',
+          dueTime: nextDue,
+          repeat: task.repeat,
+          customInterval: task.customInterval,
+          steps: resetSteps(task.steps),
+          parentTaskId: task.parentTaskId || task._id,
+          occurrenceIndex: (task.occurrenceIndex || 0) + 1,
+          completedAt: null,
+          isNudged: false,
+          nudgeCount: 0
+        });
+      }
     }
 
     res.json({
       success: true,
       message: 'Task updated successfully',
-      data: task
+      data: task,
+      nextTask
     });
 
   } catch (error) {

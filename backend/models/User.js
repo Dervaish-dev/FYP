@@ -21,6 +21,28 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters long']
+  },
+
+  // User profile information
+  age: {
+    type: Number,
+    min: [13, 'Must be at least 13 years old'],
+    max: [120, 'Please enter a valid age'],
+    default: null
+  },
+
+  neurotype: {
+    type: String,
+    enum: ['ADHD', 'Autism', 'Anxiety', 'Dyslexia', 'Other', null],
+    default: null
+  },
+
+  // One caregiver per patient (null means unassigned)
+  assignedCaregiver: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Caregiver',
+    default: null,
+    index: true
   }
 }, {
   timestamps: true

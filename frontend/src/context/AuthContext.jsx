@@ -126,6 +126,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Set session directly (used by invite-claim finalize)
+  const setSession = ({ user, token }) => {
+    if (!user || !token) return;
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    dispatch({
+      type: AUTH_ACTIONS.LOGIN_SUCCESS,
+      payload: { user, token }
+    });
+  };
+
   // Register function
   const register = async (userData) => {
     try {
@@ -176,6 +187,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    setSession,
     clearError,
   };
 
