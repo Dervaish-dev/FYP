@@ -14,7 +14,7 @@ import wellnessRoutes from './routes/wellnessRoutes.js';
 import caregiverRoutes from './routes/caregiverRoutes.js';
 import connectionRoutes from './routes/connectionRoutes.js';
 import inviteRoutes from './routes/inviteRoutes.js';
-import voiceRoutes from './routes/voiceRoutes.js';
+// import voiceRoutes from './routes/voiceRoutes.js'; // Removed - replaced with breathing exercises
 import voiceJournalRoutes from './routes/voiceJournalRoutes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -47,7 +47,7 @@ app.use('/api/wellness', wellnessRoutes);
 app.use('/api/caregiver', caregiverRoutes);
 app.use('/api/connections', connectionRoutes);
 app.use('/api/invites', inviteRoutes);
-app.use('/api/voice', voiceRoutes);
+// app.use('/api/voice', voiceRoutes); // Removed - replaced with breathing exercises
 app.use('/api/voice-journal', voiceJournalRoutes);
 
 // Health check route

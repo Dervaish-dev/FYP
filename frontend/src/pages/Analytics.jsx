@@ -1,29 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  Download, 
-  FileText, 
-  Heart, 
-  Brain, 
-  CheckCircle2, 
+import { useAuth } from '../context/AuthContext';
+import { taskAPI, journalAPI } from '../utils/api';
+import {
+  BarChart3,
+  TrendingUp,
+  Download,
+  FileText,
+  Heart,
+  Brain,
+  CheckCircle2,
   AlertTriangle,
   Calendar,
   Clock,
   Target,
   Activity
 } from 'lucide-react';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  PieChart, 
-  Pie, 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
   Cell,
   BarChart,
   Bar,
@@ -34,6 +36,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
 const Analytics = () => {
+  const { user } = useAuth();
   const [analyticsData, setAnalyticsData] = useState({
     journal: [],
     emotions: [],
@@ -42,95 +45,65 @@ const Analytics = () => {
   });
   const [overallScore, setOverallScore] = useState(0);
   const [recommendations, setRecommendations] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Load data from all modules
+  // Load data from backend API (same pattern as Tasks.jsx and Journal.jsx)
   useEffect(() => {
+    const loadAllData = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        // Fetch from backend exactly like Tasks.jsx and Journal.jsx
+        const [journalData, taskData] = await Promise.all([
+          journalAPI.listByUser(user.id).catch(() => []),
+          taskAPI.listByUser(user.id).catch(() => [])
+        ]);
+
+        // Extract emotions from journal entries (backend adds emotion to each entry)
+        const emotionData = (journalData || []).filter(entry => entry.emotion).map(entry => ({
+          emotion: entry.emotion,
+          intensity: entry.emotionConfidence || 80,
+          timestamp: entry.createdAt || entry.timestamp,
+          source: 'journal'
+        }));
+
+
+        setAnalyticsData({
+          journal: Array.isArray(journalData) ? journalData : [],
+          emotions: emotionData,
+          tasks: Array.isArray(taskData) ? taskData : [],
+          wellness: []
+        });
+
+        // Calculate overall wellness score
+        calculateOverallScore(
+          Array.isArray(journalData) ? journalData : [],
+          emotionData,
+          Array.isArray(taskData) ? taskData : [],
+          []
+        );
+
+      } catch (error) {
+        console.error('Error loading analytics data:', error);
+        // Set empty arrays on error to prevent crashes
+        setAnalyticsData({
+          journal: [],
+          emotions: [],
+          tasks: [],
+          wellness: []
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadAllData();
-  }, []);
-
-  const loadAllData = () => {
-    // Load Journal data
-    const journalData = JSON.parse(localStorage.getItem('neurocompanion-journal') || '[]');
-    
-    // Load Emotion data
-    const emotionData = JSON.parse(localStorage.getItem('neurocompanion-emotion-history') || '[]');
-    
-    // If no emotion data exists, add some sample data for demonstration
-    if (emotionData.length === 0) {
-      const sampleEmotions = [
-        { 
-          id: Date.now() - 7, 
-          date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
-          emotion: 'happy', 
-          intensity: 8, 
-          confidence: 0.85,
-          note: 'Great day at work!',
-          timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          source: 'manual'
-        },
-        { 
-          id: Date.now() - 6, 
-          date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
-          emotion: 'calm', 
-          intensity: 6, 
-          confidence: 0.78,
-          note: 'Peaceful evening',
-          timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-          source: 'manual'
-        },
-        { 
-          id: Date.now() - 5, 
-          date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
-          emotion: 'stressed', 
-          intensity: 7, 
-          confidence: 0.82,
-          note: 'Busy day',
-          timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          source: 'manual'
-        },
-        { 
-          id: Date.now() - 4, 
-          date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
-          emotion: 'excited', 
-          intensity: 9, 
-          confidence: 0.90,
-          note: 'Excited about weekend plans',
-          timestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-          source: 'manual'
-        },
-        { 
-          id: Date.now() - 3, 
-          date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], 
-          emotion: 'neutral', 
-          intensity: 5, 
-          confidence: 0.75,
-          note: 'Regular day',
-          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          source: 'manual'
-        }
-      ];
-      // Store sample data in localStorage for demonstration
-      localStorage.setItem('neurocompanion-emotion-history', JSON.stringify(sampleEmotions));
-      emotionData.push(...sampleEmotions);
-    }
-    
-    // Load Task data
-    const taskData = JSON.parse(localStorage.getItem('neurocompanion-tasks') || '[]');
-    const taskHistory = JSON.parse(localStorage.getItem('neurocompanion-task-history') || '[]');
-    
-    // Load Wellness data
-    const wellnessData = JSON.parse(localStorage.getItem('neurocompanion-wellness') || '[]');
-    
-    setAnalyticsData({
-      journal: journalData,
-      emotions: emotionData,
-      tasks: [...taskData, ...taskHistory],
-      wellness: wellnessData
-    });
-
-    // Calculate overall wellness score
-    calculateOverallScore(journalData, emotionData, [...taskData, ...taskHistory], wellnessData);
-  };
+  }, [user]);
 
   const calculateOverallScore = (journal, emotions, tasks, wellness) => {
     let score = 0;
@@ -138,7 +111,7 @@ const Analytics = () => {
 
     // Journal mood analysis (40% weight)
     if (journal.length > 0) {
-      const positiveMoods = journal.filter(entry => 
+      const positiveMoods = journal.filter(entry =>
         ['happy', 'calm', 'excited', 'grateful', 'hopeful', 'peaceful', 'content', 'optimistic'].includes(entry.mood)
       ).length;
       const journalScore = (positiveMoods / journal.length) * 100;
@@ -156,7 +129,7 @@ const Analytics = () => {
 
     // Emotion stability (20% weight)
     if (emotions.length > 0) {
-      const stableEmotions = emotions.filter(emotion => 
+      const stableEmotions = emotions.filter(emotion =>
         ['happy', 'calm', 'neutral', 'excited', 'grateful', 'hopeful', 'peaceful', 'content', 'optimistic'].includes(emotion.emotion)
       ).length;
       const emotionScore = (stableEmotions / emotions.length) * 100;
@@ -203,10 +176,10 @@ const Analytics = () => {
     }
 
     // Task-based recommendations
-    const recentTasks = tasks.filter(task => 
+    const recentTasks = tasks.filter(task =>
       new Date(task.createdAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     );
-    const completionRate = recentTasks.length > 0 ? 
+    const completionRate = recentTasks.length > 0 ?
       recentTasks.filter(task => task.status === 'done').length / recentTasks.length : 0;
 
     if (completionRate < 0.5) {
@@ -220,10 +193,10 @@ const Analytics = () => {
     }
 
     // Emotion-based recommendations
-    const recentEmotions = emotions.filter(emotion => 
+    const recentEmotions = emotions.filter(emotion =>
       new Date(emotion.timestamp) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     );
-    const negativeEmotions = recentEmotions.filter(emotion => 
+    const negativeEmotions = recentEmotions.filter(emotion =>
       ['sad', 'angry', 'stressed', 'anxious', 'depressed', 'frustrated', 'overwhelmed', 'worried', 'confused', 'lonely', 'nervous', 'pessimistic'].includes(emotion.emotion)
     ).length;
 
@@ -288,41 +261,77 @@ const Analytics = () => {
     }).reverse();
 
     return last7Days.map(date => {
-      const dayEntries = analyticsData.journal.filter(entry => 
-        entry.timestamp && entry.timestamp.startsWith(date)
-      );
-      
-      const dayEmotions = analyticsData.emotions.filter(emotion => 
-        emotion.timestamp && emotion.timestamp.startsWith(date)
-      );
-      
-      const dayTasks = analyticsData.tasks.filter(task => 
-        task.createdAt && task.createdAt.startsWith(date)
-      );
+      // Get journal entries for this day
+      const dayEntries = (analyticsData.journal || []).filter(entry => {
+        const entryDate = entry.createdAt || entry.timestamp;
+        if (!entryDate) return false;
+        try {
+          const d = new Date(entryDate);
+          if (isNaN(d.getTime())) return false;
+          return d.toISOString().split('T')[0] === date;
+        } catch {
+          return false;
+        }
+      });
 
-      // Calculate average mood from both journal entries and emotion records
-      let avgMood = 3; // Default neutral
-      
+      // Get emotions for this day
+      const dayEmotions = (analyticsData.emotions || []).filter(emotion => {
+        const emotionDate = emotion.timestamp;
+        if (!emotionDate) return false;
+        try {
+          const d = new Date(emotionDate);
+          if (isNaN(d.getTime())) return false;
+          return d.toISOString().split('T')[0] === date;
+        } catch {
+          return false;
+        }
+      });
+
+      const dayTasks = (analyticsData.tasks || []).filter(task => {
+        const taskDate = task.createdAt;
+        if (!taskDate) return false;
+        try {
+          const d = new Date(taskDate);
+          if (isNaN(d.getTime())) return false;
+          return d.toISOString().split('T')[0] === date;
+        } catch {
+          return false;
+        }
+      });
+
+      // Calculate average mood from real data
+      let avgMood = 5; // Default neutral
+
+      // Priority 1: Use emotions from journal entries
       if (dayEmotions.length > 0) {
-        // Use emotion intensity as mood score
-        avgMood = dayEmotions.reduce((sum, emotion) => sum + emotion.intensity, 0) / dayEmotions.length;
-      } else if (dayEntries.length > 0) {
-        // Fallback to journal mood scoring
-        avgMood = dayEntries.reduce((sum, entry) => {
+        const totalMood = dayEmotions.reduce((sum, emotion) => {
           const moodScores = {
-            happy: 5, excited: 5, grateful: 5, hopeful: 5, peaceful: 5, content: 5, optimistic: 5,
-            calm: 4, neutral: 3,
-            sad: 2, anxious: 2, worried: 2, confused: 2, lonely: 2, nervous: 2, pessimistic: 2,
-            angry: 1, stressed: 1, depressed: 1, frustrated: 1, overwhelmed: 1
+            'very low': 1, 'depressed': 1, 'angry': 1,
+            'low': 2, 'sad': 2, 'stressed': 2, 'anxious': 2,
+            'fair': 4, 'worried': 4, 'confused': 4,
+            'neutral': 5,
+            'calm': 6, 'content': 6,
+            'good': 7, 'hopeful': 7,
+            'great': 9, 'happy': 9, 'excited': 9,
+            'excellent': 10, 'grateful': 10
           };
-          return sum + (moodScores[entry.mood] || 3);
-        }, 0) / dayEntries.length;
+          const emotionName = (emotion.emotion || 'neutral').toLowerCase();
+          return sum + (moodScores[emotionName] || 5);
+        }, 0);
+        avgMood = totalMood / dayEmotions.length;
+      }
+      // Priority 2: Use mood from journal entries if available
+      else if (dayEntries.length > 0) {
+        const entriesWithMood = dayEntries.filter(e => typeof e.mood === 'number');
+        if (entriesWithMood.length > 0) {
+          avgMood = entriesWithMood.reduce((sum, entry) => sum + entry.mood, 0) / entriesWithMood.length;
+        }
       }
 
       return {
         date: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
-        mood: avgMood,
-        tasks: dayTasks.length,
+        mood: Math.max(1, Math.min(10, avgMood)), // Clamp between 1-10
+        tasks: dayTasks.length, // Keep tasks count
         entries: dayEntries.length + dayEmotions.length
       };
     });
@@ -336,7 +345,7 @@ const Analytics = () => {
     }).reverse();
 
     return last30Days.map(date => {
-      const dayTasks = analyticsData.tasks.filter(task => 
+      const dayTasks = analyticsData.tasks.filter(task =>
         task.createdAt && task.createdAt.startsWith(date)
       );
       const completedTasks = dayTasks.filter(task => task.status === 'done').length;
@@ -352,21 +361,21 @@ const Analytics = () => {
   const downloadPDFReport = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
-    
+
     // Title
     doc.setFontSize(20);
     doc.text('NeuroCompanion Wellness Report', pageWidth / 2, 20, { align: 'center' });
-    
+
     // Date
     doc.setFontSize(12);
     doc.text(`Generated on: ${new Date().toLocaleDateString()}`, pageWidth / 2, 30, { align: 'center' });
-    
+
     // Overall Score
     doc.setFontSize(16);
     doc.text('Overall Wellness Score', 20, 50);
     doc.setFontSize(24);
     doc.text(`${overallScore}%`, 20, 65);
-    
+
     // Score interpretation
     doc.setFontSize(12);
     let scoreInterpretation = '';
@@ -374,9 +383,9 @@ const Analytics = () => {
     else if (overallScore >= 60) scoreInterpretation = 'Good - Keep up the good work!';
     else if (overallScore >= 40) scoreInterpretation = 'Fair - Consider some improvements';
     else scoreInterpretation = 'Needs attention - Consider professional support';
-    
+
     doc.text(scoreInterpretation, 20, 75);
-    
+
     // Statistics table
     const statsData = [
       ['Metric', 'Value'],
@@ -386,30 +395,30 @@ const Analytics = () => {
       ['Emotion Records', analyticsData.emotions.length],
       ['Wellness Activities', analyticsData.wellness.length]
     ];
-    
+
     doc.autoTable({
       startY: 90,
       head: [statsData[0]],
       body: statsData.slice(1),
       theme: 'grid'
     });
-    
+
     // Recommendations
     if (recommendations.length > 0) {
       doc.setFontSize(16);
       doc.text('Recommendations', 20, doc.lastAutoTable.finalY + 20);
-      
+
       recommendations.forEach((rec, index) => {
         doc.setFontSize(12);
         doc.text(`${index + 1}. ${rec.title}`, 20, doc.lastAutoTable.finalY + 35 + (index * 15));
         doc.text(rec.description, 20, doc.lastAutoTable.finalY + 40 + (index * 15));
       });
     }
-    
+
     // Footer
     doc.setFontSize(10);
     doc.text('This report is generated by NeuroCompanion for personal use only.', pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
-    
+
     doc.save(`neurocompanion-report-${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
@@ -449,9 +458,9 @@ const Analytics = () => {
 
           {/* Overall Score */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div 
+            <div
               className="rounded-2xl p-6 shadow-lg border"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-card)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -470,9 +479,9 @@ const Analytics = () => {
               </div>
             </div>
 
-            <div 
+            <div
               className="rounded-2xl p-6 shadow-lg border"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-card)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -489,9 +498,9 @@ const Analytics = () => {
               </div>
             </div>
 
-            <div 
+            <div
               className="rounded-2xl p-6 shadow-lg border"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-card)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -500,7 +509,7 @@ const Analytics = () => {
                 <div>
                   <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Task Completion</p>
                   <p className="text-2xl font-bold" style={{ color: 'var(--theme-text)' }}>
-                    {analyticsData.tasks.length > 0 ? 
+                    {analyticsData.tasks.length > 0 ?
                       Math.round((analyticsData.tasks.filter(t => t.status === 'done').length / analyticsData.tasks.length) * 100) : 0}%
                   </p>
                   <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Completion rate</p>
@@ -515,9 +524,9 @@ const Analytics = () => {
           {/* Charts Row 1 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Mood Distribution - Fixed Pie Chart */}
-            <div 
+            <div
               className="rounded-2xl p-6 shadow-lg border"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-card)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -548,9 +557,9 @@ const Analytics = () => {
             </div>
 
             {/* Weekly Trend */}
-            <div 
+            <div
               className="rounded-2xl p-6 shadow-lg border"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-card)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -561,19 +570,47 @@ const Analytics = () => {
               </h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={weeklyData}>
+                  <LineChart data={weeklyData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Area 
-                      type="monotone" 
-                      dataKey="mood" 
-                      stroke="var(--theme-primary)" 
-                      fill="var(--theme-primary)" 
-                      fillOpacity={0.3}
+                    <YAxis
+                      domain={[0, 10]}
+                      ticks={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+                      tickFormatter={(value) => {
+                        const moodLabels = {
+                          1: 'Very Low',
+                          2: 'Low',
+                          3: 'Low',
+                          4: 'Fair',
+                          5: 'Neutral',
+                          6: 'Fair',
+                          7: 'Good',
+                          8: 'Good',
+                          9: 'Great',
+                          10: 'Excellent'
+                        };
+                        return moodLabels[value] || '';
+                      }}
                     />
-                  </AreaChart>
+                    <Tooltip
+                      formatter={(value) => {
+                        const moodLabels = {
+                          1: 'Very Low', 2: 'Low', 3: 'Low',
+                          4: 'Fair', 5: 'Neutral', 6: 'Fair',
+                          7: 'Good', 8: 'Good', 9: 'Great', 10: 'Excellent'
+                        };
+                        return [moodLabels[Math.round(value)] || 'Neutral', 'Mood'];
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="mood"
+                      stroke="var(--theme-primary)"
+                      strokeWidth={3}
+                      dot={{ fill: 'var(--theme-primary)', r: 5 }}
+                      activeDot={{ r: 7 }}
+                    />
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
@@ -582,9 +619,9 @@ const Analytics = () => {
           {/* Charts Row 2 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Task Completion */}
-            <div 
+            <div
               className="rounded-2xl p-6 shadow-lg border"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-card)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -607,9 +644,9 @@ const Analytics = () => {
             </div>
 
             {/* Activity Overview */}
-            <div 
+            <div
               className="rounded-2xl p-6 shadow-lg border"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-card)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -655,9 +692,9 @@ const Analytics = () => {
 
           {/* Recommendations */}
           {recommendations.length > 0 && (
-            <div 
+            <div
               className="rounded-2xl p-6 shadow-lg border"
-              style={{ 
+              style={{
                 backgroundColor: 'var(--theme-card)',
                 borderColor: 'var(--theme-border)'
               }}
@@ -671,10 +708,9 @@ const Analytics = () => {
                   const IconComponent = rec.icon;
                   return (
                     <div key={index} className="flex items-start space-x-3 p-4 rounded-lg" style={{ backgroundColor: 'var(--theme-background)' }}>
-                      <IconComponent className={`h-5 w-5 mt-1 ${
-                        rec.type === 'urgent' ? 'text-red-500' : 
+                      <IconComponent className={`h-5 w-5 mt-1 ${rec.type === 'urgent' ? 'text-red-500' :
                         rec.type === 'warning' ? 'text-yellow-500' : 'text-blue-500'
-                      }`} />
+                        }`} />
                       <div>
                         <h4 className="font-semibold" style={{ color: 'var(--theme-text)' }}>{rec.title}</h4>
                         <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>{rec.description}</p>

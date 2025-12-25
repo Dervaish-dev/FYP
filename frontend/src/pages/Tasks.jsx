@@ -43,7 +43,7 @@ import { useAuth } from '../context/AuthContext';
 import { taskAPI } from '../utils/api';
 
 // Task Card Component
-const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
+const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge, isUpdating }) => {
   const {
     attributes,
     listeners,
@@ -86,6 +86,8 @@ const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
         backgroundColor: 'var(--theme-card)',
         borderColor: 'var(--theme-border)',
         border: isOverdue ? '2px solid #ef4444' : '1px solid var(--theme-border)',
+        opacity: isUpdating ? 0.6 : 1,
+        pointerEvents: isUpdating ? 'none' : 'auto'
       }}
       {...attributes}
       {...listeners}
@@ -182,7 +184,7 @@ const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge }) => {
 });
 
 // Task Column Component
-const TaskColumn = React.memo(({ title, tasks, status, onTaskUpdate, onTaskDelete, onTaskNudge }) => {
+const TaskColumn = React.memo(({ title, tasks, status, onTaskUpdate, onTaskDelete, onTaskNudge, updatingTaskId }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
   });
@@ -222,6 +224,7 @@ const TaskColumn = React.memo(({ title, tasks, status, onTaskUpdate, onTaskDelet
                 onUpdate={onTaskUpdate}
                 onDelete={onTaskDelete}
                 onNudge={onTaskNudge}
+                isUpdating={updatingTaskId === (task._id || task.id)}
               />
             ))}
           </AnimatePresence>
@@ -250,6 +253,7 @@ const Tasks = () => {
   const { user } = useAuth(); // Use real authenticated user
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [updatingTaskId, setUpdatingTaskId] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [newTask, setNewTask] = useState({
@@ -388,15 +392,37 @@ const Tasks = () => {
     const wasCompleted = previousTask?.status === 'done';
 
     try {
-      // Optimistic update
-      setTasks(prev => prev.map(task =>
-        (task._id === taskId || task.id === taskId) ? { ...task, ...updateData } : task
-      ));
+      setUpdatingTaskId(taskId);
 
-      await taskAPI.update(taskId, updateData);
+      // Call API first (no optimistic update)
+      const { task: updatedTask, nextTask } = await taskAPI.update(taskId, updateData);
+
+      // Apply server-confirmed task update locally (prevents flicker and "revert" feel)
+      if (updatedTask) {
+        setTasks((prev) => {
+          const updatedId = String(updatedTask._id || updatedTask.id || taskId);
+          let next = prev.map((t) => {
+            const id = String(t._id || t.id || '');
+            return id === updatedId ? { ...t, ...updatedTask } : t;
+          });
+
+          // If backend created the next occurrence for recurring tasks, add it to the list
+          if (nextTask) {
+            const nextId = String(nextTask._id || nextTask.id || '');
+            if (nextId && !next.some((t) => String(t._id || t.id || '') === nextId)) {
+              next = [nextTask, ...next];
+            }
+          }
+
+          return next;
+        });
+      }
 
       // Show success notification
       if (updateData.status === 'done' && !wasCompleted) {
+        if (previousTask?.repeat && previousTask.repeat !== 'once') {
+          toast.info('Recurring task completed — next occurrence scheduled.');
+        }
         addNotification(
           `🎉 "${previousTask?.title}" completed! You're on fire! 🔥`,
           NOTIFICATION_TYPES.CELEBRATION,
@@ -411,14 +437,10 @@ const Tasks = () => {
     } catch (error) {
       console.error('Error updating task:', error);
       toast.error('Failed to update task');
-      // Revert optimistic update
-      if (previousTask) {
-        setTasks(prev => prev.map(task =>
-          (task._id === taskId || task.id === taskId) ? previousTask : task
-        ));
-      }
+    } finally {
+      setUpdatingTaskId(null);
     }
-  }, [tasks, addNotification]);
+  }, [tasks, addNotification, user]);
 
   const handleTaskDelete = useCallback(async (taskId) => {
     if (!window.confirm('Are you sure you want to delete this task?')) return;
@@ -602,6 +624,7 @@ const Tasks = () => {
               onTaskUpdate={handleTaskUpdate}
               onTaskDelete={handleTaskDelete}
               onTaskNudge={handleTaskNudge}
+              updatingTaskId={updatingTaskId}
             />
 
             <TaskColumn
@@ -611,6 +634,7 @@ const Tasks = () => {
               onTaskUpdate={handleTaskUpdate}
               onTaskDelete={handleTaskDelete}
               onTaskNudge={handleTaskNudge}
+              updatingTaskId={updatingTaskId}
             />
           </motion.div>
         </DndContext>

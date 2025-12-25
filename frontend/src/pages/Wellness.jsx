@@ -44,7 +44,8 @@ import {
 import { toast } from 'react-toastify';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { wellnessAPI } from '../utils/api';
+import { wellnessAPI, journalAPI } from '../utils/api';
+import api from '../utils/api';
 
 const Wellness = () => {
   // Theme integration
@@ -117,42 +118,112 @@ const Wellness = () => {
 
   // Load mood analytics
   const loadMoodAnalytics = useCallback(async () => {
+    if (!user?.id) return;
+    
     setAnalyticsLoading(true);
     try {
-      // Mock analytics data for now
-      const mockMoodData = [
-        { day: 'Mon', mood: 'happy', sleep: 7.5 },
-        { day: 'Tue', mood: 'calm', sleep: 8.0 },
-        { day: 'Wed', mood: 'stressed', sleep: 6.5 },
-        { day: 'Thu', mood: 'happy', sleep: 7.8 },
-        { day: 'Fri', mood: 'calm', sleep: 8.2 },
-        { day: 'Sat', mood: 'happy', sleep: 9.0 },
-        { day: 'Sun', mood: 'calm', sleep: 7.0 }
-      ];
+      // Fetch real emotion/mood data from journal entries
+      const [journalData, emotionData] = await Promise.all([
+        journalAPI.listByUser(user.id).catch(() => []),
+        api.get(`/emotions/history/${user.id}?limit=30`).catch(() => ({ data: { data: { emotions: [] } } }))
+      ]);
 
-      setMoodData(mockMoodData);
+      const journals = Array.isArray(journalData) ? journalData : [];
+      const emotions = emotionData?.data?.data?.emotions || [];
 
-      // Calculate mood summary
-      const happyDays = mockMoodData.filter(d => d.mood === 'happy').length;
-      const stressedDays = mockMoodData.filter(d => d.mood === 'stressed').length;
-      const calmDays = mockMoodData.filter(d => d.mood === 'calm').length;
-      const avgSleep = mockMoodData.reduce((sum, d) => sum + d.sleep, 0) / mockMoodData.length;
+      // Combine journal moods and emotion data
+      const allMoodData = [];
+      
+      // Group by day of week
+      const dayMap = {};
+      const today = new Date();
+      
+      // Get last 7 days
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+        dayMap[dayName] = { day: dayName, moods: [], sleep: 7.5 };
+      }
+
+      // Add journal moods
+      journals.forEach(entry => {
+        if (entry.emotion || entry.mood) {
+          const entryDate = new Date(entry.createdAt || entry.timestamp);
+          const dayName = entryDate.toLocaleDateString('en-US', { weekday: 'short' });
+          if (dayMap[dayName]) {
+            dayMap[dayName].moods.push(entry.emotion || entry.mood);
+          }
+        }
+      });
+
+      // Add emotion history
+      emotions.forEach(emotion => {
+        const emotionDate = new Date(emotion.timestamp || emotion.createdAt);
+        const dayName = emotionDate.toLocaleDateString('en-US', { weekday: 'short' });
+        if (dayMap[dayName]) {
+          dayMap[dayName].moods.push(emotion.emotion);
+        }
+      });
+
+      // Calculate dominant mood for each day
+      const moodData = Object.values(dayMap).map(dayData => {
+        let dominantMood = 'neutral';
+        if (dayData.moods.length > 0) {
+          // Count mood frequencies
+          const moodCounts = {};
+          dayData.moods.forEach(mood => {
+            const normalizedMood = mood.toLowerCase();
+            moodCounts[normalizedMood] = (moodCounts[normalizedMood] || 0) + 1;
+          });
+          // Get most frequent mood
+          dominantMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0][0];
+        }
+        return { ...dayData, mood: dominantMood };
+      });
+
+      setMoodData(moodData);
+
+      // Calculate mood summary from real data
+      const allMoods = moodData.map(d => d.mood);
+      const happyDays = allMoods.filter(m => ['happy', 'excited', 'grateful', 'hopeful', 'optimistic'].includes(m)).length;
+      const stressedDays = allMoods.filter(m => ['stressed', 'anxious', 'worried', 'overwhelmed'].includes(m)).length;
+      const calmDays = allMoods.filter(m => ['calm', 'peaceful', 'relaxed', 'neutral'].includes(m)).length;
+      
+      // Get sleep data if available
+      const avgSleep = sleepData.length > 0
+        ? sleepData.reduce((sum, d) => sum + (d.sleepDuration || 7.5), 0) / sleepData.length
+        : 7.5;
 
       setMoodSummary({
         averageSleep: parseFloat(avgSleep.toFixed(1)),
         happyDays,
         stressedDays,
         calmDays,
-        recommendation: avgSleep < 7 ?
-          "You've been sleeping less lately. Try a relaxing routine before bed 🌙" :
-          "Great sleep routine! You're well-rested and energized 💪"
+        recommendation: happyDays >= 3
+          ? "You're having a great week emotionally! Keep up the positive momentum 🌟"
+          : stressedDays >= 3
+          ? "You've had some stressful days. Try relaxation exercises and self-care 💙"
+          : avgSleep < 7
+          ? "You've been sleeping less lately. Try a relaxing routine before bed 🌙"
+          : "Balanced week! Keep maintaining your wellness routines 💪"
       });
     } catch (error) {
       console.error('Error loading mood analytics:', error);
+      // Fallback to safe defaults
+      setMoodData([
+        { day: 'Mon', mood: 'neutral', sleep: 7.5 },
+        { day: 'Tue', mood: 'neutral', sleep: 7.5 },
+        { day: 'Wed', mood: 'neutral', sleep: 7.5 },
+        { day: 'Thu', mood: 'neutral', sleep: 7.5 },
+        { day: 'Fri', mood: 'neutral', sleep: 7.5 },
+        { day: 'Sat', mood: 'neutral', sleep: 7.5 },
+        { day: 'Sun', mood: 'neutral', sleep: 7.5 }
+      ]);
     } finally {
       setAnalyticsLoading(false);
     }
-  }, []);
+  }, [user, sleepData]);
 
   // Save sleep data
   const saveSleepData = useCallback(async () => {

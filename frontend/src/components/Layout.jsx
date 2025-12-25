@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Link, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home,
   Heart,
@@ -11,26 +11,26 @@ import {
   Users,
   Settings as SettingsIcon,
   Brain,
-  Activity
+  Activity,
+  User,
+  LogOut
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import Settings from '../pages/Settings';
 
 const Layout = ({ children }) => {
-  // Mock user for now - no auth needed
-  const { user } = useAuth();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const navigationItems = [
-    { path: '/dashboard', icon: Home, label: 'Dashboard' },
+    { path: '/dashboard', icon: Home, label: 'Home' },
     { path: '/emotions', icon: Heart, label: 'Emotions' },
     { path: '/tasks', icon: CheckSquare, label: 'Tasks' },
     { path: '/journal', icon: BookOpen, label: 'Journal' },
-    { path: '/analytics', icon: BarChart3, label: 'Analytics' },
-    { path: '/voice', icon: Mic, label: 'Voice' },
-    { path: '/caregiver', icon: Users, label: 'Caregiver' },
-    { path: '/wellness', icon: Activity, label: 'Wellness' }
+    { path: '/analytics', icon: BarChart3, label: 'Analytics' }
   ];
 
   const isActive = (path) => location.pathname === path;
@@ -81,22 +81,62 @@ const Layout = ({ children }) => {
             <div className="flex items-center space-x-4">
               <div className="text-right">
                 <p className="font-medium text-sm" style={{ color: 'var(--theme-text)' }}>
-                  {user?.name || 'User'}
-                </p>
-                <p className="text-xs opacity-70" style={{ color: 'var(--theme-text)' }}>
-                  {user?.email || 'user@example.com'}
+                  Hi {user?.name || 'User'} 👋
                 </p>
               </div>
-              <Link
-                to="/settings"
-                className="p-2 rounded-lg hover:bg-opacity-10 transition-colors"
-                style={{
-                  color: 'var(--theme-text)',
-                  backgroundColor: 'transparent'
-                }}
-              >
-                <SettingsIcon size={20} />
-              </Link>
+              <div className="relative">
+                <button
+                  className="p-2 rounded-lg hover:bg-opacity-10 transition-colors"
+                  style={{
+                    color: 'var(--theme-text)',
+                    backgroundColor: isDropdownOpen ? 'rgba(0,0,0,0.05)' : 'transparent'
+                  }}
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                >
+                  <SettingsIcon size={20} />
+                </button>
+
+                <AnimatePresence>
+                  {isDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg border overflow-hidden z-50"
+                      style={{
+                        backgroundColor: 'var(--theme-card)',
+                        borderColor: 'var(--theme-border)'
+                      }}
+                    >
+                      <Link
+                        to="/settings"
+                        onClick={() => setIsDropdownOpen(false)}
+                        className="flex items-center space-x-3 px-4 py-3 hover:bg-opacity-10 transition-colors"
+                        style={{ color: 'var(--theme-text)' }}
+                      >
+                        <User size={18} />
+                        <span className="font-medium">Profile</span>
+                      </Link>
+                      <button
+                        onClick={() => {
+                          logout();
+                          setIsDropdownOpen(false);
+                          navigate('/login');
+                        }}
+                        className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-opacity-10 transition-colors border-t"
+                        style={{
+                          color: 'var(--theme-text)',
+                          borderColor: 'var(--theme-border)'
+                        }}
+                      >
+                        <LogOut size={18} />
+                        <span className="font-medium">Logout</span>
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
         </div>
@@ -113,19 +153,19 @@ const Layout = ({ children }) => {
         </motion.div>
       </main>
 
-      {/* Bottom Navigation */}
-      <motion.nav
-        className="fixed bottom-0 left-0 right-0 border-t z-50"
-        style={{
-          backgroundColor: 'var(--theme-card)',
-          borderColor: 'var(--theme-border)'
-        }}
-        initial={{ opacity: 0, y: 100 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.4 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-around py-3">
+      {/* Floating Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 pb-6 px-4 pointer-events-none z-50">
+        <motion.nav
+          className="max-w-md mx-auto rounded-2xl shadow-2xl border pointer-events-auto"
+          style={{
+            backgroundColor: 'var(--theme-card)',
+            borderColor: 'var(--theme-border)'
+          }}
+          initial={{ opacity: 0, y: 100 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+        >
+          <div className="flex justify-around py-3 px-2">
             {navigationItems.map((item) => (
               <Link key={item.path} to={item.path}>
                 <motion.button
@@ -146,10 +186,10 @@ const Layout = ({ children }) => {
               </Link>
             ))}
           </div>
-        </div>
-      </motion.nav>
+        </motion.nav>
+      </div>
 
-    </div>
+    </div >
   );
 };
 

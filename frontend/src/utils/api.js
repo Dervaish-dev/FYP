@@ -171,6 +171,11 @@ export const healthCheck = async () => {
   }
 };
 
+export const getMoodData = async (userId, days = 7) => {
+  const response = await apiClient.get(`/api/wellness/mood/${userId}?days=${days}`);
+  return response.data;
+};
+
 export default api;
 
 // ----- Backend-ready wrappers with mock fallbacks -----
@@ -192,7 +197,10 @@ export const taskAPI = {
     try {
       const res = await api.put(`/tasks/${id}`, update);
       console.log('%c✓ TASK UPDATED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
-      return res.data.data;
+      return {
+        task: res.data.data,
+        nextTask: res.data.nextTask || null,
+      };
     } catch (e) {
       console.error('%c✗ TASK UPDATE FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e?.response?.data || e);
       throw e.response?.data || { message: 'Failed to update task' };

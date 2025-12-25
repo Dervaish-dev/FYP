@@ -33,7 +33,7 @@ const emotionHistorySchema = new mongoose.Schema({
   },
   source: {
     type: String,
-    enum: ['manual', 'ai-analysis'],
+    enum: ['manual', 'ai-analysis', 'ai-facial-analysis', 'ai-webcam-analysis'],
     default: 'manual'
   },
   timestamp: {

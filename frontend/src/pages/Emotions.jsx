@@ -47,11 +47,7 @@ const Emotions = () => {
   const [webcamStream, setWebcamStream] = useState(null);
   const videoRef = React.useRef(null);
   const canvasRef = React.useRef(null);
-  const [aiInsights, setAiInsights] = useState([
-    "Your mood tends to be higher on weekends. Consider incorporating more relaxation activities during weekdays.",
-    "Stress levels correlate with work days. Try implementing better work-life balance strategies.",
-    "Meditation and mindfulness activities show positive correlation with your emotional well-being."
-  ]);
+  const [aiInsights, setAiInsights] = useState([]);
 
   // Fetch emotion history from backend
   useEffect(() => {
@@ -65,6 +61,121 @@ const Emotions = () => {
       }
     };
   }, [userId]);
+
+  // Generate AI insights based on emotion history
+  useEffect(() => {
+    if (emotionHistory.length > 0) {
+      generateAIInsights(emotionHistory);
+    }
+  }, [emotionHistory]);
+
+  const generateAIInsights = (emotions) => {
+    try {
+      const insights = [];
+      
+      // Analyze emotion patterns
+      const emotionCounts = {};
+      const emotionsByHour = {};
+      
+      emotions.forEach(entry => {
+        const emotion = entry.emotion?.toLowerCase() || 'neutral';
+        emotionCounts[emotion] = (emotionCounts[emotion] || 0) + 1;
+        
+        // Track time patterns
+        if (entry.timestamp || entry.createdAt) {
+          const hour = new Date(entry.timestamp || entry.createdAt).getHours();
+          emotionsByHour[hour] = emotionsByHour[hour] || [];
+          emotionsByHour[hour].push(emotion);
+        }
+      });
+
+      // Find dominant emotion
+      const sortedEmotions = Object.entries(emotionCounts).sort((a, b) => b[1] - a[1]);
+      const dominantEmotion = sortedEmotions[0]?.[0];
+      const dominantCount = sortedEmotions[0]?.[1] || 0;
+      const percentage = Math.round((dominantCount / emotions.length) * 100);
+
+      // Insight 1: Dominant emotion pattern
+      if (dominantEmotion) {
+        const positiveEmotions = ['happy', 'calm', 'excited', 'grateful', 'hopeful', 'peaceful'];
+        if (positiveEmotions.includes(dominantEmotion)) {
+          insights.push(`Your emotions are ${percentage}% ${dominantEmotion}. You're maintaining positive emotional wellness! 🌟`);
+        } else if (dominantEmotion === 'stressed' || dominantEmotion === 'anxious') {
+          insights.push(`You've been feeling ${dominantEmotion} ${percentage}% of the time. Consider relaxation techniques and breathing exercises.`);
+        } else {
+          insights.push(`Your most common emotion is ${dominantEmotion} (${percentage}%). Track patterns to understand triggers better.`);
+        }
+      }
+
+      // Insight 2: Time-based patterns
+      const morningEmotions = [];
+      const eveningEmotions = [];
+      
+      Object.entries(emotionsByHour).forEach(([hour, emotions]) => {
+        const h = parseInt(hour);
+        if (h >= 6 && h < 12) {
+          morningEmotions.push(...emotions);
+        } else if (h >= 18 && h < 24) {
+          eveningEmotions.push(...emotions);
+        }
+      });
+
+      if (morningEmotions.length > 0 && eveningEmotions.length > 0) {
+        const positiveEmotions = ['happy', 'calm', 'excited', 'grateful', 'hopeful', 'peaceful'];
+        const morningPositive = morningEmotions.filter(e => positiveEmotions.includes(e)).length;
+        const eveningPositive = eveningEmotions.filter(e => positiveEmotions.includes(e)).length;
+        
+        const morningPerc = Math.round((morningPositive / morningEmotions.length) * 100);
+        const eveningPerc = Math.round((eveningPositive / eveningEmotions.length) * 100);
+        
+        if (morningPerc > eveningPerc + 20) {
+          insights.push("Your mood tends to be better in the mornings. Consider handling important tasks earlier in the day.");
+        } else if (eveningPerc > morningPerc + 20) {
+          insights.push("You feel more positive in the evenings. Evening routines seem to work well for you!");
+        }
+      }
+
+      // Insight 3: Variety analysis
+      const uniqueEmotions = Object.keys(emotionCounts).length;
+      if (uniqueEmotions <= 2) {
+        insights.push("Your emotions show consistent patterns. This could indicate stable routines or limited emotional expression.");
+      } else if (uniqueEmotions >= 5) {
+        insights.push("You experience a diverse range of emotions, which is healthy and normal. Keep tracking to identify triggers.");
+      }
+
+      // Fallback insights if not enough data
+      if (insights.length === 0) {
+        insights.push(
+          "Track your emotions regularly to discover personalized patterns and insights.",
+          "Consistent emotion tracking helps identify triggers and improve self-awareness.",
+          "Your emotional data is building. Check back soon for personalized insights!"
+        );
+      }
+
+      setAiInsights(insights.slice(0, 3)); // Keep max 3 insights
+    } catch (error) {
+      console.error('Error generating AI insights:', error);
+      // Fallback insights
+      setAiInsights([
+        "Track your emotions regularly to discover personalized patterns and insights.",
+        "Mindfulness and self-awareness are key to emotional wellness.",
+        "Your emotional journey is unique. Keep tracking to understand yourself better."
+      ]);
+    }
+  };
+
+  // Effect to handle video stream when it changes
+  useEffect(() => {
+    if (webcamStream && videoRef.current) {
+      console.log('🔄 Attaching stream to video element');
+      videoRef.current.srcObject = webcamStream;
+      videoRef.current.play().then(() => {
+        console.log('✅ Video playing successfully');
+      }).catch(err => {
+        console.error('❌ Video play error:', err);
+      });
+    }
+  }, [webcamStream]);
 
   const fetchEmotionHistory = async () => {
     try {
@@ -213,11 +324,10 @@ const Emotions = () => {
       // Add to emotion history with enhanced data
       const newEntry = {
         id: Date.now(),
-        date: new Date().toISOString().split('T')[0],
         emotion: detectedEmotionResult.toLowerCase(),
         intensity: Number.isFinite(intensityFromModel) ? intensityFromModel : emotionIntensity,
         confidence: Number.isFinite(confidenceFromModel) ? confidenceFromModel : 0.75,
-        note: `AI detected: ${detectedEmotionResult} (${(confidenceFromModel * 100).toFixed(1)}% confident)`,
+        note: '',
         timestamp: new Date().toISOString(),
         source: 'ai-facial-analysis'
       };
@@ -275,6 +385,7 @@ const Emotions = () => {
   // Webcam functions
   const startWebcam = async () => {
     try {
+      console.log('🎥 Starting webcam...');
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           width: { ideal: 1280 },
@@ -282,15 +393,14 @@ const Emotions = () => {
           facingMode: 'user'
         } 
       });
+      console.log('✅ Got media stream:', stream.id);
+      console.log('📊 Stream tracks:', stream.getTracks().map(t => `${t.kind}: ${t.enabled}`));
       setWebcamStream(stream);
       setWebcamActive(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
       setUploadError('');
     } catch (error) {
-      console.error('Error accessing webcam:', error);
-      setUploadError('Unable to access webcam. Please check permissions.');
+      console.error('❌ Error accessing webcam:', error);
+      setUploadError(`Unable to access webcam: ${error.message}. Please check permissions.`);
     }
   };
 
@@ -304,14 +414,28 @@ const Emotions = () => {
   };
 
   const capturePhoto = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current) {
+      console.error('Video or canvas ref not available');
+      setUploadError('Camera not ready. Please try again.');
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
+    
+    // Check if video is actually playing
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+      console.error('Video not ready:', video.readyState);
+      setUploadError('Camera still loading. Please wait a moment and try again.');
+      return;
+    }
+    
     const context = canvas.getContext('2d');
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    
+    console.log('Capturing photo:', canvas.width, 'x', canvas.height);
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob(async (blob) => {
@@ -356,11 +480,10 @@ const Emotions = () => {
 
         const newEntry = {
           id: Date.now(),
-          date: new Date().toISOString().split('T')[0],
           emotion: detectedEmotionResult.toLowerCase(),
           intensity: Number.isFinite(intensityFromModel) ? intensityFromModel : emotionIntensity,
           confidence: Number.isFinite(confidenceFromModel) ? confidenceFromModel : 0.75,
-          note: `AI detected via webcam: ${detectedEmotionResult} (${(confidenceFromModel * 100).toFixed(1)}% confident)`,
+          note: '',
           timestamp: new Date().toISOString(),
           source: 'ai-webcam-analysis'
         };
@@ -400,11 +523,10 @@ const Emotions = () => {
       // Add to emotion history with enhanced data
       const newEntry = {
         id: Date.now(),
-        date: new Date().toISOString().split('T')[0],
         emotion: emotion.toLowerCase(),
         intensity: emotionIntensity,
         confidence: 1.0, // Manual selection has 100% confidence
-        note: `Manually selected: ${emotion}`,
+        note: '',
         timestamp: new Date().toISOString(),
         source: 'manual'
       };
@@ -481,7 +603,7 @@ const Emotions = () => {
 
   const getWeeklyTrend = () => {
     return emotionHistory.map(entry => ({
-      date: new Date(entry.date).toLocaleDateString('en-US', { weekday: 'short' }),
+      date: new Date(entry.timestamp || entry.date).toLocaleDateString('en-US', { weekday: 'short' }),
       intensity: entry.intensity,
       emotion: entry.emotion
     }));
@@ -543,17 +665,17 @@ const Emotions = () => {
                     value={selectedEmotion}
                     onChange={(e) => setSelectedEmotion(e.target.value)}
                   >
-                    <option value="">Choose your current emotion</option>
-                    <option value="Happy">😊 Happy</option>
-                    <option value="Sad">😔 Sad</option>
-                    <option value="Calm">😌 Calm</option>
-                    <option value="Stressed">😟 Stressed</option>
-                    <option value="Angry">😠 Angry</option>
-                    <option value="Neutral">😐 Neutral</option>
-                    <option value="Excited">🤩 Excited</option>
-                    <option value="Worried">😥 Worried</option>
-                    <option value="Confused">🤔 Confused</option>
-                    <option value="Surprised">😲 Surprised</option>
+                    <option value="" style={{ backgroundColor: 'var(--theme-card)', color: 'var(--theme-text)' }}>Choose your current emotion</option>
+                    <option value="Happy" style={{ backgroundColor: 'var(--theme-card)', color: 'var(--theme-text)' }}>😊 Happy</option>
+                    <option value="Sad" style={{ backgroundColor: 'var(--theme-card)', color: 'var(--theme-text)' }}>😔 Sad</option>
+                    <option value="Calm" style={{ backgroundColor: 'var(--theme-card)', color: 'var(--theme-text)' }}>😌 Calm</option>
+                    <option value="Stressed" style={{ backgroundColor: 'var(--theme-card)', color: 'var(--theme-text)' }}>😟 Stressed</option>
+                    <option value="Angry" style={{ backgroundColor: 'var(--theme-card)', color: 'var(--theme-text)' }}>😠 Angry</option>
+                    <option value="Neutral" style={{ backgroundColor: 'var(--theme-card)', color: 'var(--theme-text)' }}>😐 Neutral</option>
+                    <option value="Excited" style={{ backgroundColor: 'var(--theme-card)', color: 'var(--theme-text)' }}>🤩 Excited</option>
+                    <option value="Worried" style={{ backgroundColor: 'var(--theme-card)', color: 'var(--theme-text)' }}>😥 Worried</option>
+                    <option value="Confused" style={{ backgroundColor: 'var(--theme-card)', color: 'var(--theme-text)' }}>🤔 Confused</option>
+                    <option value="Surprised" style={{ backgroundColor: 'var(--theme-card)', color: 'var(--theme-text)' }}>😲 Surprised</option>
                   </select>
 
                   {/* Intensity Slider */}
@@ -652,12 +774,20 @@ const Emotions = () => {
                     </div>
                   ) : (
                     <div className="mb-4 space-y-3">
-                      <div className="relative rounded-lg overflow-hidden border-2" style={{ borderColor: 'var(--theme-primary)' }}>
+                      <div className="text-sm mb-2 font-semibold" style={{ color: 'var(--theme-primary)' }}>
+                        📹 Webcam Active {webcamStream && `(Stream ID: ${webcamStream.id.slice(0, 8)}...)`}
+                      </div>
+                      <div className="relative rounded-lg overflow-hidden border-2 bg-black" style={{ borderColor: 'var(--theme-primary)' }}>
                         <video
                           ref={videoRef}
                           autoPlay
                           playsInline
+                          muted
                           className="w-full h-64 object-cover"
+                          style={{ minHeight: '256px' }}
+                          onLoadedMetadata={() => console.log('📹 Video metadata loaded')}
+                          onPlay={() => console.log('▶️ Video started playing')}
+                          onError={(e) => console.error('❌ Video error:', e)}
                         />
                       </div>
                       <div className="flex gap-2">
@@ -950,15 +1080,12 @@ const Emotions = () => {
                             {emotionData?.label}
                           </span>
                           <span className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
-                            {entry.intensity}/10
+                            Intensity: {entry.intensity}/10
                           </span>
                         </div>
-                        <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
-                          {entry.note}
-                        </p>
                       </div>
                       <div className="text-sm opacity-60" style={{ color: 'var(--theme-text)' }}>
-                        {new Date(entry.date).toLocaleDateString()}
+                        {new Date(entry.timestamp || entry.date).toLocaleDateString()}
                       </div>
                     </motion.div>
                   );
