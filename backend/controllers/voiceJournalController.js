@@ -1,0 +1,258 @@
+import mongoose from 'mongoose';
+import CallReport from '../models/CallReport.js';
+import { convertTranscriptToJournal } from '../utils/journalConverter.js';
+
+// Define Journal schema inline (or import if separate file)
+const journalSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
+  title: { type: String, required: true },
+  content: { type: String, required: true },
+  summary: { type: String, default: '' },
+  mood: { type: String, default: 'neutral' },
+  sentiment: { type: String, enum: ['positive', 'negative', 'neutral'], default: 'neutral' },
+  sentimentConfidence: { type: Number, default: 0.5 },
+  stressLevel: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
+  stressScore: { type: Number, default: 5 },
+  emotionalIntensity: { type: Number, default: 5, min: 1, max: 10 },
+  topics: [{ type: String }],
+  keywords: [{ type: String }],
+  source: { type: String, enum: ['manual', 'voice_call'], default: 'manual' },
+  call_id: { type: String, default: null },
+  createdAt: { type: Date, default: Date.now }
+}, { timestamps: true });
+
+const Journal = mongoose.models.Journal || mongoose.model('Journal', journalSchema);
+
+/**
+ * Webhook handler for Retell AI call completion
+ * Receives call data and initiates journal creation after delay
+ */
+export async function handleCallCompleted(req, res) {
+  try {
+    console.log('📞 Received call completion webhook');
+    console.log('📦 Payload:', JSON.stringify(req.body, null, 2));
+    
+    const { call_id, user_id, transcript, summary } = req.body;
+    
+    // Validate required fields
+    if (!call_id || !user_id || !transcript) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: call_id, user_id, transcript'
+      });
+    }
+    
+    // Check if already processed
+    const existing = await CallReport.findOne({ call_id });
+    if (existing?.processed) {
+      console.log('⏭️ Call already processed:', call_id);
+      return res.status(200).json({
+        success: true,
+        message: 'Call already processed',
+        journal_id: existing.journal_id
+      });
+    }
+    
+    // Store/update call report
+    let callReport;
+    if (existing) {
+      callReport = existing;
+      callReport.transcript = transcript;
+      callReport.summary = summary || '';
+      await callReport.save();
+    } else {
+      callReport = await CallReport.create({
+        user_id,
+        call_id,
+        transcript,
+        summary: summary || '',
+        processed: false
+      });
+    }
+    
+    console.log('✅ Call report saved:', call_id);
+    
+    // Respond immediately to webhook
+    res.status(200).json({
+      success: true,
+      message: 'Call received, processing journal entry',
+      call_id
+    });
+    
+    // Process journal creation after 3-second delay (non-blocking)
+    setTimeout(async () => {
+      try {
+        await createJournalFromCall(callReport._id);
+      } catch (error) {
+        console.error('❌ Background journal creation failed:', error);
+      }
+    }, 3000);
+    
+  } catch (error) {
+    console.error('❌ Webhook error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Webhook processing failed',
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Create journal entry from call report
+ * Called after delay from webhook
+ */
+async function createJournalFromCall(callReportId) {
+  try {
+    console.log('📝 Starting journal creation for call:', callReportId);
+    
+    const callReport = await CallReport.findById(callReportId);
+    if (!callReport) {
+      throw new Error('Call report not found');
+    }
+    
+    if (callReport.processed) {
+      console.log('⏭️ Already processed');
+      return;
+    }
+    
+    // Convert transcript to journal format with AI
+    console.log('🤖 Converting transcript to journal...');
+    const { content, emotion } = await convertTranscriptToJournal(
+      callReport.transcript,
+      callReport.summary
+    );
+    
+    console.log('✅ Conversion complete');
+    console.log('📝 Journal content length:', content.length);
+    console.log('😊 Detected emotion:', emotion.mood);
+    
+    // Create journal entry
+    const journalDate = new Date(callReport.created_at);
+    const title = `Voice Journal - ${journalDate.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}`;
+    
+    const journal = await Journal.create({
+      userId: new mongoose.Types.ObjectId(callReport.user_id),
+      title,
+      content,
+      summary: callReport.summary,
+      mood: emotion.mood,
+      sentiment: emotion.sentiment,
+      sentimentConfidence: 0.85, // AI-generated, high confidence
+      stressLevel: emotion.stressLevel,
+      stressScore: emotion.stressLevel === 'high' ? 8 : emotion.stressLevel === 'medium' ? 5 : 2,
+      emotionalIntensity: emotion.intensity,
+      topics: emotion.topics || [],
+      keywords: emotion.keywords || [],
+      source: 'voice_call',
+      call_id: callReport.call_id,
+      createdAt: callReport.created_at
+    });
+    
+    console.log('✅ Journal created:', journal._id);
+    
+    // Mark as processed
+    callReport.processed = true;
+    callReport.journal_id = journal._id;
+    await callReport.save();
+    
+    console.log('✅ Call report marked as processed');
+    
+    // TODO: Send notification to user
+    // await notifyUser(callReport.user_id, journal._id);
+    
+    return journal;
+  } catch (error) {
+    console.error('❌ Journal creation error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Manual trigger to process unprocessed calls
+ * GET /api/voice-journal/process-pending?user_id=xxx
+ */
+export async function processPendingCalls(req, res) {
+  try {
+    const { user_id } = req.query;
+    
+    const query = { processed: false };
+    if (user_id) {
+      query.user_id = user_id;
+    }
+    
+    const pendingCalls = await CallReport.find(query).sort({ created_at: -1 });
+    
+    console.log(`📋 Found ${pendingCalls.length} pending calls`);
+    
+    const results = [];
+    for (const call of pendingCalls) {
+      try {
+        const journal = await createJournalFromCall(call._id);
+        results.push({
+          call_id: call.call_id,
+          journal_id: journal._id,
+          success: true
+        });
+      } catch (error) {
+        results.push({
+          call_id: call.call_id,
+          success: false,
+          error: error.message
+        });
+      }
+    }
+    
+    res.json({
+      success: true,
+      processed: results.length,
+      results
+    });
+  } catch (error) {
+    console.error('❌ Process pending error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+}
+
+/**
+ * Get voice journal entries for a user
+ * GET /api/voice-journal/history?user_id=xxx
+ */
+export async function getVoiceJournalHistory(req, res) {
+  try {
+    const { user_id } = req.query;
+    
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'user_id required'
+      });
+    }
+    
+    const journals = await Journal.find({
+      userId: new mongoose.Types.ObjectId(user_id),
+      source: 'voice_call'
+    }).sort({ createdAt: -1 }).limit(50);
+    
+    res.json({
+      success: true,
+      count: journals.length,
+      journals
+    });
+  } catch (error) {
+    console.error('❌ History error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+}

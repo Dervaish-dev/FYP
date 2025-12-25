@@ -15,6 +15,7 @@ import caregiverRoutes from './routes/caregiverRoutes.js';
 import connectionRoutes from './routes/connectionRoutes.js';
 import inviteRoutes from './routes/inviteRoutes.js';
 import voiceRoutes from './routes/voiceRoutes.js';
+import voiceJournalRoutes from './routes/voiceJournalRoutes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -47,6 +48,7 @@ app.use('/api/caregiver', caregiverRoutes);
 app.use('/api/connections', connectionRoutes);
 app.use('/api/invites', inviteRoutes);
 app.use('/api/voice', voiceRoutes);
+app.use('/api/voice-journal', voiceJournalRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
