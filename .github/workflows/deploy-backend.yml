@@ -44,6 +44,7 @@ jobs:
             -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
             -e PORT=5005 \
             -e GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+            -e HF_TOKEN="${{ secrets.HF_TOKEN }}" \
             -e N8N_WEBHOOK_URL="${{ secrets.N8N_WEBHOOK_URL }}" \
             -e INVITE_HMAC_SECRET="${{ secrets.INVITE_HMAC_SECRET }}" \
             -e OTP_HMAC_SECRET="${{ secrets.OTP_HMAC_SECRET }}" \
