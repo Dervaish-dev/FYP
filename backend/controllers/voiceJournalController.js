@@ -175,6 +175,72 @@ async function createJournalFromCall(callReportId) {
 }
 
 /**
+ * Process latest unprocessed call for user (MOBILE APP ENDPOINT)
+ * Called when user ends call in mobile app
+ * POST /api/voice-journal/process-latest
+ * Body: { user_id: "xxx" }
+ */
+export async function processLatestCall(req, res) {
+  try {
+    const { user_id } = req.body;
+    
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'user_id required'
+      });
+    }
+    
+    console.log(`📱 Processing latest call for user: ${user_id}`);
+    
+    // Find latest unprocessed call for this user
+    const latestCall = await CallReport.findOne({
+      user_id,
+      processed: false
+    }).sort({ created_at: -1 });
+    
+    if (!latestCall) {
+      return res.status(404).json({
+        success: false,
+        message: 'No unprocessed calls found for this user'
+      });
+    }
+    
+    console.log(`✅ Found latest call: ${latestCall.call_id}`);
+    
+    // Process immediately (no delay)
+    const journal = await createJournalFromCall(latestCall._id);
+    
+    console.log(`✅ Journal created: ${journal._id}`);
+    
+    res.json({
+      success: true,
+      message: 'Voice journal created successfully',
+      journal: {
+        _id: journal._id,
+        title: journal.title,
+        content: journal.content,
+        summary: journal.summary,
+        mood: journal.mood,
+        emotionalIntensity: journal.emotionalIntensity,
+        sentiment: journal.sentiment,
+        stressLevel: journal.stressLevel,
+        topics: journal.topics,
+        keywords: journal.keywords,
+        call_id: journal.call_id,
+        createdAt: journal.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('❌ Process latest error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+}
+
+/**
  * Manual trigger to process unprocessed calls
  * GET /api/voice-journal/process-pending?user_id=xxx
  */

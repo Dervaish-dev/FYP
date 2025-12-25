@@ -5,3 +5,14 @@
 🚀 NeuroCompanion API server running on port 5005
 📊 Health check: http://localhost:5005/api/health
 ✅ MongoDB Connected: ac-ilbyd7u-shard-00-02.popuf6f.mongodb.net
+Facial emotion analysis error: Error: HF_TOKEN not configured in .env
+    at file:///Users/apple/NC/FYP/backend/routes/emotionRoutes.js:222:13
+    at Layer.handle [as handle_request] (/Users/apple/NC/FYP/backend/node_modules/express/lib/router/layer.js:95:5)
+    at next (/Users/apple/NC/FYP/backend/node_modules/express/lib/router/route.js:149:13)
+    at done (/Users/apple/NC/FYP/backend/node_modules/multer/lib/make-middleware.js:59:7)
+    at indicateDone (/Users/apple/NC/FYP/backend/node_modules/multer/lib/make-middleware.js:63:68)
+    at /Users/apple/NC/FYP/backend/node_modules/multer/lib/make-middleware.js:176:11
+    at WriteStream.<anonymous> (/Users/apple/NC/FYP/backend/node_modules/multer/storage/disk.js:43:9)
+    at WriteStream.emit (node:events:520:35)
+    at finish (node:internal/streams/writable:953:10)
+    at node:internal/streams/writable:934:13
