@@ -29,7 +29,9 @@ connectDB().catch(() => {
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:5556',
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://your-frontend.vercel.app', 'https://your-domain.com'] // Replace with your actual Vercel frontend URL
+    : 'http://localhost:5556',
   credentials: true
 }));
 app.use(express.json());

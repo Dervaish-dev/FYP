@@ -9,7 +9,7 @@ const router = express.Router();
 
 // Configure multer for file uploads
 const upload = multer({ 
-  dest: "uploads/",
+  storage: multer.memoryStorage(), // Use memory storage for Vercel/serverless
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
@@ -23,11 +23,7 @@ const upload = multer({
   }
 });
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+// Note: No need to create uploads directory with memory storage
 
 // POST /api/emotion/analyze
 router.post("/analyze", upload.single("image"), async (req, res) => {
