@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { validationResult, body } from 'express-validator';
 import User from '../models/User.js';
 
+
 // Validation rules
 export const validateRegister = [
   body('name')
