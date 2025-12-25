@@ -38,10 +38,23 @@ jobs:
           docker pull ${{ secrets.DOCKERHUB_USERNAME }}/neurocompanion-backend:latest
           docker stop backend-app || true
           docker rm backend-app || true
-          docker run -d -p 5000:5000 --name backend-app \
+          docker run -d -p 5005:5005 --name backend-app \
             -e MONGO_URI="${{ secrets.MONGO_URI }}" \
             -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            -e N8N_WEBHOOK_URL="${{ secrets.N8N_WEBHOOK_URL }}" \
+            -e PORT=5005 \
             -e GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+            -e N8N_WEBHOOK_URL="${{ secrets.N8N_WEBHOOK_URL }}" \
+            -e INVITE_HMAC_SECRET="${{ secrets.INVITE_HMAC_SECRET }}" \
+            -e OTP_HMAC_SECRET="${{ secrets.OTP_HMAC_SECRET }}" \
+            -e CLAIM_TOKEN_HMAC_SECRET="${{ secrets.CLAIM_TOKEN_HMAC_SECRET }}" \
+            -e INVITE_EXPIRES_HOURS="${{ secrets.INVITE_EXPIRES_HOURS }}" \
+            -e OTP_EXPIRES_MINUTES="${{ secrets.OTP_EXPIRES_MINUTES }}" \
+            -e CLAIM_TOKEN_EXPIRES_MINUTES="${{ secrets.CLAIM_TOKEN_EXPIRES_MINUTES }}" \
+            -e SMTP_HOST="${{ secrets.SMTP_HOST }}" \
+            -e SMTP_PORT="${{ secrets.SMTP_PORT }}" \
+            -e SMTP_USER="${{ secrets.SMTP_USER }}" \
+            -e SMTP_PASS="${{ secrets.SMTP_PASS }}" \
+            -e SMTP_FROM="${{ secrets.SMTP_FROM }}" \
+            -e SMTP_FROM_NAME="${{ secrets.SMTP_FROM_NAME }}" \
             -e NODE_ENV=production \
             ${{ secrets.DOCKERHUB_USERNAME }}/neurocompanion-backend:latest
