@@ -43,6 +43,10 @@ const Emotions = () => {
   const [previewImage, setPreviewImage] = useState(null);
   const [emotionHistory, setEmotionHistory] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [webcamActive, setWebcamActive] = useState(false);
+  const [webcamStream, setWebcamStream] = useState(null);
+  const videoRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
   const [aiInsights, setAiInsights] = useState([
     "Your mood tends to be higher on weekends. Consider incorporating more relaxation activities during weekdays.",
     "Stress levels correlate with work days. Try implementing better work-life balance strategies.",
@@ -54,6 +58,12 @@ const Emotions = () => {
     if (userId) {
       fetchEmotionHistory();
     }
+    // Cleanup webcam on unmount
+    return () => {
+      if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop());
+      }
+    };
   }, [userId]);
 
   const fetchEmotionHistory = async () => {
@@ -260,6 +270,116 @@ const Emotions = () => {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  // Webcam functions
+  const startWebcam = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        } 
+      });
+      setWebcamStream(stream);
+      setWebcamActive(true);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setUploadError('');
+    } catch (error) {
+      console.error('Error accessing webcam:', error);
+      setUploadError('Unable to access webcam. Please check permissions.');
+    }
+  };
+
+  const stopWebcam = () => {
+    if (webcamStream) {
+      webcamStream.getTracks().forEach(track => track.stop());
+      setWebcamStream(null);
+    }
+    setWebcamActive(false);
+    setPreviewImage(null);
+  };
+
+  const capturePhoto = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        setUploadError('Failed to capture photo');
+        return;
+      }
+
+      const file = new File([blob], 'webcam-capture.jpg', { type: 'image/jpeg' });
+      stopWebcam();
+
+      const reader = new FileReader();
+      reader.onload = (e) => setPreviewImage(e.target.result);
+      reader.readAsDataURL(file);
+
+      setIsAnalyzing(true);
+      setUploadError('');
+
+      const formData = new FormData();
+      formData.append('image', file);
+
+      try {
+        const response = await api.post('/emotion/analyze-face', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+
+        const detectedEmotionResult = response.data.emotion;
+        const intensityFromModel = response.data.intensity;
+        const confidenceFromModel = response.data.confidence;
+        
+        setDetectedEmotion(detectedEmotionResult);
+        setUploadSuccess(true);
+
+        if (adaptiveMode) {
+          applyAdaptiveTheme(detectedEmotionResult.toLowerCase());
+        }
+
+        setSelectedEmotion(detectedEmotionResult);
+        if (Number.isFinite(intensityFromModel)) {
+          setEmotionIntensity(intensityFromModel);
+        }
+
+        const newEntry = {
+          id: Date.now(),
+          date: new Date().toISOString().split('T')[0],
+          emotion: detectedEmotionResult.toLowerCase(),
+          intensity: Number.isFinite(intensityFromModel) ? intensityFromModel : emotionIntensity,
+          confidence: Number.isFinite(confidenceFromModel) ? confidenceFromModel : 0.75,
+          note: `AI detected via webcam: ${detectedEmotionResult} (${(confidenceFromModel * 100).toFixed(1)}% confident)`,
+          timestamp: new Date().toISOString(),
+          source: 'ai-webcam-analysis'
+        };
+        
+        await saveEmotionToBackend(newEntry);
+        await fetchEmotionHistory();
+
+        addNotification(
+          `📸 Webcam Analysis: ${detectedEmotionResult} (${(confidenceFromModel * 100).toFixed(0)}% confident)`,
+          NOTIFICATION_TYPES.INFO,
+          '📸'
+        );
+      } catch (error) {
+        console.error('Error analyzing webcam capture:', error);
+        setUploadError(error.response?.data?.error || 'Failed to analyze photo. Please try again.');
+      } finally {
+        setIsAnalyzing(false);
+      }
+    }, 'image/jpeg', 0.95);
   };
 
   const handleManualEmotionSelect = async (emotion) => {
@@ -510,8 +630,72 @@ const Emotions = () => {
                 {/* Image Upload Section */}
                 <div>
                   <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--theme-text)' }}>
-                    Upload Picture for AI Analysis
+                    Capture or Upload for AI Analysis
                   </h3>
+                  
+                  {/* Webcam Section */}
+                  {!webcamActive ? (
+                    <div className="mb-4">
+                      <button
+                        onClick={startWebcam}
+                        disabled={isAnalyzing}
+                        className="w-full py-3 px-4 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2 border-2"
+                        style={{ 
+                          borderColor: 'var(--theme-primary)',
+                          color: 'var(--theme-primary)',
+                          backgroundColor: 'transparent'
+                        }}
+                      >
+                        <Camera className="h-5 w-5" />
+                        <span>Use Webcam</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mb-4 space-y-3">
+                      <div className="relative rounded-lg overflow-hidden border-2" style={{ borderColor: 'var(--theme-primary)' }}>
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          className="w-full h-64 object-cover"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={capturePhoto}
+                          disabled={isAnalyzing}
+                          className="flex-1 py-2 px-4 rounded-lg font-semibold text-white transition-all duration-300 flex items-center justify-center gap-2"
+                          style={{ backgroundColor: 'var(--theme-primary)' }}
+                        >
+                          {isAnalyzing ? (
+                            <>
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                              <span>Analyzing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="h-5 w-5" />
+                              <span>Capture</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={stopWebcam}
+                          disabled={isAnalyzing}
+                          className="py-2 px-4 rounded-lg font-semibold transition-all duration-300 border"
+                          style={{ 
+                            borderColor: 'var(--theme-border)',
+                            color: 'var(--theme-text)'
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hidden canvas for photo capture */}
+                  <canvas ref={canvasRef} style={{ display: 'none' }} />
                   
                   <div className="text-center mb-4">
                     <div className="text-gray-500 text-sm mb-4">— OR —</div>
@@ -528,13 +712,13 @@ const Emotions = () => {
                         accept="image/*"
                         className="hidden"
                         onChange={handleImageUpload}
-                        disabled={isAnalyzing}
+                        disabled={isAnalyzing || webcamActive}
                       />
                       <div className="flex flex-col items-center space-y-2">
                         {isAnalyzing ? (
                           <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--theme-primary)' }} />
                         ) : (
-                          <Camera className="h-8 w-8" style={{ color: 'var(--theme-primary)' }} />
+                          <Upload className="h-8 w-8" style={{ color: 'var(--theme-primary)' }} />
                         )}
                         <span className="font-medium" style={{ color: 'var(--theme-text)' }}>
                           {isAnalyzing ? 'Analyzing...' : 'Upload a Picture'}
