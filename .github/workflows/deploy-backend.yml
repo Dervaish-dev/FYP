@@ -1,0 +1,47 @@
+name: Deploy Backend to Docker Hub
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'  # ONLY trigger when files in backend folder change
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend  # Path to your backend folder (relative to FYP root)
+        push: true
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/neurocompanion-backend:latest
+
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/neurocompanion-backend:latest
+          docker stop backend-app || true
+          docker rm backend-app || true
+          docker run -d -p 5000:5000 --name backend-app \
+            -e MONGO_URI="${{ secrets.MONGO_URI }}" \
+            -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            -e N8N_WEBHOOK_URL="${{ secrets.N8N_WEBHOOK_URL }}" \
+            -e GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+            -e NODE_ENV=production \
+            ${{ secrets.DOCKERHUB_USERNAME }}/neurocompanion-backend:latest
