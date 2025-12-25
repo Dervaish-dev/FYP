@@ -174,17 +174,23 @@ const Emotions = () => {
     formData.append('image', file);
 
     try {
-      // Append user context in headers for backend prompt augmentation (ready for future)
-      const response = await api.post('/emotion/analyze', formData, {
+      // Use HuggingFace facial emotion detection for better accuracy
+      const response = await api.post('/emotion/analyze-face', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'X-User-Context': buildUserContextString()
         },
       });
 
       const detectedEmotionResult = response.data.emotion;
-      const intensityFromGemini = response.data.intensity;
-      const confidenceFromGemini = response.data.confidence;
+      const intensityFromModel = response.data.intensity;
+      const confidenceFromModel = response.data.confidence;
+      const allResults = response.data.allResults || [];
+      
+      console.log('HuggingFace emotion detection:', { 
+        emotion: detectedEmotionResult, 
+        confidence: confidenceFromModel,
+        allResults 
+      });
       
       setDetectedEmotion(detectedEmotionResult);
       setUploadSuccess(true);
@@ -199,11 +205,11 @@ const Emotions = () => {
         id: Date.now(),
         date: new Date().toISOString().split('T')[0],
         emotion: detectedEmotionResult.toLowerCase(),
-        intensity: Number.isFinite(intensityFromGemini) ? intensityFromGemini : emotionIntensity,
-        confidence: Number.isFinite(confidenceFromGemini) ? confidenceFromGemini : 0.75,
-        note: `AI detected: ${detectedEmotionResult}`,
+        intensity: Number.isFinite(intensityFromModel) ? intensityFromModel : emotionIntensity,
+        confidence: Number.isFinite(confidenceFromModel) ? confidenceFromModel : 0.75,
+        note: `AI detected: ${detectedEmotionResult} (${(confidenceFromModel * 100).toFixed(1)}% confident)`,
         timestamp: new Date().toISOString(),
-        source: 'ai-analysis'
+        source: 'ai-facial-analysis'
       };
       
       // Save to backend

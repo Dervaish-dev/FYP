@@ -5,7 +5,8 @@ on:
     branches:
       - main
     paths:
-      - 'backend/**'  # ONLY trigger when files in backend folder change
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
 
 jobs:
   build-and-push:

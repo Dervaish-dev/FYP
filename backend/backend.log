@@ -1,0 +1,7 @@
+🔑 Gemini API Key configured: ✅ YES
+(node:87415) [MONGOOSE] Warning: Duplicate schema index on {"email":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:87415) [MONGOOSE] Warning: Duplicate schema index on {"expiresAt":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+🚀 NeuroCompanion API server running on port 5005
+📊 Health check: http://localhost:5005/api/health
+✅ MongoDB Connected: ac-ilbyd7u-shard-00-00.popuf6f.mongodb.net

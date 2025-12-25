@@ -4,6 +4,7 @@ import fs from "fs";
 import fetch from "node-fetch";
 import path from "path";
 import sharp from "sharp";
+import { InferenceClient } from "@huggingface/inference";
 
 const router = express.Router();
 
@@ -204,6 +205,105 @@ router.post("/analyze", upload.single("image"), async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Emotion analysis failed',
+      error: err.message
+    });
+  }
+});
+
+// POST /api/emotion/analyze-face - Hugging Face facial emotion detection
+router.post("/analyze-face", upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No image file provided" });
+    }
+
+    const hfToken = process.env.HF_TOKEN;
+    if (!hfToken) {
+      throw new Error('HF_TOKEN not configured in .env');
+    }
+
+    const imagePath = req.file.path;
+    console.log(`Analyzing facial emotion: ${req.file.originalname} (${req.file.size} bytes)`);
+
+    // Read image file
+    const imageBuffer = fs.readFileSync(imagePath);
+
+    // Initialize Hugging Face client
+    const client = new InferenceClient(hfToken);
+
+    // Call Hugging Face image classification model
+    const output = await client.imageClassification({
+      data: imageBuffer,
+      model: "dima806/facial_emotions_image_detection",
+    });
+
+    console.log('HuggingFace API response:', JSON.stringify(output, null, 2));
+
+    // Clean up temporary file
+    try {
+      fs.unlinkSync(imagePath);
+    } catch (unlinkError) {
+      console.warn('Failed to delete temporary file:', unlinkError.message);
+    }
+
+    // Get the most probable emotion
+    if (!output || output.length === 0) {
+      return res.json({
+        emotion: "Neutral",
+        confidence: 0,
+        allResults: [],
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Sort by confidence (score) descending
+    const sortedResults = output.sort((a, b) => b.score - a.score);
+    const topResult = sortedResults[0];
+
+    // Map HuggingFace labels to our emotion names
+    const emotionMap = {
+      'angry': 'Angry',
+      'disgust': 'Disgusted',
+      'fear': 'Worried',
+      'happy': 'Happy',
+      'sad': 'Sad',
+      'surprise': 'Surprised',
+      'neutral': 'Neutral'
+    };
+
+    const detectedLabel = topResult.label.toLowerCase();
+    const detectedEmotion = emotionMap[detectedLabel] || topResult.label;
+    const confidence = topResult.score;
+
+    // Calculate intensity based on confidence (1-10 scale)
+    const intensity = Math.max(1, Math.min(10, Math.round(confidence * 10)));
+
+    res.json({
+      emotion: detectedEmotion,
+      confidence: confidence,
+      intensity: intensity,
+      allResults: sortedResults.map(r => ({
+        emotion: emotionMap[r.label.toLowerCase()] || r.label,
+        confidence: r.score
+      })),
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (err) {
+    console.error('Facial emotion analysis error:', err);
+    
+    // Clean up temporary file on error
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.warn('Failed to delete temporary file after error:', unlinkError.message);
+      }
+    }
+    
+    return res.status(500).json({
+      success: false,
+      message: 'Facial emotion analysis failed',
       error: err.message
     });
   }
