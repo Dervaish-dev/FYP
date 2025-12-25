@@ -4,7 +4,6 @@ import fs from "fs";
 import fetch from "node-fetch";
 import path from "path";
 import sharp from "sharp";
-import { InferenceClient } from "@huggingface/inference";
 
 const router = express.Router();
 
@@ -218,6 +217,8 @@ router.post("/analyze-face", upload.single("image"), async (req, res) => {
     }
 
     const hfToken = process.env.HF_TOKEN;
+    console.log('HF_TOKEN check:', hfToken ? `EXISTS (${hfToken.length} chars)` : 'NOT FOUND');
+    
     if (!hfToken) {
       throw new Error('HF_TOKEN not configured in .env');
     }
@@ -225,18 +226,32 @@ router.post("/analyze-face", upload.single("image"), async (req, res) => {
     const imagePath = req.file.path;
     console.log(`Analyzing facial emotion: ${req.file.originalname} (${req.file.size} bytes)`);
 
-    // Read image file
+    // Read image file as buffer
     const imageBuffer = fs.readFileSync(imagePath);
 
-    // Initialize Hugging Face client
-    const client = new InferenceClient(hfToken);
+    // Use HuggingFace router endpoint with direct binary data
+    console.log('Calling HuggingFace router API...');
+    const response = await fetch(
+      "https://router.huggingface.co/hf-inference/models/trpakov/vit-face-expression",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${hfToken}`,
+          "Content-Type": "image/jpeg",
+        },
+        body: imageBuffer,
+      }
+    );
 
-    // Call Hugging Face image classification model
-    const output = await client.imageClassification({
-      data: imageBuffer,
-      model: "dima806/facial_emotions_image_detection",
-    });
+    console.log('Response status:', response.status, response.statusText);
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('Error response:', errorText);
+      throw new Error(`HuggingFace API error: ${response.status} - ${errorText}`);
+    }
+
+    const output = await response.json();
     console.log('HuggingFace API response:', JSON.stringify(output, null, 2));
 
     // Clean up temporary file

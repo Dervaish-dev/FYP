@@ -4,6 +4,9 @@ import auth from '../middleware/auth.js';
 
 const router = express.Router();
 
+
+
+
 const patientSignupDisabled = (req, res) => {
 	return res.status(410).json({
 		success: false,
