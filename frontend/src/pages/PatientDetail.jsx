@@ -116,47 +116,90 @@ const PatientDetail = () => {
     }
   };
 
+  // Helper function to convert mood score to text
+  const getMoodLabel = (score) => {
+    if (score <= 2) return 'Very Poor';
+    if (score <= 4) return 'Poor';
+    if (score <= 6) return 'Fair';
+    if (score <= 8) return 'Good';
+    return 'Excellent';
+  };
+
+  // Helper function to convert stress score to text
+  const getStressLabel = (score) => {
+    if (score <= 2) return 'Very Low';
+    if (score <= 4) return 'Low';
+    if (score <= 6) return 'Moderate';
+    if (score <= 8) return 'High';
+    return 'Very High';
+  };
+
+  // Helper function to convert energy score to text
+  const getEnergyLabel = (score) => {
+    if (score <= 2) return 'Very Low';
+    if (score <= 4) return 'Low';
+    if (score <= 6) return 'Fair';
+    if (score <= 8) return 'Good';
+    return 'Excellent';
+  };
+
   // Helper function to calculate emotion trend for chart
   const calculateEmotionTrend = (emotions) => {
-    const last7Days = [];
+    const last14Days = []; // Show 2 weeks to see week separation
     const today = new Date();
+    const dayToWeek = {};
     
-    for (let i = 6; i >= 0; i--) {
+    for (let i = 13; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+      const dateString = date.toDateString();
+      const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
       
+      // Track week
+      const weekStart = new Date(date);
+      weekStart.setDate(date.getDate() - date.getDay());
+      const weekKey = weekStart.toISOString().split('T')[0];
+      dayToWeek[dateKey] = weekKey;
+      
+      // Get all emotions for this day
       const dayEmotions = emotions.filter(e => {
-        const emotionDate = new Date(e.timestamp);
-        return emotionDate.toDateString() === date.toDateString();
+        const emotionDate = new Date(e.timestamp || e.createdAt || e.date);
+        return emotionDate.toDateString() === dateString;
       });
       
-      const positiveEmotions = ['happy', 'excited', 'grateful', 'peaceful', 'content'];
-      const negativeEmotions = ['sad', 'anxious', 'angry', 'frustrated', 'stressed'];
+      const positiveEmotions = ['happy', 'excited', 'grateful', 'peaceful', 'content', 'calm', 'hopeful'];
+      const negativeEmotions = ['sad', 'anxious', 'angry', 'frustrated', 'stressed', 'worried'];
       
       let moodScore = 5;
       let stressScore = 5;
       let energyScore = 5;
       
       if (dayEmotions.length > 0) {
+        // Calculate averages instead of just counts
         const positiveCount = dayEmotions.filter(e => positiveEmotions.includes(e.emotion?.toLowerCase())).length;
         const negativeCount = dayEmotions.filter(e => negativeEmotions.includes(e.emotion?.toLowerCase())).length;
         const avgIntensity = dayEmotions.reduce((sum, e) => sum + (e.intensity || 5), 0) / dayEmotions.length;
         
-        moodScore = Math.min(10, Math.max(1, 5 + positiveCount - negativeCount));
-        stressScore = Math.min(10, Math.max(1, negativeCount > 0 ? negativeCount + 3 : 2));
-        energyScore = Math.min(10, Math.max(1, avgIntensity));
+        // Use the average intensity for mood, adjusted by positive/negative ratio
+        moodScore = Math.min(10, Math.max(1, avgIntensity + (positiveCount > 0 ? 1 : 0) - (negativeCount > 0 ? 1 : 0)));
+        stressScore = negativeCount > 0 ? Math.min(10, 7 + (negativeCount / dayEmotions.length)) : 2;
+        energyScore = Math.round(avgIntensity);
       }
       
-      last7Days.push({
+      last14Days.push({
+        dateKey,
+        weekKey,
         date: dayName,
-        mood: moodScore,
-        stress: stressScore,
-        energy: energyScore
+        fullDate: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        mood: parseFloat(moodScore.toFixed(1)),
+        stress: parseFloat(stressScore.toFixed(1)),
+        energy: parseFloat(energyScore.toFixed(1)),
+        entryCount: dayEmotions.length
       });
     }
     
-    return last7Days;
+    return last14Days;
   };
 
   // Helper function to calculate task completion
@@ -368,13 +411,11 @@ const PatientDetail = () => {
   if (loading) {
     return (
       <CaregiverLayout>
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="w-16 h-16 border-4 rounded-full animate-spin mx-auto mb-4"
-                   style={{ borderColor: 'var(--theme-primary)', borderTopColor: 'transparent' }} />
-              <p style={{ color: 'var(--theme-text)' }}>Loading patient details...</p>
-            </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 rounded-full animate-spin mx-auto mb-4"
+                  style={{ borderColor: 'var(--theme-primary)', borderTopColor: 'transparent' }} />
+            <p style={{ color: 'var(--theme-text)' }}>Loading patient details...</p>
           </div>
         </div>
       </CaregiverLayout>
@@ -384,23 +425,21 @@ const PatientDetail = () => {
   if (error || !patient) {
     return (
       <CaregiverLayout>
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="rounded-xl border p-6" style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}>
-            <div className="flex items-center gap-3 mb-4">
-              <AlertCircle className="w-6 h-6 text-red-500" />
-              <p className="text-lg font-semibold" style={{ color: 'var(--theme-text)' }}>
-                {error || 'Patient not found'}
-              </p>
-            </div>
-            <button
-              onClick={() => navigate('/caregiver/dashboard')}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg"
-              style={{ backgroundColor: 'var(--theme-primary)', color: 'white' }}
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Dashboard
-            </button>
+        <div className="rounded-xl border p-6" style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}>
+          <div className="flex items-center gap-3 mb-4">
+            <AlertCircle className="w-6 h-6 text-red-500" />
+            <p className="text-lg font-semibold" style={{ color: 'var(--theme-text)' }}>
+              {error || 'Patient not found'}
+            </p>
           </div>
+          <button
+            onClick={() => navigate('/caregiver/dashboard')}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg"
+            style={{ backgroundColor: 'var(--theme-primary)', color: 'white' }}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Dashboard
+          </button>
         </div>
       </CaregiverLayout>
     );
@@ -433,23 +472,22 @@ const PatientDetail = () => {
 
   return (
     <CaregiverLayout>
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Back Button */}
-        <button
-          onClick={() => navigate('/caregiver/dashboard')}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg mb-6 hover:opacity-80 transition-opacity"
-          style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}
-        >
-          <ArrowLeft className="w-4 h-4" style={{ color: 'var(--theme-text)' }} />
-          <span style={{ color: 'var(--theme-text)' }}>Back to Patients</span>
-        </button>
+      {/* Back Button */}
+      <button
+        onClick={() => navigate('/caregiver/dashboard')}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg mb-6 hover:opacity-80 transition-opacity"
+        style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}
+      >
+        <ArrowLeft className="w-4 h-4" style={{ color: 'var(--theme-text)' }} />
+        <span style={{ color: 'var(--theme-text)' }}>Back to Patients</span>
+      </button>
 
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="space-y-6"
-        >
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="space-y-6"
+      >
           {/* Patient Header */}
           <motion.div
             variants={itemVariants}
@@ -525,7 +563,7 @@ const PatientDetail = () => {
                       {patient.moodTrend === 'improving' ? 'Improving' : 'Stable'}
                     </p>
                   </div>
-                  <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)', opacity: 0.1 }}>
+                  <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(var(--primary-rgb), 0.1)' }}>
                     <Heart className="h-6 w-6" style={{ color: 'var(--theme-primary)' }} />
                   </div>
                 </div>
@@ -541,7 +579,7 @@ const PatientDetail = () => {
                       {patient.tasksCompleted}/{patient.totalTasks} completed
                     </p>
                   </div>
-                  <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)', opacity: 0.1 }}>
+                  <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(var(--primary-rgb), 0.1)' }}>
                     <Target className="h-6 w-6" style={{ color: 'var(--theme-primary)' }} />
                   </div>
                 </div>
@@ -557,7 +595,7 @@ const PatientDetail = () => {
                       Overall health
                     </p>
                   </div>
-                  <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)', opacity: 0.1 }}>
+                  <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(var(--primary-rgb), 0.1)' }}>
                     <Brain className="h-6 w-6" style={{ color: 'var(--theme-primary)' }} />
                   </div>
                 </div>
@@ -572,7 +610,7 @@ const PatientDetail = () => {
                       Activity: {patient.activityLevel}
                     </p>
                   </div>
-                  <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)', opacity: 0.1 }}>
+                  <div className="h-12 w-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(var(--primary-rgb), 0.1)' }}>
                     <Activity className="h-6 w-6" style={{ color: 'var(--theme-primary)' }} />
                   </div>
                 </div>
@@ -589,22 +627,68 @@ const PatientDetail = () => {
                   <BarChart3 className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
                   <span>Emotion Trend Analysis</span>
                 </h3>
-                <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={patient.emotionTrendData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--theme-border)" />
-                    <XAxis dataKey="date" stroke="var(--theme-text)" style={{ fontSize: '12px' }} />
-                    <YAxis stroke="var(--theme-text)" style={{ fontSize: '12px' }} />
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={patient.emotionTrendData} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--theme-border)" opacity={0.5} />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="var(--theme-text)" 
+                      style={{ fontSize: '11px' }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis 
+                      stroke="var(--theme-text)" 
+                      style={{ fontSize: '11px' }}
+                      domain={[0, 10]}
+                    />
                     <Tooltip
                       contentStyle={{ 
                         backgroundColor: 'var(--theme-card)', 
                         borderColor: 'var(--theme-border)', 
                         borderRadius: '0.75rem',
-                        color: 'var(--theme-text)'
+                        color: 'var(--theme-text)',
+                        padding: '10px'
                       }}
+                      formatter={(value, name) => {
+                        if (name === 'Mood') return [getMoodLabel(value), name];
+                        if (name === 'Stress') return [getStressLabel(value), name];
+                        if (name === 'Energy') return [getEnergyLabel(value), name];
+                        return [value.toFixed(1), name];
+                      }}
+                      labelFormatter={(label) => `${label}`}
                     />
-                    <Line type="monotone" dataKey="mood" stroke="#10b981" strokeWidth={3} name="Mood" />
-                    <Line type="monotone" dataKey="stress" stroke="#f59e0b" strokeWidth={3} name="Stress" />
-                    <Line type="monotone" dataKey="energy" stroke="#3b82f6" strokeWidth={3} name="Energy" />
+                    <Line 
+                      type="monotone" 
+                      dataKey="mood" 
+                      stroke="#10b981" 
+                      strokeWidth={2.5} 
+                      name="Mood"
+                      dot={{ fill: '#10b981', r: 4 }}
+                      activeDot={{ r: 6 }}
+                      connectNulls={true}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="stress" 
+                      stroke="#f59e0b" 
+                      strokeWidth={2.5} 
+                      name="Stress"
+                      dot={{ fill: '#f59e0b', r: 4 }}
+                      activeDot={{ r: 6 }}
+                      connectNulls={true}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="energy" 
+                      stroke="#3b82f6" 
+                      strokeWidth={2.5} 
+                      name="Energy"
+                      dot={{ fill: '#3b82f6', r: 4 }}
+                      activeDot={{ r: 6 }}
+                      connectNulls={true}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -811,7 +895,6 @@ const PatientDetail = () => {
             </motion.div>
           )}
         </motion.div>
-      </div>
     </CaregiverLayout>
   );
 };

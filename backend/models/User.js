@@ -43,6 +43,28 @@ const userSchema = new mongoose.Schema({
     ref: 'Caregiver',
     default: null,
     index: true
+  },
+
+  // Two-Factor Authentication
+  twoFactorEnabled: {
+    type: Boolean,
+    default: false
+  },
+  loginOTP: {
+    type: String,
+    select: false
+  },
+  loginOTPExpires: {
+    type: Date,
+    select: false
+  },
+  resetPasswordOTP: {
+    type: String,
+    select: false
+  },
+  resetPasswordOTPExpires: {
+    type: Date,
+    select: false
   }
 }, {
   timestamps: true

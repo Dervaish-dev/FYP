@@ -34,6 +34,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { journalAPI } from '../utils/api';
 import VoiceJournalButton from '../components/VoiceJournalButton';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const Journal = () => {
   const { applyAdaptiveTheme } = useTheme();
@@ -51,6 +52,11 @@ const Journal = () => {
   const [chatbotInput, setChatbotInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showChatbotButton, setShowChatbotButton] = useState(false);
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState({
+    isOpen: false,
+    entryId: null,
+    entryTitle: ''
+  });
 
   // Load journal entries from API - extracted as reusable function
   const loadJournalEntries = async () => {
@@ -465,11 +471,21 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
     }
   };
 
-  const handleDeleteEntry = async (entryId) => {
-    if (!window.confirm('Delete this entry?')) return;
+  const handleDeleteEntry = (entryId) => {
+    const entry = journalEntries.find(e => e.id === entryId || e._id === entryId);
+    setDeleteConfirmModal({
+      isOpen: true,
+      entryId,
+      entryTitle: entry?.title || new Date(entry?.createdAt || Date.now()).toLocaleDateString() || 'This entry'
+    });
+  };
+
+  const confirmDeleteEntry = async () => {
+    const { entryId } = deleteConfirmModal;
     try {
       await journalAPI.delete(entryId);
       setJournalEntries(prev => prev.filter(entry => entry.id !== entryId && entry._id !== entryId));
+      setDeleteConfirmModal({ isOpen: false, entryId: null, entryTitle: '' });
     } catch (error) {
       console.error('Failed to delete entry:', error);
     }
@@ -1435,6 +1451,18 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ConfirmationModal
+        isOpen={deleteConfirmModal.isOpen}
+        title="Delete Journal Entry"
+        message={`Are you sure you want to delete "${deleteConfirmModal.entryTitle}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDeleteEntry}
+        onCancel={() => setDeleteConfirmModal({ isOpen: false, entryId: null, entryTitle: '' })}
+        type="error"
+        isDangerous={true}
+      />
     </div>
   );
 };

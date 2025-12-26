@@ -41,6 +41,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useNotifications, NOTIFICATION_TYPES } from '../components/NotificationCenter';
 import { useAuth } from '../context/AuthContext';
 import { taskAPI } from '../utils/api';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 // Task Card Component
 const TaskCard = React.memo(({ task, onUpdate, onDelete, onNudge, isUpdating }) => {
@@ -256,6 +257,11 @@ const Tasks = () => {
   const [updatingTaskId, setUpdatingTaskId] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState({
+    isOpen: false,
+    taskId: null,
+    taskTitle: ''
+  });
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -443,22 +449,31 @@ const Tasks = () => {
   }, [tasks, addNotification, user]);
 
   const handleTaskDelete = useCallback(async (taskId) => {
-    if (!window.confirm('Are you sure you want to delete this task?')) return;
+    const task = tasks.find(t => t._id === taskId || t.id === taskId);
+    // Show confirmation modal instead of window.confirm
+    setDeleteConfirmModal({
+      isOpen: true,
+      taskId,
+      taskTitle: task?.title || 'Task'
+    });
+  }, [tasks]);
 
+  const confirmDeleteTask = useCallback(async () => {
+    const taskId = deleteConfirmModal.taskId;
     const previousTasks = [...tasks];
     try {
       // Optimistic update
       setTasks(prev => prev.filter(task => task._id !== taskId && task.id !== taskId));
 
       await taskAPI.delete(taskId);
-
       toast.success('Task deleted');
+      setDeleteConfirmModal({ isOpen: false, taskId: null, taskTitle: '' });
     } catch (error) {
       console.error('Error deleting task:', error);
       toast.error('Failed to delete task');
       setTasks(previousTasks); // Revert
     }
-  }, [tasks]);
+  }, [deleteConfirmModal, tasks]);
 
   const handleTaskNudge = useCallback(async (taskId) => {
     try {
@@ -886,6 +901,18 @@ const Tasks = () => {
           </div>
         </motion.div>
       </div>
+
+      <ConfirmationModal
+        isOpen={deleteConfirmModal.isOpen}
+        title="Delete Task"
+        message={`Are you sure you want to delete "${deleteConfirmModal.taskTitle}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDeleteTask}
+        onCancel={() => setDeleteConfirmModal({ isOpen: false, taskId: null, taskTitle: '' })}
+        type="error"
+        isDangerous={true}
+      />
 
       <ToastContainer
         position="top-right"

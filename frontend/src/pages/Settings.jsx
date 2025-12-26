@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
   User,
   Lock,
@@ -16,6 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { toast } from 'react-toastify';
 import { preferencesAPI } from '../utils/api';
+import ConfirmationModal from '../components/ConfirmationModal';
 import {
   getNotificationsEnabled,
   setNotificationsEnabled
@@ -42,7 +44,8 @@ const SettingsSection = ({ title, icon: Icon, children }) => (
 );
 
 const Settings = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, toggle2FA } = useAuth();
+  const navigate = useNavigate();
   const {
     theme,
     setTheme,
@@ -55,6 +58,7 @@ const Settings = () => {
 
   const [notifications, setNotifications] = useState(getNotificationsEnabled());
   const [loading, setLoading] = useState(false);
+  const [logoutConfirmModal, setLogoutConfirmModal] = useState(false);
   const [prefs, setPrefs] = useState({
     fullName: user?.name || '',
     age: '',
@@ -107,10 +111,22 @@ const Settings = () => {
     }
   };
 
-  const handleLogout = () => {
-    if (window.confirm('Are you sure you want to log out?')) {
-      logout();
+  const handleToggle2FA = async () => {
+    try {
+      const data = await toggle2FA();
+      toast.success(`Two-factor authentication ${data.twoFactorEnabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      toast.error('Failed to toggle 2FA');
     }
+  };
+
+  const handleLogout = () => {
+    setLogoutConfirmModal(true);
+  };
+
+  const confirmLogout = () => {
+    setLogoutConfirmModal(false);
+    logout();
   };
 
   return (
@@ -148,26 +164,21 @@ const Settings = () => {
               <label className="block text-sm font-medium mb-2" style={{ color: 'var(--theme-text)' }}>Age</label>
               <input
                 type="number"
-                value={prefs.age}
-                onChange={(e) => setPrefs({ ...prefs, age: e.target.value })}
-                className="w-full p-3 rounded-xl border bg-transparent"
+                value={prefs.age || ''}
+                disabled
+                className="w-full p-3 rounded-xl border bg-gray-50 opacity-70 cursor-not-allowed"
                 style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
               />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2" style={{ color: 'var(--theme-text)' }}>Neurotype</label>
-              <select
-                value={prefs.neurotype}
-                onChange={(e) => setPrefs({ ...prefs, neurotype: e.target.value })}
-                className="w-full p-3 rounded-xl border bg-transparent"
+              <input
+                type="text"
+                value={prefs.neurotype || ''}
+                disabled
+                className="w-full p-3 rounded-xl border bg-gray-50 opacity-70 cursor-not-allowed"
                 style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
-              >
-                <option value="">Select...</option>
-                <option value="ADHD">ADHD</option>
-                <option value="Autism">Autism</option>
-                <option value="Anxiety">Anxiety</option>
-                <option value="Other">Other</option>
-              </select>
+              />
             </div>
           </div>
         </SettingsSection>
@@ -178,10 +189,14 @@ const Settings = () => {
             <div className="flex items-center justify-between p-4 rounded-xl border" style={{ borderColor: 'var(--theme-border)' }}>
               <div>
                 <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Password</p>
-                <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Last changed 3 months ago</p>
+                <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Reset your password via email OTP</p>
               </div>
-              <button className="px-4 py-2 text-sm font-medium rounded-lg border hover:bg-gray-50 transition-colors" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}>
-                Change Password
+              <button 
+                onClick={() => navigate('/forgot-password')}
+                className="px-4 py-2 text-sm font-medium rounded-lg border hover:bg-gray-50 transition-colors" 
+                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
+              >
+                Reset Password
               </button>
             </div>
             <div className="flex items-center justify-between p-4 rounded-xl border" style={{ borderColor: 'var(--theme-border)' }}>
@@ -189,8 +204,17 @@ const Settings = () => {
                 <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Two-Factor Authentication</p>
                 <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Add an extra layer of security</p>
               </div>
-              <button className="px-4 py-2 text-sm font-medium rounded-lg border hover:bg-gray-50 transition-colors" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}>
-                Enable
+              <button
+                onClick={handleToggle2FA}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                  user?.twoFactorEnabled ? 'bg-green-500' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    user?.twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
               </button>
             </div>
           </div>
@@ -328,6 +352,18 @@ const Settings = () => {
           </div>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={logoutConfirmModal}
+        title="Logout Confirmation"
+        message="Are you sure you want to log out? You'll need to log back in to access your account."
+        confirmText="Logout"
+        cancelText="Cancel"
+        onConfirm={confirmLogout}
+        onCancel={() => setLogoutConfirmModal(false)}
+        type="warning"
+        isDangerous={false}
+      />
     </div>
   );
 };

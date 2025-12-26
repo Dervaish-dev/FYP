@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Moon,
@@ -64,6 +65,7 @@ const Wellness = () => {
   const [breathingCycle, setBreathingCycle] = useState(0);
   const [breathingProgress, setBreathingProgress] = useState(0);
   const [breathingSessionComplete, setBreathingSessionComplete] = useState(false);
+  const [breathingHistory, setBreathingHistory] = useState([]);
 
   // Mood Summary States
   const [moodSummary, setMoodSummary] = useState({
@@ -92,7 +94,8 @@ const Wellness = () => {
     try {
       await Promise.all([
         loadSleepData(),
-        loadMoodAnalytics()
+        loadMoodAnalytics(),
+        loadBreathingHistory()
       ]);
     } catch (error) {
       console.error('Error loading wellness data:', error);
@@ -101,6 +104,17 @@ const Wellness = () => {
       setLoading(false);
     }
   }, []);
+
+  // Load breathing history
+  const loadBreathingHistory = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const history = await wellnessAPI.getBreathingHistory(user.id);
+      setBreathingHistory(history || []);
+    } catch (error) {
+      console.error('Error loading breathing history:', error);
+    }
+  }, [user]);
 
   // Load sleep data
   const loadSleepData = useCallback(async () => {
@@ -225,9 +239,18 @@ const Wellness = () => {
     }
   }, [user, sleepData]);
 
+  // Check if sleep entry exists for today
+  const todaysSleepEntry = sleepData.find(entry => {
+    const entryDate = new Date(entry.createdAt);
+    const today = new Date();
+    return entryDate.getFullYear() === today.getFullYear() &&
+           entryDate.getMonth() === today.getMonth() &&
+           entryDate.getDate() === today.getDate();
+  });
+
   // Save sleep data
   const saveSleepData = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id || todaysSleepEntry) return;
 
     setSleepLoading(true);
     try {
@@ -263,7 +286,7 @@ const Wellness = () => {
     } finally {
       setSleepLoading(false);
     }
-  }, [bedtime, wakeTime, user, loadSleepData, loadMoodAnalytics]);
+  }, [bedtime, wakeTime, user, loadSleepData, loadMoodAnalytics, todaysSleepEntry]);
 
   // Calculate sleep duration
   const calculateSleepDuration = (bedtime, wakeTime) => {
@@ -376,25 +399,17 @@ const Wellness = () => {
   };
 
   // Process data for charts
-  // Use real data if available, otherwise mock for visualization
+  // Use real data if available, otherwise empty array
   const processedSleepData = sleepData.length > 0
     ? sleepData.slice(0, 7).reverse().map(entry => ({
       day: new Date(entry.createdAt).toLocaleDateString('en-US', { weekday: 'short' }),
       hours: entry.sleepDuration || 0
     }))
-    : [
-      { day: 'Mon', hours: 7.5 },
-      { day: 'Tue', hours: 8.2 },
-      { day: 'Wed', hours: 6.8 },
-      { day: 'Thu', hours: 7.9 },
-      { day: 'Fri', hours: 8.5 },
-      { day: 'Sat', hours: 9.1 },
-      { day: 'Sun', hours: 8.3 }
-    ];
+    : [];
 
   const averageSleep = processedSleepData.length > 0
     ? (processedSleepData.reduce((sum, day) => sum + day.hours, 0) / processedSleepData.length).toFixed(1)
-    : '8.0';
+    : '0.0';
 
   // Mood distribution for pie chart
   const moodDistribution = [
@@ -426,7 +441,7 @@ const Wellness = () => {
 
   return (
     <>
-      <style jsx>{`
+      <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 0.2; transform: scale(1); }
           50% { opacity: 0.4; transform: scale(1.05); }
@@ -435,8 +450,8 @@ const Wellness = () => {
       <div
         className="min-h-screen p-6"
         style={{
-          backgroundColor: 'var(--bg-color)',
-          color: 'var(--text-color)'
+          backgroundColor: 'var(--theme-background)',
+          color: 'var(--theme-text)'
         }}
       >
         <div className="max-w-6xl mx-auto">
@@ -447,7 +462,7 @@ const Wellness = () => {
                   className="h-8 w-8 animate-spin mx-auto mb-4"
                   style={{ color: 'var(--accent-color)' }}
                 />
-                <p style={{ color: 'var(--text-color)' }}>Loading wellness data...</p>
+                <p style={{ color: 'var(--theme-text)' }}>Loading wellness data...</p>
               </div>
             </div>
           ) : (
@@ -461,13 +476,13 @@ const Wellness = () => {
               <motion.div variants={cardVariants} className="text-center mb-8">
                 <h1
                   className="text-4xl font-bold mb-2"
-                  style={{ color: 'var(--text-color)' }}
+                  style={{ color: 'var(--theme-text)' }}
                 >
                   Health & Wellness
                 </h1>
                 <p
                   className="text-lg opacity-70"
-                  style={{ color: 'var(--text-color)' }}
+                  style={{ color: 'var(--theme-text)' }}
                 >
                   Track your wellness journey with personalized insights
                 </p>
@@ -478,8 +493,8 @@ const Wellness = () => {
                 <div
                   className="rounded-3xl p-8 shadow-xl border"
                   style={{
-                    backgroundColor: 'var(--card-bg)',
-                    borderColor: 'var(--border-color)'
+                    backgroundColor: 'var(--theme-card)',
+                    borderColor: 'var(--theme-border)'
                   }}
                 >
                   <div className="flex items-center mb-6">
@@ -489,7 +504,7 @@ const Wellness = () => {
                     />
                     <h2
                       className="text-2xl font-bold"
-                      style={{ color: 'var(--text-color)' }}
+                      style={{ color: 'var(--theme-text)' }}
                     >
                       Sleep Routine Tracker
                     </h2>
@@ -499,7 +514,7 @@ const Wellness = () => {
                     <div>
                       <label
                         className="block text-sm font-semibold mb-3"
-                        style={{ color: 'var(--text-color)' }}
+                        style={{ color: 'var(--theme-text)' }}
                       >
                         <Sunset className="inline h-4 w-4 mr-2" />
                         Bedtime
@@ -510,16 +525,16 @@ const Wellness = () => {
                         onChange={(e) => setBedtime(e.target.value)}
                         className="w-full p-4 border-2 rounded-xl focus:ring-2 focus:border-transparent text-lg"
                         style={{
-                          backgroundColor: 'var(--bg-color)',
-                          borderColor: 'var(--border-color)',
-                          color: 'var(--text-color)'
+                          backgroundColor: 'var(--theme-background)',
+                          borderColor: 'var(--theme-border)',
+                          color: 'var(--theme-text)'
                         }}
                       />
                     </div>
                     <div>
                       <label
                         className="block text-sm font-semibold mb-3"
-                        style={{ color: 'var(--text-color)' }}
+                        style={{ color: 'var(--theme-text)' }}
                       >
                         <Sunrise className="inline h-4 w-4 mr-2" />
                         Wake-up Time
@@ -530,9 +545,9 @@ const Wellness = () => {
                         onChange={(e) => setWakeTime(e.target.value)}
                         className="w-full p-4 border-2 rounded-xl focus:ring-2 focus:border-transparent text-lg"
                         style={{
-                          backgroundColor: 'var(--bg-color)',
-                          borderColor: 'var(--border-color)',
-                          color: 'var(--text-color)'
+                          backgroundColor: 'var(--theme-background)',
+                          borderColor: 'var(--theme-border)',
+                          color: 'var(--theme-text)'
                         }}
                       />
                     </div>
@@ -541,7 +556,7 @@ const Wellness = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     <div
                       className="text-center rounded-2xl p-6"
-                      style={{ backgroundColor: 'var(--bg-color)' }}
+                      style={{ backgroundColor: 'var(--theme-background)' }}
                     >
                       <div
                         className="text-3xl font-bold mb-2"
@@ -551,21 +566,21 @@ const Wellness = () => {
                       </div>
                       <div
                         className="text-sm font-medium opacity-70"
-                        style={{ color: 'var(--text-color)' }}
+                        style={{ color: 'var(--theme-text)' }}
                       >
                         Sleep Duration
                       </div>
                     </div>
                     <div
                       className="text-center rounded-2xl p-6"
-                      style={{ backgroundColor: 'var(--bg-color)' }}
+                      style={{ backgroundColor: 'var(--theme-background)' }}
                     >
                       <div className="text-4xl mb-2">
                         {getSleepQuality(calculateSleepDuration(bedtime, wakeTime)).emoji}
                       </div>
                       <div
                         className="text-sm font-medium opacity-70"
-                        style={{ color: 'var(--text-color)' }}
+                        style={{ color: 'var(--theme-text)' }}
                       >
                         {getSleepQuality(calculateSleepDuration(bedtime, wakeTime)).text}
                       </div>
@@ -573,18 +588,18 @@ const Wellness = () => {
                     <div className="flex items-center justify-center">
                       <motion.button
                         onClick={saveSleepData}
-                        disabled={sleepLoading}
-                        className="w-full px-6 py-4 font-semibold rounded-xl flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all duration-200"
-                        style={{ backgroundColor: 'var(--accent-color)', color: 'white' }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                        disabled={sleepLoading || !!todaysSleepEntry}
+                        className="w-full px-6 py-4 font-semibold rounded-xl flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ backgroundColor: 'var(--primary-500)', color: 'white' }}
+                        whileHover={!todaysSleepEntry ? { scale: 1.05 } : {}}
+                        whileTap={!todaysSleepEntry ? { scale: 0.95 } : {}}
                       >
                         {sleepLoading ? (
                           <Loader className="h-5 w-5 animate-spin" />
                         ) : (
                           <Save className="h-5 w-5" />
                         )}
-                        <span>{sleepLoading ? 'Saving...' : 'Save Sleep Data'}</span>
+                        <span>{sleepLoading ? 'Saving...' : todaysSleepEntry ? 'Already logged today' : 'Save Sleep Data'}</span>
                       </motion.button>
                     </div>
                   </div>
@@ -592,11 +607,11 @@ const Wellness = () => {
                   {/* Sleep Chart */}
                   <div
                     className="rounded-2xl p-6"
-                    style={{ backgroundColor: 'var(--bg-color)' }}
+                    style={{ backgroundColor: 'var(--theme-background)' }}
                   >
                     <h3
                       className="text-lg font-semibold mb-4 flex items-center"
-                      style={{ color: 'var(--text-color)' }}
+                      style={{ color: 'var(--theme-text)' }}
                     >
                       <Target
                         className="h-5 w-5 mr-2"
@@ -605,46 +620,53 @@ const Wellness = () => {
                       Weekly Sleep Trend
                     </h3>
                     <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={processedSleepData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
-                          <XAxis
-                            dataKey="day"
-                            stroke="#9CA3AF"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                          />
-                          <YAxis
-                            stroke="#9CA3AF"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                            domain={[0, 12]}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: '#1F2937',
-                              border: '1px solid #374151',
-                              borderRadius: '8px',
-                              color: '#F9FAFB',
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)'
-                            }}
-                            formatter={(value) => [`${value} hours`, 'Sleep']}
-                          />
-                          <Bar
-                            dataKey="hours"
-                            fill="#3B82F6"
-                            radius={[4, 4, 0, 0]}
-                            stroke="none"
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
+                      {processedSleepData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={processedSleepData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
+                            <XAxis
+                              dataKey="day"
+                              stroke="#9CA3AF"
+                              fontSize={12}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <YAxis
+                              stroke="#9CA3AF"
+                              fontSize={12}
+                              tickLine={false}
+                              axisLine={false}
+                              domain={[0, 12]}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: '#1F2937',
+                                border: '1px solid #374151',
+                                borderRadius: '8px',
+                                color: '#F9FAFB',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)'
+                              }}
+                              formatter={(value) => [`${value} hours`, 'Sleep']}
+                            />
+                            <Bar
+                              dataKey="hours"
+                              fill="#3B82F6"
+                              radius={[4, 4, 0, 0]}
+                              stroke="none"
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center opacity-50">
+                          <Moon className="h-12 w-12 mb-2" style={{ color: 'var(--theme-text)' }} />
+                          <p style={{ color: 'var(--theme-text)' }}>No sleep data recorded yet</p>
+                        </div>
+                      )}
                     </div>
                     <div className="text-center mt-4">
                       <span
                         className="text-sm opacity-70"
-                        style={{ color: 'var(--text-color)' }}
+                        style={{ color: 'var(--theme-text)' }}
                       >
                         Average: <span
                           className="font-semibold"
@@ -660,183 +682,123 @@ const Wellness = () => {
 
               {/* 🌬️ Breathing Exercise Guide */}
               <motion.div variants={cardVariants}>
-                <div
-                  className="rounded-3xl p-8 shadow-xl border"
-                  style={{
-                    backgroundColor: 'var(--card-bg)',
-                    borderColor: 'var(--border-color)'
-                  }}
-                >
-                  <div className="flex items-center mb-6">
-                    <Wind
-                      className="h-8 w-8 mr-3"
-                      style={{ color: 'var(--accent-color)' }}
-                    />
-                    <h2
-                      className="text-2xl font-bold"
-                      style={{ color: 'var(--text-color)' }}
-                    >
-                      🫁 Guided Breathing Exercise
-                    </h2>
-                  </div>
-
-                  <p
-                    className="mb-8 text-center opacity-70"
-                    style={{ color: 'var(--text-color)' }}
+                <Link to="/breathing" className="block">
+                  <motion.div
+                    className="rounded-3xl p-8 shadow-xl border cursor-pointer transition-all duration-300 hover:shadow-2xl"
+                    style={{
+                      backgroundColor: 'var(--theme-card)',
+                      borderColor: 'var(--theme-border)'
+                    }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                   >
-                    Follow the expanding circle to calm your breathing
-                  </p>
-
-                  {/* Breathing Animation */}
-                  <div className="flex justify-center mb-8">
-                    <div
-                      className="relative w-96 h-96 rounded-3xl flex items-center justify-center overflow-hidden"
-                      style={{ backgroundColor: 'var(--bg-color)' }}
-                    >
-                      {/* Animated gradient background */}
-                      <div
-                        className="absolute inset-0 rounded-3xl opacity-20"
-                        style={{
-                          background: `radial-gradient(circle at center, var(--accent-color) 0%, transparent 70%)`,
-                          animation: breathingActive ? 'pulse 4s ease-in-out infinite' : 'none'
-                        }}
-                      />
-
-                      {/* Breathing circle with smooth animation */}
-                      <motion.div
-                        className="absolute rounded-full border-4 shadow-lg"
-                        animate={{
-                          width: getBreathingCircleSize(),
-                          height: getBreathingCircleSize(),
-                          opacity: breathingActive ? [0.6, 1, 0.6] : 0.4,
-                          scale: breathingActive ? [0.9, 1.1, 0.9] : 1
-                        }}
-                        transition={{
-                          duration: breathingActive ? 4 : 0.5,
-                          repeat: breathingActive ? Infinity : 0,
-                          ease: "easeInOut"
-                        }}
-                        style={{
-                          borderColor: 'var(--accent-color)',
-                          backgroundColor: `rgba(${theme === 'dark' ? '59, 130, 246' : '14, 165, 233'}, 0.1)`,
-                          filter: 'drop-shadow(0 0 20px var(--accent-color))'
-                        }}
-                      />
-
-                      {/* Floating particles effect */}
-                      {breathingActive && (
-                        <>
-                          {[...Array(6)].map((_, i) => (
-                            <motion.div
-                              key={i}
-                              className="absolute w-2 h-2 rounded-full"
-                              style={{ backgroundColor: 'var(--accent-color)' }}
-                              animate={{
-                                x: [0, Math.cos(i * 60 * Math.PI / 180) * 100, 0],
-                                y: [0, Math.sin(i * 60 * Math.PI / 180) * 100, 0],
-                                opacity: [0, 1, 0],
-                                scale: [0, 1, 0]
-                              }}
-                              transition={{
-                                duration: 3,
-                                repeat: Infinity,
-                                delay: i * 0.5,
-                                ease: "easeInOut"
-                              }}
-                            />
-                          ))}
-                        </>
-                      )}
-
-                      {/* Center content */}
-                      <div className="text-center z-20 relative">
-                        <div
-                          className="text-5xl font-bold mb-3"
-                          style={{ color: 'var(--text-color)' }}
-                        >
-                          {breathingCycle}/4
-                        </div>
-                        <div
-                          className="text-xl font-medium"
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <Wind
+                          className="h-10 w-10 mr-4"
                           style={{ color: 'var(--accent-color)' }}
-                        >
-                          {breathingActive ? getBreathingInstruction() : 'Ready to begin'}
-                        </div>
-                        {breathingActive && (
-                          <div
-                            className="mt-4 text-sm opacity-70"
-                            style={{ color: 'var(--text-color)' }}
+                        />
+                        <div>
+                          <h2
+                            className="text-2xl font-bold mb-2"
+                            style={{ color: 'var(--theme-text)' }}
                           >
-                            Phase: {breathingPhase}
-                          </div>
-                        )}
+                            Breathing Exercises
+                          </h2>
+                          <p
+                            className="text-sm opacity-70"
+                            style={{ color: 'var(--theme-text)' }}
+                          >
+                            Calm your mind and reduce stress with guided routines
+                          </p>
+                        </div>
                       </div>
+                      <motion.button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          window.location.href = '/breathing';
+                        }}
+                        className="px-8 py-4 font-semibold rounded-xl flex items-center space-x-3 shadow-lg hover:shadow-xl transition-all duration-200 text-white whitespace-nowrap ml-4"
+                        style={{ backgroundColor: 'var(--primary-500)' }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        <span>Start a Routine</span>
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                </Link>
+              </motion.div>
+
+              {/* Breathing History */}
+              {breathingHistory.length > 0 && (
+                <motion.div variants={cardVariants}>
+                  <div
+                    className="rounded-3xl p-8 shadow-xl border"
+                    style={{
+                      backgroundColor: 'var(--theme-card)',
+                      borderColor: 'var(--theme-border)'
+                    }}
+                  >
+                    <div className="flex items-center mb-6">
+                      <Activity
+                        className="h-8 w-8 mr-3"
+                        style={{ color: 'var(--accent-color)' }}
+                      />
+                      <h2
+                        className="text-2xl font-bold"
+                        style={{ color: 'var(--theme-text)' }}
+                      >
+                        Breathing History
+                      </h2>
+                    </div>
+                    <div className="space-y-4">
+                      {breathingHistory.slice(0, 5).map((session, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-4 rounded-xl"
+                          style={{ backgroundColor: 'var(--theme-background)' }}
+                        >
+                          <div className="flex items-center">
+                            <div
+                              className="p-3 rounded-full mr-4"
+                              style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)' }}
+                            >
+                              <Wind className="h-5 w-5 text-green-500" />
+                            </div>
+                            <div>
+                              <div className="font-semibold" style={{ color: 'var(--theme-text)' }}>
+                                {session.exerciseType === '478' ? '4-7-8 Breathing' : 
+                                 session.exerciseType === 'box' ? 'Box Breathing' : 
+                                 session.exerciseType === 'relaxation' ? 'Deep Relaxation' : 'Breathing Session'}
+                              </div>
+                              <div className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
+                                {new Date(session.createdAt).toLocaleDateString()} • {new Date(session.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold" style={{ color: 'var(--accent-color)' }}>
+                              {Math.round(session.duration)}s
+                            </div>
+                            <div className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
+                              {session.cycles} cycles
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-
-                  {/* Controls */}
-                  <div className="flex justify-center space-x-4">
-                    {!breathingActive ? (
-                      <motion.button
-                        onClick={startBreathingExercise}
-                        className="px-8 py-4 font-semibold rounded-xl flex items-center space-x-3 shadow-lg hover:shadow-xl transition-all duration-200"
-                        style={{ backgroundColor: 'var(--accent-color)', color: 'white' }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <Play className="h-6 w-6" />
-                        <span>Start Breathing Exercise</span>
-                      </motion.button>
-                    ) : (
-                      <motion.button
-                        onClick={stopBreathingExercise}
-                        className="px-8 py-4 font-semibold rounded-xl flex items-center space-x-3 shadow-lg hover:shadow-xl transition-all duration-200"
-                        style={{ backgroundColor: '#ef4444', color: 'white' }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <Pause className="h-6 w-6" />
-                        <span>Stop Exercise</span>
-                      </motion.button>
-                    )}
-                  </div>
-
-                  {/* Session Complete Message */}
-                  <AnimatePresence>
-                    {breathingSessionComplete && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className="mt-6 text-center"
-                      >
-                        <div
-                          className="rounded-xl p-4 border"
-                          style={{
-                            backgroundColor: 'var(--bg-color)',
-                            borderColor: 'var(--accent-color)'
-                          }}
-                        >
-                          <div
-                            className="font-semibold"
-                            style={{ color: 'var(--accent-color)' }}
-                          >
-                            🌿 Session Complete! Your breathing is more relaxed now.
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </motion.div>
+                </motion.div>
+              )}
 
               {/* 📈 Mood Summary & Weekly Insights */}
               <motion.div variants={cardVariants}>
                 <div
                   className="rounded-3xl p-8 shadow-xl border"
                   style={{
-                    backgroundColor: 'var(--card-bg)',
-                    borderColor: 'var(--border-color)'
+                    backgroundColor: 'var(--theme-card)',
+                    borderColor: 'var(--theme-border)'
                   }}
                 >
                   <div className="flex items-center mb-6">
@@ -846,16 +808,16 @@ const Wellness = () => {
                     />
                     <h2
                       className="text-2xl font-bold"
-                      style={{ color: 'var(--text-color)' }}
+                      style={{ color: 'var(--theme-text)' }}
                     >
-                      📈 Mood Summary & Weekly Insights
+                      Mood Summary & Weekly Insights
                     </h2>
                   </div>
 
                   <div className="text-center mb-8">
                     <h3
                       className="text-xl font-semibold mb-2 opacity-70"
-                      style={{ color: 'var(--text-color)' }}
+                      style={{ color: 'var(--theme-text)' }}
                     >
                       Here's how your week went 🌤️
                     </h3>
@@ -865,11 +827,11 @@ const Wellness = () => {
                     {/* Mood Distribution Chart */}
                     <div
                       className="rounded-2xl p-6"
-                      style={{ backgroundColor: 'var(--bg-color)' }}
+                      style={{ backgroundColor: 'var(--theme-background)' }}
                     >
                       <h4
                         className="text-lg font-semibold mb-4 flex items-center"
-                        style={{ color: 'var(--text-color)' }}
+                        style={{ color: 'var(--theme-text)' }}
                       >
                         <Activity
                           className="h-5 w-5 mr-2"
@@ -887,7 +849,7 @@ const Wellness = () => {
                               outerRadius={80}
                               fill="#8884d8"
                               dataKey="value"
-                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                              label={({ value, name, percent }) => value > 0 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
                             >
                               {moodDistribution.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.color} />
@@ -895,10 +857,10 @@ const Wellness = () => {
                             </Pie>
                             <Tooltip
                               contentStyle={{
-                                backgroundColor: 'var(--card-bg)',
+                                backgroundColor: 'var(--theme-card)',
                                 border: '1px solid var(--border-color)',
                                 borderRadius: '12px',
-                                color: 'var(--text-color)'
+                                color: 'var(--theme-text)'
                               }}
                             />
                           </PieChart>
@@ -910,11 +872,11 @@ const Wellness = () => {
                     <div className="space-y-6">
                       <div
                         className="rounded-2xl p-6"
-                        style={{ backgroundColor: 'var(--bg-color)' }}
+                        style={{ backgroundColor: 'var(--theme-background)' }}
                       >
                         <h4
                           className="text-lg font-semibold mb-4 flex items-center"
-                          style={{ color: 'var(--text-color)' }}
+                          style={{ color: 'var(--theme-text)' }}
                         >
                           <Coffee
                             className="h-5 w-5 mr-2"
@@ -924,7 +886,7 @@ const Wellness = () => {
                         </h4>
                         <div className="space-y-4">
                           <div className="flex justify-between items-center">
-                            <span style={{ color: 'var(--text-color)' }}>Average Sleep</span>
+                            <span style={{ color: 'var(--theme-text)' }}>Average Sleep</span>
                             <span
                               className="font-bold"
                               style={{ color: 'var(--accent-color)' }}
@@ -933,7 +895,7 @@ const Wellness = () => {
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span style={{ color: 'var(--text-color)' }}>Happy Days</span>
+                            <span style={{ color: 'var(--theme-text)' }}>Happy Days</span>
                             <span
                               className="font-bold"
                               style={{ color: '#10b981' }}
@@ -942,7 +904,7 @@ const Wellness = () => {
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span style={{ color: 'var(--text-color)' }}>Calm Days</span>
+                            <span style={{ color: 'var(--theme-text)' }}>Calm Days</span>
                             <span
                               className="font-bold"
                               style={{ color: '#3b82f6' }}
@@ -951,7 +913,7 @@ const Wellness = () => {
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span style={{ color: 'var(--text-color)' }}>Stressed Days</span>
+                            <span style={{ color: 'var(--theme-text)' }}>Stressed Days</span>
                             <span
                               className="font-bold"
                               style={{ color: '#f59e0b' }}
@@ -960,32 +922,6 @@ const Wellness = () => {
                             </span>
                           </div>
                         </div>
-                      </div>
-
-                      {/* AI Recommendation */}
-                      <div
-                        className="rounded-2xl p-6 border"
-                        style={{
-                          backgroundColor: 'var(--bg-color)',
-                          borderColor: 'var(--accent-color)'
-                        }}
-                      >
-                        <h4
-                          className="text-lg font-semibold mb-3 flex items-center"
-                          style={{ color: 'var(--text-color)' }}
-                        >
-                          <Sparkles
-                            className="h-5 w-5 mr-2"
-                            style={{ color: 'var(--accent-color)' }}
-                          />
-                          AI Recommendation
-                        </h4>
-                        <p
-                          className="leading-relaxed"
-                          style={{ color: 'var(--text-color)' }}
-                        >
-                          {moodSummary.recommendation}
-                        </p>
                       </div>
                     </div>
                   </div>
@@ -997,13 +933,13 @@ const Wellness = () => {
                 <div
                   className="rounded-2xl p-6 border"
                   style={{
-                    backgroundColor: 'var(--bg-color)',
+                    backgroundColor: 'var(--theme-background)',
                     borderColor: 'var(--accent-color)'
                   }}
                 >
                   <p
                     className="text-lg font-medium"
-                    style={{ color: 'var(--text-color)' }}
+                    style={{ color: 'var(--theme-text)' }}
                   >
                     Remember: small steps today lead to big changes tomorrow 🌱
                   </p>

@@ -602,16 +602,69 @@ const Emotions = () => {
   };
 
   const getWeeklyTrend = () => {
-    return emotionHistory.map(entry => ({
-      date: new Date(entry.timestamp || entry.date).toLocaleDateString('en-US', { weekday: 'short' }),
-      intensity: entry.intensity,
-      emotion: entry.emotion
-    }));
+    if (emotionHistory.length === 0) return [];
+
+    // Group entries by date and week
+    const groupedByDay = {};
+    const dayToWeek = {}; // Track which week each day belongs to
+
+    emotionHistory.forEach(entry => {
+      const date = new Date(entry.timestamp || entry.date);
+      const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const weekStart = new Date(date);
+      weekStart.setDate(date.getDate() - date.getDay()); // Get start of week (Sunday)
+      const weekKey = weekStart.toISOString().split('T')[0]; // Week identifier
+
+      dayToWeek[dateKey] = weekKey;
+
+      if (!groupedByDay[dateKey]) {
+        groupedByDay[dateKey] = [];
+      }
+      groupedByDay[dateKey].push(entry.intensity || 5);
+    });
+
+    // Convert to array and calculate averages
+    const result = Object.entries(groupedByDay).map(([dateKey, intensities]) => {
+      const date = new Date(dateKey + 'T00:00:00Z');
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+      const weekKey = dayToWeek[dateKey];
+      const average = (intensities.reduce((sum, val) => sum + val, 0) / intensities.length).toFixed(1);
+
+      return {
+        dateKey,
+        weekKey,
+        date: dayName,
+        fullDate: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        intensity: parseFloat(average),
+        entryCount: intensities.length
+      };
+    });
+
+    // Sort by actual date
+    result.sort((a, b) => new Date(a.dateKey) - new Date(b.dateKey));
+
+    // Limit to last 14 days (2 weeks) to show clear week separation
+    return result.slice(-14).map((item, index, arr) => {
+      const isNewWeek = index === 0 || item.weekKey !== arr[index - 1].weekKey;
+      return {
+        ...item,
+        displayDate: `${item.date}\n${item.fullDate}${isNewWeek ? ' (Week)' : ''}`
+      };
+    });
   };
 
   const averageIntensity = emotionHistory.length > 0 
     ? (emotionHistory.reduce((sum, entry) => sum + entry.intensity, 0) / emotionHistory.length).toFixed(1)
     : 0;
+
+  // Helper function to convert intensity score to text
+  const getIntensityLabel = (score) => {
+    if (score <= 2) return 'Very Low';
+    if (score <= 4) return 'Low';
+    if (score <= 6) return 'Moderate';
+    if (score <= 8) return 'High';
+    return 'Very High';
+  };
 
   const currentEmotionData = emotions.find(e => e.key === currentEmotion);
 
@@ -957,31 +1010,53 @@ const Emotions = () => {
                   <TrendingUp className="h-5 w-5" style={{ color: 'var(--theme-primary)' }} />
                   <span>Weekly Emotion Trend</span>
                 </h3>
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={getWeeklyTrend()}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--theme-border)" />
-                    <XAxis dataKey="date" stroke="var(--theme-text)" opacity={0.7} />
-                    <YAxis stroke="var(--theme-text)" opacity={0.7} />
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={getWeeklyTrend()} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--theme-border)" opacity={0.5} />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="var(--theme-text)" 
+                      opacity={0.7}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis 
+                      stroke="var(--theme-text)" 
+                      opacity={0.7}
+                      domain={[0, 10]}
+                      label={{ value: 'Intensity', angle: -90, position: 'insideLeft' }}
+                    />
                     <Tooltip
                       contentStyle={{ 
                         backgroundColor: 'var(--theme-card)', 
                         borderColor: 'var(--theme-border)', 
-                        borderRadius: '0.75rem' 
+                        borderRadius: '0.75rem',
+                        padding: '10px'
                       }}
                       labelStyle={{ color: 'var(--theme-text)' }}
-                      itemStyle={{ color: 'var(--theme-text)' }}
+                      itemStyle={{ color: 'var(--theme-primary)' }}
+                      formatter={(value, name) => {
+                        if (name === 'intensity') return [getIntensityLabel(value), 'Intensity'];
+                        return value;
+                      }}
+                      labelFormatter={(label) => `${label}`}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="intensity" 
                       stroke="var(--theme-primary)" 
                       strokeWidth={3}
-                      dot={{ fill: 'var(--theme-primary)', strokeWidth: 2, r: 6 }}
+                      dot={{ fill: 'var(--theme-primary)', strokeWidth: 2, r: 5 }}
+                      activeDot={{ r: 7 }}
+                      isAnimationActive={true}
+                      connectNulls={true}
                     />
                   </LineChart>
                 </ResponsiveContainer>
                 <p className="text-sm opacity-70 text-center mt-2" style={{ color: 'var(--theme-text)' }}>
-                  Average intensity: {averageIntensity}/10
+                  Average intensity: <span className="font-semibold">{getIntensityLabel(averageIntensity)}</span> ({averageIntensity}/10)
                 </p>
               </div>
             </motion.div>

@@ -6,6 +6,7 @@ import User from '../models/User.js';
 import Message from '../models/Message.js';
 import Appointment from '../models/Appointment.js';
 import mongoose from 'mongoose';
+import { sendOtpEmail } from '../utils/mailer.js';
 
 const noAudit = (req, res, next) => next();
 
@@ -210,6 +211,27 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // 2FA Check
+    if (caregiver.twoFactorEnabled) {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      caregiver.loginOTP = otp;
+      caregiver.loginOTPExpires = Date.now() + 10 * 60 * 1000; // 10 mins
+      await caregiver.save();
+
+      try {
+        await sendOtpEmail({ to: caregiver.email, otp, expiresMinutes: 10 });
+        return res.status(200).json({
+          success: true,
+          requires2FA: true,
+          caregiverId: caregiver._id,
+          message: '2FA code sent to email'
+        });
+      } catch (err) {
+        console.error('2FA Email Error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to send 2FA code' });
+      }
+    }
+
     // Update last login
     caregiver.lastLogin = new Date();
     await caregiver.save();
@@ -231,7 +253,8 @@ router.post('/login', async (req, res) => {
         email: caregiver.email,
         role: caregiver.role,
         specialization: caregiver.specialization,
-        organization: caregiver.organization
+        organization: caregiver.organization,
+        twoFactorEnabled: caregiver.twoFactorEnabled
       }
     });
   } catch (error) {
@@ -241,6 +264,63 @@ router.post('/login', async (req, res) => {
       message: 'Server error during login',
       error: error.message
     });
+  }
+});
+
+// Verify 2FA Login
+router.post('/verify-2fa', async (req, res) => {
+  const { caregiverId, otp } = req.body;
+  try {
+    const caregiver = await Caregiver.findById(caregiverId).select('+loginOTP +loginOTPExpires');
+    if (!caregiver) return res.status(404).json({ success: false, message: 'Caregiver not found' });
+
+    if (!caregiver.loginOTP || caregiver.loginOTP !== otp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP' });
+    }
+
+    if (caregiver.loginOTPExpires < Date.now()) {
+      return res.status(400).json({ success: false, message: 'OTP expired' });
+    }
+
+    // Clear OTP
+    caregiver.loginOTP = undefined;
+    caregiver.loginOTPExpires = undefined;
+    caregiver.lastLogin = new Date();
+    await caregiver.save();
+
+    const token = jwt.sign(
+      { id: caregiver._id, role: 'caregiver', email: caregiver.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      token,
+      caregiver: {
+        id: caregiver._id,
+        name: caregiver.name,
+        email: caregiver.email,
+        role: caregiver.role,
+        twoFactorEnabled: caregiver.twoFactorEnabled
+      }
+    });
+  } catch (err) {
+    console.error('Verify 2FA Error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Toggle 2FA
+router.post('/toggle-2fa', authenticateCaregiver, async (req, res) => {
+  try {
+    const caregiver = await Caregiver.findById(req.caregiver.id);
+    caregiver.twoFactorEnabled = !caregiver.twoFactorEnabled;
+    await caregiver.save();
+    res.json({ success: true, twoFactorEnabled: caregiver.twoFactorEnabled });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

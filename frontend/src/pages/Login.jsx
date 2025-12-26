@@ -7,18 +7,36 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
 const Login = () => {
-  const { login, isLoading, error, clearError } = useAuth();
+  const { login, verify2FA, isLoading, error, clearError } = useAuth();
   const { theme, setTheme, themes } = useTheme();
   const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const [showOTP, setShowOTP] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [userId, setUserId] = useState(null);
   const navigate = useNavigate();
 
   const handleLogin = async (credentials) => {
     try {
-      await login(credentials);
-      navigate('/dashboard');
+      const data = await login(credentials);
+      if (data.requires2FA) {
+        setShowOTP(true);
+        setUserId(data.userId);
+      } else {
+        navigate('/dashboard');
+      }
     } catch (error) {
       // Error is handled by AuthContext
       console.error('Login error:', error);
+    }
+  };
+
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault();
+    try {
+      await verify2FA(userId, otp);
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('OTP Verification error:', error);
     }
   };
 
@@ -62,26 +80,85 @@ const Login = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          <AuthForm
-            type="login"
-            onSubmit={handleLogin}
-            isLoading={isLoading}
-            error={error}
-            onClearError={clearError}
-          />
+          {showOTP ? (
+            <form onSubmit={handleVerifyOTP} className="space-y-6">
+              <div className="text-center mb-6">
+                <h3 className="text-lg font-medium text-gray-900">Two-Factor Authentication</h3>
+                <p className="text-sm text-gray-500">Enter the code sent to your email</p>
+              </div>
+              
+              <div>
+                <label htmlFor="otp" className="block text-sm font-medium text-gray-700">
+                  Verification Code
+                </label>
+                <div className="mt-1">
+                  <input
+                    id="otp"
+                    name="otp"
+                    type="text"
+                    required
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    placeholder="123456"
+                  />
+                </div>
+              </div>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">
-              Don't have an account?{' '}
-              <Link 
-                to="/join" 
-                className="text-primary-600 hover:text-primary-700 font-medium inline-flex items-center space-x-1 transition-colors"
-              >
-                <span>Sign up</span>
-                <ArrowRight size={16} />
-              </Link>
-            </p>
-          </div>
+              {error && (
+                <div className="rounded-md bg-red-50 p-4">
+                  <div className="flex">
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">{error}</h3>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+                >
+                  {isLoading ? 'Verifying...' : 'Verify Code'}
+                </button>
+              </div>
+              
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowOTP(false)}
+                  className="text-sm text-primary-600 hover:text-primary-500"
+                >
+                  Back to Login
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <AuthForm
+                type="login"
+                onSubmit={handleLogin}
+                isLoading={isLoading}
+                error={error}
+                onClearError={clearError}
+              />
+
+              <div className="mt-6 text-center">
+                <p className="text-gray-600">
+                  Don't have an account?{' '}
+                  <Link 
+                    to="/join" 
+                    className="text-primary-600 hover:text-primary-700 font-medium inline-flex items-center space-x-1 transition-colors"
+                  >
+                    <span>Sign up</span>
+                    <ArrowRight size={16} />
+                  </Link>
+                </p>
+              </div>
+            </>
+          )}
         </motion.div>
 
         {/* Theme Selector */}

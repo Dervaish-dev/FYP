@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = 'http://localhost:5005/api';
 
 // Create axios instance
 const api = axios.create({
@@ -98,6 +98,26 @@ export const authAPI = {
     }
   },
 
+  // Verify 2FA
+  verify2FA: async (data) => {
+    try {
+      const response = await api.post('/auth/verify-2fa', data);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Verification failed' };
+    }
+  },
+
+  // Toggle 2FA
+  toggle2FA: async () => {
+    try {
+      const response = await api.post('/auth/toggle-2fa');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to toggle 2FA' };
+    }
+  },
+
   // Get current user
   getCurrentUser: async () => {
     console.log('%c👤 GET CURRENT USER', 'color: #2196F3; font-weight: bold; font-size: 14px');
@@ -121,6 +141,36 @@ export const authAPI = {
     } catch (error) {
       console.error('%c✗ LOGOUT FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', error.response?.data);
       throw error.response?.data || { message: 'Logout failed' };
+    }
+  },
+
+  // Forgot Password
+  forgotPassword: async (email) => {
+    try {
+      const response = await api.post('/auth/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to send reset code' };
+    }
+  },
+
+  // Verify Reset OTP
+  verifyResetOTP: async (email, otp) => {
+    try {
+      const response = await api.post('/auth/verify-reset-otp', { email, otp });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Invalid OTP' };
+    }
+  },
+
+  // Reset Password
+  resetPassword: async (email, otp, newPassword) => {
+    try {
+      const response = await api.post('/auth/reset-password', { email, otp, newPassword });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'Failed to reset password' };
     }
   },
 };
@@ -359,6 +409,28 @@ export const wellnessAPI = {
       return res.data.data.entries;
     } catch (e) {
       console.error('%c✗ SLEEP DATA FETCH FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e);
+      throw e;
+    }
+  },
+  async logBreathing(data) {
+    console.log('%c🌬️ LOG BREATHING DATA', 'color: #673AB7; font-weight: bold; font-size: 14px');
+    try {
+      const res = await api.post('/wellness/breathing', data);
+      console.log('%c✓ BREATHING DATA LOGGED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
+      return res.data.data;
+    } catch (e) {
+      console.error('%c✗ BREATHING LOG FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e);
+      throw e;
+    }
+  },
+  async getBreathingHistory(userId) {
+    console.log('%c📉 GET BREATHING HISTORY', 'color: #673AB7; font-weight: bold; font-size: 14px', userId);
+    try {
+      const res = await api.get(`/wellness/breathing/${userId}`);
+      console.log('%c✓ BREATHING HISTORY RETRIEVED', 'color: #4CAF50; font-weight: bold; font-size: 14px');
+      return res.data.data;
+    } catch (e) {
+      console.error('%c✗ BREATHING HISTORY FETCH FAILED', 'color: #f44336; font-weight: bold; font-size: 14px', e);
       throw e;
     }
   }

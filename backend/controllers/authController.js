@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { validationResult, body } from 'express-validator';
 import User from '../models/User.js';
+import { sendOtpEmail } from '../utils/mailer.js';
 
 
 // Validation rules
@@ -140,6 +141,27 @@ const login = async (req, res) => {
       });
     }
 
+    // 2FA Check
+    if (user.twoFactorEnabled) {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      user.loginOTP = otp;
+      user.loginOTPExpires = Date.now() + 10 * 60 * 1000; // 10 mins
+      await user.save();
+
+      try {
+        await sendOtpEmail({ to: user.email, otp, expiresMinutes: 10 });
+        return res.status(200).json({
+          success: true,
+          requires2FA: true,
+          userId: user._id,
+          message: '2FA code sent to email'
+        });
+      } catch (err) {
+        console.error('2FA Email Error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to send 2FA code' });
+      }
+    }
+
     // Generate token
     const token = generateToken(user._id);
 
@@ -150,7 +172,8 @@ const login = async (req, res) => {
         user: {
           id: user._id,
           name: user.name,
-          email: user.email
+          email: user.email,
+          twoFactorEnabled: user.twoFactorEnabled
         },
         token
       }
@@ -183,7 +206,8 @@ const getCurrentUser = async (req, res) => {
         user: {
           id: user._id,
           name: user.name,
-          email: user.email
+          email: user.email,
+          twoFactorEnabled: user.twoFactorEnabled
         }
       }
     });
@@ -215,9 +239,164 @@ const logout = async (req, res) => {
   }
 };
 
+// Verify 2FA Login
+const verify2FALogin = async (req, res) => {
+  const { userId, otp } = req.body;
+  try {
+    const user = await User.findById(userId).select('+loginOTP +loginOTPExpires');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (!user.loginOTP || user.loginOTP !== otp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP' });
+    }
+
+    if (user.loginOTPExpires < Date.now()) {
+      return res.status(400).json({ success: false, message: 'OTP expired' });
+    }
+
+    // Clear OTP
+    user.loginOTP = undefined;
+    user.loginOTPExpires = undefined;
+    await user.save();
+
+    const token = generateToken(user._id);
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          twoFactorEnabled: user.twoFactorEnabled
+        },
+        token
+      }
+    });
+  } catch (err) {
+    console.error('Verify 2FA Error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Toggle 2FA
+const toggle2FA = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    
+    user.twoFactorEnabled = !user.twoFactorEnabled;
+    await user.save();
+    
+    res.json({ 
+      success: true, 
+      twoFactorEnabled: user.twoFactorEnabled,
+      message: user.twoFactorEnabled ? '2FA Enabled' : '2FA Disabled'
+    });
+  } catch (err) {
+    console.error('Toggle 2FA Error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Forgot Password
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: 'If an account with that email exists, a reset code has been sent.'
+      });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetPasswordOTP = otp;
+    user.resetPasswordOTPExpires = Date.now() + 10 * 60 * 1000; // 10 mins
+    await user.save();
+
+    try {
+      await sendOtpEmail({ to: user.email, otp, expiresMinutes: 10 });
+    } catch (err) {
+      console.error('Reset Password Email Error:', err);
+      return res.status(500).json({ success: false, message: 'Failed to send reset code' });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'If an account with that email exists, a reset code has been sent.'
+    });
+
+  } catch (error) {
+    console.error('Forgot Password error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+// Verify Reset OTP
+const verifyResetOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    const user = await User.findOne({ 
+      email, 
+      resetPasswordOTP: otp,
+      resetPasswordOTPExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+    }
+
+    res.status(200).json({ success: true, message: 'OTP verified' });
+
+  } catch (error) {
+    console.error('Verify Reset OTP error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+// Reset Password
+const resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    
+    if (!newPassword || newPassword.length < 8) {
+       return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
+    }
+
+    const user = await User.findOne({ 
+      email, 
+      resetPasswordOTP: otp,
+      resetPasswordOTPExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+    }
+
+    user.password = newPassword;
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordOTPExpires = undefined;
+    await user.save();
+
+    res.status(200).json({ success: true, message: 'Password reset successfully' });
+
+  } catch (error) {
+    console.error('Reset Password error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 export {
   register,
   login,
+  verify2FALogin,
+  toggle2FA,
   getCurrentUser,
-  logout
+  logout,
+  forgotPassword,
+  verifyResetOTP,
+  resetPassword
 };

@@ -1,17 +1,60 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wind, Play, Pause, RotateCcw, Heart, Brain, Zap, Activity } from 'lucide-react';
+import { Wind, Play, Pause, RotateCcw, Heart, Brain, Zap, Activity, Clock } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { wellnessAPI } from '../utils/api';
+
+const exercises = [
+  {
+    id: '478',
+    name: '4-7-8 Breathing',
+    description: 'Natural tranquilizer for the nervous system',
+    icon: Brain,
+    phases: [
+      { name: 'inhale', duration: 4000, instruction: 'Inhale through nose (4s)' },
+      { name: 'hold', duration: 7000, instruction: 'Hold your breath (7s)' },
+      { name: 'exhale', duration: 8000, instruction: 'Exhale through mouth (8s)' }
+    ],
+    cycles: 4,
+    color: '#3b82f6'
+  },
+  {
+    id: 'box',
+    name: 'Box Breathing',
+    description: 'Used by Navy SEALs for focus and calm',
+    icon: Zap,
+    phases: [
+      { name: 'inhale', duration: 4000, instruction: 'Inhale slowly (4s)' },
+      { name: 'hold', duration: 4000, instruction: 'Hold your breath (4s)' },
+      { name: 'exhale', duration: 4000, instruction: 'Exhale gently (4s)' },
+      { name: 'hold', duration: 4000, instruction: 'Hold empty (4s)' }
+    ],
+    cycles: 4,
+    color: '#10b981'
+  },
+  {
+    id: 'relaxation',
+    name: 'Deep Relaxation',
+    description: 'Perfect for stress relief and sleep preparation',
+    icon: Heart,
+    phases: [
+      { name: 'inhale', duration: 5000, instruction: 'Breathe in deeply (5s)' },
+      { name: 'hold', duration: 2000, instruction: 'Hold gently (2s)' },
+      { name: 'exhale', duration: 7000, instruction: 'Exhale slowly (7s)' }
+    ],
+    cycles: 5,
+    color: '#a855f7'
+  }
+];
 
 const BreathingExercises = () => {
   const { theme } = useTheme();
-  const { user } = useContext(AuthContext);
+  const { user } = useAuth();
 
   // Breathing Exercise States
   const [breathingActive, setBreathingActive] = useState(false);
-  const [breathingPhase, setBreathingPhase] = useState('inhale');
+  const [breathingPhaseIndex, setBreathingPhaseIndex] = useState(0);
   const [breathingCycle, setBreathingCycle] = useState(0);
   const [breathingProgress, setBreathingProgress] = useState(0);
   const [breathingSessionComplete, setBreathingSessionComplete] = useState(false);
@@ -24,71 +67,7 @@ const BreathingExercises = () => {
     totalCycles: 0
   });
 
-  const exercises = [
-    {
-      id: '478',
-      name: '4-7-8 Breathing',
-      description: 'Natural tranquilizer for the nervous system',
-      icon: Brain,
-      phases: [
-        { name: 'inhale', duration: 4000, instruction: 'Inhale through nose (4s)' },
-        { name: 'hold', duration: 7000, instruction: 'Hold your breath (7s)' },
-        { name: 'exhale', duration: 8000, instruction: 'Exhale through mouth (8s)' }
-      ],
-      cycles: 4,
-      color: '#3b82f6'
-    },
-    {
-      id: 'box',
-      name: 'Box Breathing',
-      description: 'Used by Navy SEALs for focus and calm',
-      icon: Zap,
-      phases: [
-        { name: 'inhale', duration: 4000, instruction: 'Inhale slowly (4s)' },
-        { name: 'hold', duration: 4000, instruction: 'Hold your breath (4s)' },
-        { name: 'exhale', duration: 4000, instruction: 'Exhale gently (4s)' },
-        { name: 'hold', duration: 4000, instruction: 'Hold empty (4s)' }
-      ],
-      cycles: 4,
-      color: '#10b981'
-    },
-    {
-      id: 'relaxation',
-      name: 'Deep Relaxation',
-      description: 'Perfect for stress relief and sleep preparation',
-      icon: Heart,
-      phases: [
-        { name: 'inhale', duration: 5000, instruction: 'Breathe in deeply (5s)' },
-        { name: 'hold', duration: 2000, instruction: 'Hold gently (2s)' },
-        { name: 'exhale', duration: 7000, instruction: 'Exhale slowly (7s)' }
-      ],
-      cycles: 5,
-      color: '#a855f7'
-    }
-  ];
-
   const currentExercise = exercises.find(ex => ex.id === selectedExercise) || exercises[0];
-
-  // Load breathing history on mount
-  useEffect(() => {
-    const loadBreathingData = async () => {
-      if (!user?.id) return;
-
-      try {
-        const data = await wellnessAPI.getBreathingData(user.id);
-        setBreathingHistory(data.history || []);
-        setBreathingStats(data.statistics || {
-          totalExercises: 0,
-          totalDuration: 0,
-          totalCycles: 0
-        });
-      } catch (error) {
-        console.error('Error loading breathing data:', error);
-      }
-    };
-
-    loadBreathingData();
-  }, [user]);
 
   // Log completed breathing exercise
   const logBreathingExercise = async (duration, cycles) => {
@@ -97,23 +76,54 @@ const BreathingExercises = () => {
     try {
       await wellnessAPI.logBreathing({
         userId: user.id,
-        duration: Math.round(duration / 60), // Convert to minutes
-        cycles: cycles
+        duration: duration,
+        cycles: cycles,
+        exerciseType: selectedExercise
       });
-
-      // Reload data after logging
-      const data = await wellnessAPI.getBreathingData(user.id);
-      setBreathingHistory(data.history || []);
-      setBreathingStats(data.statistics || {});
+      console.log('Breathing exercise logged:', { userId: user.id, duration, cycles });
+      
+      // Refresh history
+      fetchBreathingHistory();
     } catch (error) {
       console.error('Error logging breathing exercise:', error);
     }
   };
 
+  const fetchBreathingHistory = async () => {
+    if (!user?.id) return;
+    try {
+      const response = await wellnessAPI.getBreathingHistory(user.id);
+      // The API returns { history: [...], statistics: {...} }
+      const history = response.history || [];
+      setBreathingHistory(history);
+      
+      // Calculate stats from history if not provided in response, or use response stats
+      if (response.statistics) {
+        setBreathingStats(response.statistics);
+      } else {
+        const totalExercises = history.length;
+        const totalDuration = history.reduce((acc, curr) => acc + (curr.duration || 0), 0);
+        const totalCycles = history.reduce((acc, curr) => acc + (curr.cycles || 0), 0);
+        
+        setBreathingStats({
+          totalExercises,
+          totalDuration,
+          totalCycles
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching breathing history:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchBreathingHistory();
+  }, [user?.id]);
+
   const startBreathingExercise = () => {
     setBreathingActive(true);
-    setBreathingCycle(0);
-    setBreathingPhase('inhale');
+    setBreathingCycle(1);
+    setBreathingPhaseIndex(0);
     setBreathingProgress(0);
     setBreathingSessionComplete(false);
     setBreathingStartTime(Date.now());
@@ -122,7 +132,7 @@ const BreathingExercises = () => {
   const stopBreathingExercise = () => {
     setBreathingActive(false);
     setBreathingCycle(0);
-    setBreathingPhase('inhale');
+    setBreathingPhaseIndex(0);
     setBreathingProgress(0);
   };
 
@@ -135,66 +145,99 @@ const BreathingExercises = () => {
   useEffect(() => {
     if (!breathingActive || !currentExercise) return;
 
+    let animationFrameId;
+    const startTime = Date.now();
     const phases = currentExercise.phases;
-    let currentPhaseIndex = 0;
-    let cycleCount = 0;
-    let progress = 0;
+    const phaseDuration = phases.reduce((sum, phase) => sum + phase.duration, 0);
+    const totalDuration = phaseDuration * currentExercise.cycles;
 
-    const interval = setInterval(() => {
-      const currentPhase = phases[currentPhaseIndex];
-      setBreathingPhase(currentPhase.name);
+    const animate = () => {
+      const now = Date.now();
+      const elapsedTime = now - startTime;
 
-      progress += 100 / (currentPhase.duration / 100);
-      setBreathingProgress(progress);
-
-      if (progress >= 100) {
-        currentPhaseIndex = (currentPhaseIndex + 1) % phases.length;
-        progress = 0;
+      if (elapsedTime >= totalDuration) {
+        setBreathingActive(false);
+        setBreathingSessionComplete(true);
         setBreathingProgress(0);
-
-        if (currentPhaseIndex === 0) {
-          cycleCount++;
-          setBreathingCycle(cycleCount);
-
-          if (cycleCount >= currentExercise.cycles) {
-            setBreathingActive(false);
-            setBreathingSessionComplete(true);
-
-            // Log the completed session
-            if (breathingStartTime) {
-              const duration = (Date.now() - breathingStartTime) / 1000; // in seconds
-              logBreathingExercise(duration, cycleCount);
-            }
-          }
+        setBreathingPhaseIndex(0);
+        setBreathingCycle(currentExercise.cycles);
+        
+        // Log the completed session
+        if (breathingStartTime) {
+          const duration = (Date.now() - breathingStartTime) / 1000; // in seconds
+          logBreathingExercise(duration, currentExercise.cycles);
         }
+        return;
       }
-    }, 100);
 
-    return () => clearInterval(interval);
+      // Calculate current cycle
+      const currentCycleIndex = Math.floor(elapsedTime / phaseDuration);
+      const timeInCurrentCycle = elapsedTime % phaseDuration;
+
+      // Determine current phase
+      let accumulatedPhaseTime = 0;
+      let phaseIndex = 0;
+      
+      for (let i = 0; i < phases.length; i++) {
+        if (timeInCurrentCycle < accumulatedPhaseTime + phases[i].duration) {
+          phaseIndex = i;
+          break;
+        }
+        accumulatedPhaseTime += phases[i].duration;
+      }
+
+      const currentPhaseObj = phases[phaseIndex];
+      const timeInPhase = timeInCurrentCycle - accumulatedPhaseTime;
+      const progress = Math.min((timeInPhase / currentPhaseObj.duration) * 100, 100);
+
+      setBreathingPhaseIndex(phaseIndex);
+      setBreathingProgress(progress);
+      setBreathingCycle(currentCycleIndex + 1);
+
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
   }, [breathingActive, currentExercise]);
 
   const getCurrentInstruction = () => {
     if (!currentExercise) return 'Ready to begin';
-    const phase = currentExercise.phases.find(p => p.name === breathingPhase);
+    const phase = currentExercise.phases[breathingPhaseIndex];
     return phase ? phase.instruction : 'Ready to begin';
   };
 
   const getBreathingCircleSize = () => {
+    if (!currentExercise) return 100;
+    const currentPhaseObj = currentExercise.phases[breathingPhaseIndex];
     const progress = breathingProgress / 100;
-    switch (breathingPhase) {
-      case 'inhale':
-        return 100 + (progress * 120); // Expand from 100 to 220
-      case 'hold':
-        return 220; // Stay at max size during hold
-      case 'exhale':
-        return 220 - (progress * 120); // Contract from 220 to 100
-      default:
-        return 100;
+
+    if (currentPhaseObj.name === 'inhale') {
+      return 100 + (progress * 120); // Expand from 100 to 220
+    } else if (currentPhaseObj.name === 'exhale') {
+      return 220 - (progress * 120); // Contract from 220 to 100
+    } else if (currentPhaseObj.name === 'hold') {
+      // Check previous phase to decide if holding full or empty
+      const prevPhaseIndex = (breathingPhaseIndex - 1 + currentExercise.phases.length) % currentExercise.phases.length;
+      const prevPhase = currentExercise.phases[prevPhaseIndex];
+      
+      if (prevPhase.name === 'inhale') return 220; // Hold full
+      if (prevPhase.name === 'exhale') return 100; // Hold empty
+      return 220;
     }
+    return 100;
   };
 
+  // Calculate smooth circle size based on current phase and progress
+  const smoothCircleSize = getBreathingCircleSize();
+
   return (
-    <div className="min-h-screen p-6" style={{ backgroundColor: 'var(--theme-background)' }}>
+    <div className="min-h-screen w-full overflow-x-hidden p-4 md:p-6" style={{ backgroundColor: 'var(--theme-background)' }}>
       <div className="max-w-6xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -251,7 +294,7 @@ const BreathingExercises = () => {
 
           {/* Main Breathing Animation */}
           <div
-            className="rounded-3xl p-8 shadow-xl border"
+            className="rounded-3xl p-6 md:p-8 shadow-xl border overflow-hidden"
             style={{
               backgroundColor: 'var(--theme-card)',
               borderColor: 'var(--theme-border)'
@@ -271,9 +314,9 @@ const BreathingExercises = () => {
             </div>
 
             {/* Breathing Animation Circle */}
-            <div className="flex justify-center mb-8">
+            <div className="flex justify-center mb-8 overflow-hidden">
               <div
-                className="relative w-96 h-96 rounded-full flex items-center justify-center overflow-hidden"
+                className="relative w-80 h-80 md:w-96 md:h-96 rounded-full flex items-center justify-center overflow-hidden"
                 style={{
                   backgroundColor: theme === 'dark' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.5)'
                 }}
@@ -292,19 +335,16 @@ const BreathingExercises = () => {
                 <motion.div
                   className="absolute rounded-full border-4 shadow-2xl"
                   animate={{
-                    width: getBreathingCircleSize(),
-                    height: getBreathingCircleSize()
-                  }}
-                  transition={{
-                    width: { duration: 0.1, ease: "linear" },
-                    height: { duration: 0.1, ease: "linear" }
+                    width: smoothCircleSize,
+                    height: smoothCircleSize,
+                    opacity: breathingActive ? 0.8 : 0.5,
                   }}
                   style={{
                     borderColor: currentExercise.color,
                     backgroundColor: `${currentExercise.color}20`,
                     boxShadow: `0 0 40px ${currentExercise.color}60`,
-                    opacity: breathingActive ? 0.8 : 0.5
                   }}
+                  transition={{ duration: 0 }}
                 />
 
                 {/* Floating particles */}
@@ -348,7 +388,7 @@ const BreathingExercises = () => {
                   </div>
                   {breathingActive && (
                     <div className="mt-6">
-                      <div className="w-48 h-2 bg-gray-700 rounded-full mx-auto overflow-hidden">
+                      <div className="w-40 md:w-48 h-2 bg-gray-700 rounded-full mx-auto overflow-hidden">
                         <motion.div
                           className="h-full rounded-full"
                           style={{
@@ -365,27 +405,27 @@ const BreathingExercises = () => {
             </div>
 
             {/* Controls */}
-            <div className="flex justify-center space-x-4">
+            <div className="flex justify-center space-x-3 flex-wrap gap-3">
               {!breathingActive ? (
                 <motion.button
                   onClick={startBreathingExercise}
-                  className="px-8 py-4 font-semibold rounded-xl flex items-center space-x-3 shadow-lg hover:shadow-xl transition-all duration-200 text-white"
+                  className="px-6 md:px-8 py-3 md:py-4 font-semibold rounded-xl flex items-center space-x-2 md:space-x-3 shadow-lg hover:shadow-xl transition-all duration-200 text-white text-sm md:text-base"
                   style={{ backgroundColor: currentExercise.color }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <Play className="h-6 w-6" />
+                  <Play className="h-5 w-5 md:h-6 md:w-6" />
                   <span>Start Exercise</span>
                 </motion.button>
               ) : (
                 <motion.button
                   onClick={stopBreathingExercise}
-                  className="px-8 py-4 font-semibold rounded-xl flex items-center space-x-3 shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="px-6 md:px-8 py-3 md:py-4 font-semibold rounded-xl flex items-center space-x-2 md:space-x-3 shadow-lg hover:shadow-xl transition-all duration-200 text-white text-sm md:text-base"
                   style={{ backgroundColor: '#ef4444', color: 'white' }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <Pause className="h-6 w-6" />
+                  <Pause className="h-5 w-5 md:h-6 md:w-6" />
                   <span>Stop Exercise</span>
                 </motion.button>
               )}
@@ -393,7 +433,7 @@ const BreathingExercises = () => {
               {(breathingSessionComplete || breathingCycle > 0) && !breathingActive && (
                 <motion.button
                   onClick={resetExercise}
-                  className="px-8 py-4 font-semibold rounded-xl flex items-center space-x-3 shadow-lg hover:shadow-xl transition-all duration-200 border-2"
+                  className="px-6 md:px-8 py-3 md:py-4 font-semibold rounded-xl flex items-center space-x-2 md:space-x-3 shadow-lg hover:shadow-xl transition-all duration-200 border-2 text-sm md:text-base"
                   style={{
                     borderColor: 'var(--theme-border)',
                     color: 'var(--theme-text)',
@@ -467,6 +507,61 @@ const BreathingExercises = () => {
               <p className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>
                 Prepares your body for restful and deep sleep
               </p>
+            </div>
+          </div>
+
+          {/* History & Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Stats Card */}
+            <div className="rounded-3xl p-8 shadow-xl border" style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}>
+              <div className="flex items-center mb-6">
+                <Activity className="h-8 w-8 mr-3" style={{ color: 'var(--accent-color)' }} />
+                <h2 className="text-2xl font-bold" style={{ color: 'var(--theme-text)' }}>Your Progress</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl" style={{ backgroundColor: 'var(--theme-background)' }}>
+                  <div className="text-3xl font-bold mb-1" style={{ color: 'var(--accent-color)' }}>{breathingStats.totalExercises}</div>
+                  <div className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Total Sessions</div>
+                </div>
+                <div className="p-4 rounded-xl" style={{ backgroundColor: 'var(--theme-background)' }}>
+                  <div className="text-3xl font-bold mb-1" style={{ color: '#10b981' }}>{Math.round(breathingStats.totalDuration / 60)}</div>
+                  <div className="text-sm opacity-70" style={{ color: 'var(--theme-text)' }}>Minutes Breathed</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent History */}
+            <div className="rounded-3xl p-8 shadow-xl border" style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}>
+              <div className="flex items-center mb-6">
+                <Clock className="h-8 w-8 mr-3" style={{ color: 'var(--accent-color)' }} />
+                <h2 className="text-2xl font-bold" style={{ color: 'var(--theme-text)' }}>Recent Sessions</h2>
+              </div>
+              <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
+                {breathingHistory.length === 0 ? (
+                  <div className="text-center opacity-50 py-8" style={{ color: 'var(--theme-text)' }}>
+                    <p>No breathing sessions yet.</p>
+                    <p className="text-sm mt-2">Complete an exercise to see your history!</p>
+                  </div>
+                ) : (
+                  breathingHistory.slice(0, 5).map((session, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: 'var(--theme-background)' }}>
+                      <div>
+                        <div className="font-semibold" style={{ color: 'var(--theme-text)' }}>
+                          {session.exerciseType === '478' ? '4-7-8 Breathing' : 
+                           session.exerciseType === 'box' ? 'Box Breathing' : 
+                           session.exerciseType === 'relaxation' ? 'Deep Relaxation' : 'Breathing Session'}
+                        </div>
+                        <div className="text-xs opacity-70" style={{ color: 'var(--theme-text)' }}>
+                          {new Date(session.createdAt).toLocaleDateString()} • {new Date(session.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold" style={{ color: 'var(--accent-color)' }}>{Math.round(session.duration)}s</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </motion.div>

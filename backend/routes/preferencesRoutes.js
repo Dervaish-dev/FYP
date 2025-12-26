@@ -1,5 +1,6 @@
 import express from "express";
 import mongoose from "mongoose";
+import User from "../models/User.js";
 
 const router = express.Router();
 
@@ -86,14 +87,15 @@ router.get("/:userId", async (req, res) => {
     const { userId } = req.params;
 
     let preferences = await UserPreferences.findOne({ userId });
+    const user = await User.findById(userId);
 
     // If no preferences exist, create default ones
     if (!preferences) {
       preferences = new UserPreferences({
         userId,
-        fullName: '',
-        age: null,
-        neurotype: 'None',
+        fullName: user?.name || '',
+        age: user?.age || null,
+        neurotype: user?.neurotype || 'None',
         preferredNotificationTimes: [],
         defaultTheme: 'ocean',
         personalGoals: '',
@@ -104,6 +106,25 @@ router.get("/:userId", async (req, res) => {
       });
 
       await preferences.save();
+    } else {
+      // Sync with User model if fields are missing in preferences
+      let updated = false;
+      if (!preferences.fullName && user?.name) {
+        preferences.fullName = user.name;
+        updated = true;
+      }
+      if (!preferences.age && user?.age) {
+        preferences.age = user.age;
+        updated = true;
+      }
+      if ((!preferences.neurotype || preferences.neurotype === 'None') && user?.neurotype) {
+        preferences.neurotype = user.neurotype;
+        updated = true;
+      }
+      
+      if (updated) {
+        await preferences.save();
+      }
     }
 
     res.json({

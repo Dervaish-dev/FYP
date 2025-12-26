@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import InputField from './InputField';
 
@@ -165,6 +166,14 @@ const AuthForm = ({
           {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
         </button>
       </div>
+
+      {isLogin && (
+        <div className="flex justify-end">
+          <Link to="/forgot-password" class="text-sm font-medium text-primary-600 hover:text-primary-500">
+            Forgot your password?
+          </Link>
+        </div>
+      )}
 
       {error && (
         <motion.div

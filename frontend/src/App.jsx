@@ -5,6 +5,7 @@ import { AuthProvider } from './context/AuthContext';
 import LandingPage from './pages/LandingPage';
 import JoinPage from './pages/JoinPage';
 import LoginPage from './pages/LoginPage';
+import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import Emotions from './pages/Emotions';
 import Tasks from './pages/Tasks';
@@ -14,10 +15,12 @@ import VoiceAssistant from './pages/VoiceAssistant';
 import TaskScheduling from './pages/TaskScheduling';
 import CaregiverLogin from './pages/CaregiverLogin';
 import CaregiverDashboard from './pages/CaregiverDashboard';
+import CaregiverPatients from './pages/CaregiverPatients';
 import PatientDetail from './pages/PatientDetail';
 import CaregiverSettings from './pages/CaregiverSettings';
 import Settings from './pages/Settings';
 import Wellness from './pages/Wellness';
+import BreathingExercises from './pages/BreathingExercises';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import CaregiverProtectedRoute from './components/CaregiverProtectedRoute';
@@ -35,6 +38,7 @@ const AppRoutes = () => {
         <Route path="/join" element={<JoinPage />} />
         <Route path="/signup" element={<Navigate to="/join" replace />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
         {/* Protected Routes */}
         <Route
@@ -117,6 +121,14 @@ const AppRoutes = () => {
           }
         />
         <Route
+          path="/caregiver/patients"
+          element={
+            <CaregiverProtectedRoute>
+              <CaregiverPatients />
+            </CaregiverProtectedRoute>
+          }
+        />
+        <Route
           path="/caregiver/patient/:patientId"
           element={
             <CaregiverProtectedRoute>
@@ -156,6 +168,16 @@ const AppRoutes = () => {
             <ProtectedRoute>
               <Layout>
                 <Wellness />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/breathing"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <BreathingExercises />
               </Layout>
             </ProtectedRoute>
           }

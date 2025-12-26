@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Save, KeyRound, LogOut, Shield } from 'lucide-react';
+import { ArrowLeft, Save, LogOut, Shield } from 'lucide-react';
 import { caregiverApi } from '../utils/caregiverApi';
 import CaregiverLayout from '../components/CaregiverLayout';
 
@@ -10,7 +10,6 @@ const CaregiverSettings = () => {
 
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -21,21 +20,8 @@ const CaregiverSettings = () => {
     organization: '',
     phone: '',
     licenseNumber: '',
+    twoFactorEnabled: false,
   });
-
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmNewPassword: '',
-  });
-
-  const canSubmitPassword = useMemo(() => {
-    return (
-      passwordForm.currentPassword.trim().length > 0 &&
-      passwordForm.newPassword.trim().length >= 6 &&
-      passwordForm.newPassword === passwordForm.confirmNewPassword
-    );
-  }, [passwordForm]);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +41,7 @@ const CaregiverSettings = () => {
           organization: caregiver?.organization || '',
           phone: caregiver?.phone || '',
           licenseNumber: caregiver?.licenseNumber || '',
+          twoFactorEnabled: caregiver?.twoFactorEnabled || false,
         });
       } catch (e) {
         if (!cancelled) setError(e.message || 'Failed to load profile');
@@ -111,33 +98,21 @@ const CaregiverSettings = () => {
     }
   };
 
-  const changePassword = async (e) => {
-    e.preventDefault();
-
-    if (!canSubmitPassword) {
-      setError('Please fill passwords correctly (min 6 chars, must match).');
-      return;
-    }
-
+  const toggle2FA = async () => {
     try {
-      setSavingPassword(true);
       setError('');
       setSuccess('');
-
-      const data = await caregiverApi('/api/caregiver/me/password', {
-        method: 'PUT',
-        body: JSON.stringify({
-          currentPassword: passwordForm.currentPassword,
-          newPassword: passwordForm.newPassword,
-        }),
+      const data = await caregiverApi('/api/caregiver/toggle-2fa', {
+        method: 'POST'
       });
-
-      setSuccess(data?.message || 'Password updated');
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmNewPassword: '' });
+      
+      if (data.success) {
+        setProfile(prev => ({ ...prev, twoFactorEnabled: data.twoFactorEnabled }));
+        setSuccess(`Two-factor authentication ${data.twoFactorEnabled ? 'enabled' : 'disabled'}`);
+      }
     } catch (e) {
-      setError(e.message || 'Failed to update password');
-    } finally {
-      setSavingPassword(false);
+      console.error('Toggle 2FA error:', e);
+      setError(e.message || 'Failed to toggle 2FA');
     }
   };
 
@@ -258,67 +233,38 @@ const CaregiverSettings = () => {
               </div>
             </form>
 
-            <form
-              onSubmit={changePassword}
+            <div
               className="p-6 rounded-2xl border"
               style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
             >
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold" style={{ color: 'var(--text-color)' }}>Security</h2>
-                <button
-                  type="submit"
-                  disabled={savingPassword}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white disabled:opacity-60"
-                  style={{ backgroundColor: 'var(--primary-500)' }}
-                >
-                  <KeyRound className="h-4 w-4" />
-                  {savingPassword ? 'Updating...' : 'Change Password'}
-                </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>Current Password</label>
-                  <input
-                    type="password"
-                    value={passwordForm.currentPassword}
-                    onChange={(e) => setPasswordForm((p) => ({ ...p, currentPassword: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-lg border"
-                    style={inputStyle}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>New Password</label>
-                  <input
-                    type="password"
-                    value={passwordForm.newPassword}
-                    onChange={(e) => setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-lg border"
-                    style={inputStyle}
-                  />
-                  <p className="text-xs mt-2 opacity-70" style={{ color: 'var(--text-color)' }}>
-                    Minimum 6 characters.
-                  </p>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>Confirm New Password</label>
-                  <input
-                    type="password"
-                    value={passwordForm.confirmNewPassword}
-                    onChange={(e) => setPasswordForm((p) => ({ ...p, confirmNewPassword: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-lg border"
-                    style={inputStyle}
-                  />
-                  {!canSubmitPassword && (passwordForm.confirmNewPassword.length > 0 || passwordForm.newPassword.length > 0) && (
-                    <p className="text-xs mt-2" style={{ color: 'var(--text-color)', opacity: 0.7 }}>
-                      Passwords must match.
+              <div className="mb-6 p-4 rounded-lg border" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--theme-background)' }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium" style={{ color: 'var(--text-color)' }}>Two-Factor Authentication</h3>
+                    <p className="text-sm opacity-70" style={{ color: 'var(--text-color)' }}>
+                      Add an extra layer of security to your account.
                     </p>
-                  )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggle2FA}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                      profile.twoFactorEnabled ? 'bg-green-500' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        profile.twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
-            </form>
+            </div>
           </div>
         )}
 

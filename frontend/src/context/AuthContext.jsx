@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { useContext, useReducer, useEffect } from 'react';
 import { authAPI } from '../utils/api';
+import { AuthContext } from './AuthContextObject';
 
 // Initial state
 const initialState = {
@@ -61,9 +62,6 @@ const authReducer = (state, action) => {
   }
 };
 
-// Create context
-const AuthContext = createContext();
-
 // Auth provider component
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
@@ -105,23 +103,76 @@ export const AuthProvider = ({ children }) => {
       dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
       dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
 
-      const response = await authAPI.login(credentials);
+      const data = await authAPI.login(credentials);
       
+      if (data.requires2FA) {
+        dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
+        return data;
+      }
+
       // Store in localStorage
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+      const authData = data.data || data;
+      localStorage.setItem('token', authData.token);
+      localStorage.setItem('user', JSON.stringify(authData.user));
 
       dispatch({
         type: AUTH_ACTIONS.LOGIN_SUCCESS,
-        payload: response.data,
+        payload: authData,
       });
 
-      return response;
+      return authData;
     } catch (error) {
       dispatch({
         type: AUTH_ACTIONS.SET_ERROR,
         payload: error.message || 'Login failed',
       });
+      throw error;
+    }
+  };
+
+  // Verify 2FA
+  const verify2FA = async (userId, otp) => {
+    try {
+      dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
+      dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
+
+      const data = await authAPI.verify2FA({ userId, otp });
+
+      // Store in localStorage
+      const authData = data.data || data;
+      localStorage.setItem('token', authData.token);
+      localStorage.setItem('user', JSON.stringify(authData.user));
+
+      dispatch({
+        type: AUTH_ACTIONS.LOGIN_SUCCESS,
+        payload: authData,
+      });
+
+      return authData;
+    } catch (error) {
+      dispatch({
+        type: AUTH_ACTIONS.SET_ERROR,
+        payload: error.message || 'Verification failed',
+      });
+      throw error;
+    }
+  };
+
+  // Toggle 2FA
+  const toggle2FA = async () => {
+    try {
+      const data = await authAPI.toggle2FA();
+      // Update user in state
+      if (state.user) {
+        const updatedUser = { ...state.user, twoFactorEnabled: data.twoFactorEnabled };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        dispatch({
+          type: AUTH_ACTIONS.LOGIN_SUCCESS,
+          payload: { user: updatedUser, token: state.token }
+        });
+      }
+      return data;
+    } catch (error) {
       throw error;
     }
   };
@@ -189,6 +240,8 @@ export const AuthProvider = ({ children }) => {
     logout,
     setSession,
     clearError,
+    verify2FA,
+    toggle2FA,
   };
 
   return (

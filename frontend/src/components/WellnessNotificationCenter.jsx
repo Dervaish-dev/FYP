@@ -13,6 +13,7 @@ import {
   Info
 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { getNotificationsEnabled } from '../utils/userPreferences';
 
 const WellnessNotificationCenter = () => {
   const [notifications, setNotifications] = useState([]);
@@ -63,6 +64,8 @@ const WellnessNotificationCenter = () => {
   // Show motivational notifications periodically
   useEffect(() => {
     const showNotification = () => {
+      if (!getNotificationsEnabled()) return;
+      
       const motivationalNotifications = generateMotivationalNotifications();
       setNotifications(prev => [...prev, ...motivationalNotifications]);
       setIsVisible(true);

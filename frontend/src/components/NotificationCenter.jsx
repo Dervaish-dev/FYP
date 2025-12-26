@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Bell, CheckCircle2, Clock, Heart, Brain, Zap, Star, Coffee, Sun } from 'lucide-react';
+import { getNotificationsEnabled } from '../utils/userPreferences';
 
 // Notification Types and Messages
 const NOTIFICATION_TYPES = {
@@ -278,6 +279,8 @@ const NotificationCenter = () => {
   }, [notificationHistory]);
 
   const addNotification = useCallback((message, type, customIcon = null) => {
+    if (!getNotificationsEnabled()) return;
+
     const id = Date.now().toString();
     const messages = MESSAGE_LIBRARY[type] || MESSAGE_LIBRARY[NOTIFICATION_TYPES.MOTIVATION];
     const selectedMessage = messages[Math.floor(Math.random() * messages.length)];
@@ -313,6 +316,8 @@ const NotificationCenter = () => {
 
   // Play notification sound
   const playNotificationSound = useCallback(() => {
+    if (!getNotificationsEnabled()) return;
+
     try {
       const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBS13yO/eizEIHWq+8+OWT');
       audio.volume = 0.3;

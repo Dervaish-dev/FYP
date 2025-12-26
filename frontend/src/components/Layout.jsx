@@ -13,7 +13,8 @@ import {
   Brain,
   Activity,
   User,
-  LogOut
+  LogOut,
+  Wind
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -27,8 +28,9 @@ const Layout = ({ children }) => {
 
   const navigationItems = [
     { path: '/dashboard', icon: Home, label: 'Home' },
-    { path: '/emotions', icon: Heart, label: 'Emotions' },
+    { path: '/emotions', icon: Brain, label: 'Mood' },
     { path: '/tasks', icon: CheckSquare, label: 'Tasks' },
+    { path: '/wellness', icon: Heart, label: 'Wellness' },
     { path: '/journal', icon: BookOpen, label: 'Journal' },
     { path: '/analytics', icon: BarChart3, label: 'Analytics' }
   ];
@@ -143,7 +145,7 @@ const Layout = ({ children }) => {
       </motion.header>
 
       {/* Main Content */}
-      <main className="flex-1 pb-20">
+      <main className="flex-1 pb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -154,9 +156,9 @@ const Layout = ({ children }) => {
       </main>
 
       {/* Floating Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 pb-6 px-4 pointer-events-none z-50">
+      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
         <motion.nav
-          className="max-w-md mx-auto rounded-2xl shadow-2xl border pointer-events-auto"
+          className="rounded-3xl border shadow-xl px-2 py-3"
           style={{
             backgroundColor: 'var(--theme-card)',
             borderColor: 'var(--theme-border)'
@@ -165,31 +167,31 @@ const Layout = ({ children }) => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
         >
-          <div className="flex justify-around py-3 px-2">
+          <div className="flex items-center justify-center gap-2">
             {navigationItems.map((item) => (
               <Link key={item.path} to={item.path}>
                 <motion.button
-                  className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-all duration-200 ${isActive(item.path)
-                    ? 'text-white'
-                    : 'opacity-70 hover:opacity-100'
+                  className={`flex flex-col items-center justify-center py-2 px-3 transition-all duration-200 rounded-2xl ${isActive(item.path)
+                    ? ''
+                    : ''
                     }`}
                   style={{
                     backgroundColor: isActive(item.path) ? 'var(--theme-primary)' : 'transparent',
-                    color: isActive(item.path) ? 'white' : 'var(--theme-text)'
+                    color: isActive(item.path) ? 'white' : 'var(--theme-text)',
+                    opacity: isActive(item.path) ? 1 : 0.6
                   }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <item.icon size={20} />
-                  <span className="text-xs font-medium">{item.label}</span>
+                  <item.icon size={24} />
+                  <span className="text-xs font-medium mt-1">{item.label}</span>
                 </motion.button>
               </Link>
             ))}
           </div>
         </motion.nav>
       </div>
-
-    </div >
+    </div>
   );
 };
 

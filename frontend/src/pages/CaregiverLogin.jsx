@@ -10,6 +10,9 @@ const CaregiverLogin = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showOTP, setShowOTP] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [caregiverId, setCaregiverId] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -54,6 +57,13 @@ const CaregiverLogin = () => {
       }
 
       if (data.success) {
+        if (data.requires2FA) {
+          setShowOTP(true);
+          setCaregiverId(data.caregiverId);
+          setLoading(false);
+          return;
+        }
+
         // Store token and caregiver info
         localStorage.setItem('caregiverToken', data.token);
         localStorage.setItem('caregiverInfo', JSON.stringify(data.caregiver));
@@ -63,6 +73,38 @@ const CaregiverLogin = () => {
       }
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/caregiver/verify-2fa', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ caregiverId, otp }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Verification failed');
+      }
+
+      if (data.success) {
+        localStorage.setItem('caregiverToken', data.token);
+        localStorage.setItem('caregiverInfo', JSON.stringify(data.caregiver));
+        navigate('/caregiver/dashboard');
+      }
+    } catch (err) {
+      setError(err.message || 'Invalid OTP');
     } finally {
       setLoading(false);
     }
@@ -114,8 +156,8 @@ const CaregiverLogin = () => {
 
           <div className="space-y-4">
             <div className="flex items-start space-x-4">
-              <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--primary-100)' }}>
-                <Shield className="h-6 w-6" style={{ color: 'var(--primary-600)' }} />
+              <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(var(--primary-rgb), 0.1)' }}>
+                <Shield className="h-6 w-6" style={{ color: 'var(--theme-primary)' }} />
               </div>
               <div>
                 <h3 className="font-semibold mb-1" style={{ color: 'var(--text-color)' }}>
@@ -128,8 +170,8 @@ const CaregiverLogin = () => {
             </div>
 
             <div className="flex items-start space-x-4">
-              <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--primary-100)' }}>
-                <Activity className="h-6 w-6" style={{ color: 'var(--primary-600)' }} />
+              <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(var(--primary-rgb), 0.1)' }}>
+                <Activity className="h-6 w-6" style={{ color: 'var(--theme-primary)' }} />
               </div>
               <div>
                 <h3 className="font-semibold mb-1" style={{ color: 'var(--text-color)' }}>
@@ -142,8 +184,8 @@ const CaregiverLogin = () => {
             </div>
 
             <div className="flex items-start space-x-4">
-              <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--primary-100)' }}>
-                <Users className="h-6 w-6" style={{ color: 'var(--primary-600)' }} />
+              <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(var(--primary-rgb), 0.1)' }}>
+                <Users className="h-6 w-6" style={{ color: 'var(--theme-primary)' }} />
               </div>
               <div>
                 <h3 className="font-semibold mb-1" style={{ color: 'var(--text-color)' }}>
@@ -187,6 +229,51 @@ const CaregiverLogin = () => {
             </motion.div>
           )}
 
+          {showOTP ? (
+            <form onSubmit={handleVerifyOTP} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>
+                  Enter Verification Code
+                </label>
+                <p className="text-sm mb-4 opacity-70" style={{ color: 'var(--text-color)' }}>
+                  We sent a 6-digit code to your email.
+                </p>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 opacity-50" style={{ color: 'var(--text-color)' }} />
+                  <input
+                    type="text"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    required
+                    className="w-full pl-12 pr-4 py-3 rounded-lg border focus:ring-2 focus:ring-opacity-50 transition-all"
+                    style={{
+                      backgroundColor: 'var(--theme-background)',
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-color)',
+                      outline: 'none'
+                    }}
+                    placeholder="123456"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 rounded-lg font-semibold text-white flex items-center justify-center space-x-2 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: 'var(--primary-500)' }}
+              >
+                {loading ? 'Verifying...' : 'Verify Code'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowOTP(false)}
+                className="w-full py-2 text-sm opacity-70 hover:opacity-100"
+                style={{ color: 'var(--text-color)' }}
+              >
+                Back to Login
+              </button>
+            </form>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div>
@@ -361,6 +448,7 @@ const CaregiverLogin = () => {
               )}
             </button>
           </form>
+          )}
 
           <div className="mt-6 text-center">
             <button

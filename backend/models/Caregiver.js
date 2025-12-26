@@ -48,6 +48,21 @@ const caregiverSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  
+  // Two-Factor Authentication
+  twoFactorEnabled: {
+    type: Boolean,
+    default: false
+  },
+  loginOTP: {
+    type: String,
+    select: false
+  },
+  loginOTPExpires: {
+    type: Date,
+    select: false
+  },
+
   createdAt: {
     type: Date,
     default: Date.now

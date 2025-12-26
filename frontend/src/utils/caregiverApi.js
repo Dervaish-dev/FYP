@@ -4,7 +4,9 @@ export async function caregiverApi(path, options = {}) {
     throw new Error('Caregiver authentication required. Please sign in again.');
   }
 
-  const url = path.startsWith('/') ? path : `/${path}`;
+  const baseUrl = 'http://localhost:5005';
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const url = `${baseUrl}${normalizedPath}`;
 
   const headers = {
     ...(options.headers || {}),
