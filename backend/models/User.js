@@ -37,6 +37,12 @@ const userSchema = new mongoose.Schema({
     default: null
   },
 
+  gender: {
+    type: String,
+    enum: ['Male', 'Female', 'Other', 'Prefer not to say', null],
+    default: null
+  },
+
   // One caregiver per patient (null means unassigned)
   assignedCaregiver: {
     type: mongoose.Schema.Types.ObjectId,
@@ -87,6 +93,9 @@ userSchema.pre('save', async function(next) {
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
+
+// Note: Email index is created automatically by unique: true in schema definition
+// No need for explicit userSchema.index({ email: 1 }) to avoid duplicate index warning
 
 // Remove password from JSON output
 userSchema.methods.toJSON = function() {

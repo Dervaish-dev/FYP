@@ -22,7 +22,8 @@ const InputField = ({
     >
       <label 
         htmlFor={name}
-        className="block text-sm font-medium text-gray-700"
+        className="block text-sm font-medium"
+        style={{ color: 'var(--theme-text)' }}
       >
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}

@@ -2,10 +2,37 @@ import express from "express";
 import mongoose from "mongoose";
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
+import CallReport from '../models/CallReport.js';
 
 dotenv.config();
 
 const router = express.Router();
+
+// Import Journal model from voiceJournalController for voice status checks
+// Define it here to avoid circular dependency
+const voiceJournalSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
+  title: { type: String, required: true },
+  content: { type: String, required: true },
+  summary: { type: String, default: '' },
+  mood: { type: String, default: 'neutral' },
+  sentiment: { type: String, enum: ['positive', 'negative', 'neutral'], default: 'neutral' },
+  sentimentConfidence: { type: Number, default: 0.5 },
+  stressLevel: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
+  stressScore: { type: Number, default: 5 },
+  emotionalIntensity: { type: Number, default: 5, min: 1, max: 10 },
+  topics: [{ type: String }],
+  keywords: [{ type: String }],
+  source: { type: String, enum: ['manual', 'voice_call'], default: 'manual' },
+  call_id: { type: String, default: null },
+  createdAt: { type: Date, default: Date.now }
+}, { timestamps: true });
+
+// Add index for fast call_id lookups
+voiceJournalSchema.index({ call_id: 1 });
+voiceJournalSchema.index({ userId: 1, createdAt: -1 });
+
+const VoiceJournal = mongoose.models.Journal || mongoose.model('Journal', voiceJournalSchema);
 
 // Initialize Gemini AI
 const API_KEY = process.env.GEMINI_API_KEY || '';
@@ -246,6 +273,10 @@ const journalEntrySchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Compound index for efficient time-based queries with sorting
+journalEntrySchema.index({ userId: 1, createdAt: -1 });
+journalEntrySchema.index({ userId: 1, isVoiceEntry: 1 });
+
 // Update the updatedAt field before saving
 journalEntrySchema.pre('save', function(next) {
   this.updatedAt = Date.now();
@@ -363,61 +394,150 @@ router.get("/:userId", async (req, res) => {
     const { userId } = req.params;
     const { limit = 20, offset = 0, emotion, mood, tags } = req.query;
 
-    // Build query
-    const query = { userId };
-    if (emotion) query.emotion = emotion.toLowerCase();
-    if (mood) query.mood = parseInt(mood);
+    // Build query for manual entries
+    const manualQuery = { userId };
+    if (emotion) manualQuery.emotion = emotion.toLowerCase();
+    if (mood) manualQuery.mood = parseInt(mood);
     if (tags) {
       const tagArray = tags.split(',').map(tag => tag.trim());
-      query.tags = { $in: tagArray };
+      manualQuery.tags = { $in: tagArray };
     }
 
-    // Get journal entries
-    const entries = await JournalEntry
-      .find(query)
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(parseInt(offset));
-
-    // Get journal statistics
-    const stats = await JournalEntry.aggregate([
-      { $match: { userId } },
-      {
-        $group: {
-          _id: '$emotion',
-          count: { $sum: 1 },
-          avgMood: { $avg: '$mood' },
-          avgConfidence: { $avg: '$emotionConfidence' }
-        }
-      }
+    // Build query for voice entries  
+    const voiceQuery = { userId };
+    if (mood) voiceQuery.mood = parseInt(mood);
+    
+    console.log('📊 Fetching journal entries for user:', userId);
+    
+    // Get both manual and voice entries - use lean() for read-only performance boost
+    const [manualEntries, voiceEntries] = await Promise.all([
+      JournalEntry
+        .find(manualQuery)
+        .sort({ createdAt: -1 })
+        .lean(),
+      VoiceJournal
+        .find(voiceQuery)
+        .sort({ createdAt: -1 })
+        .lean()
     ]);
 
-    // Get mood trends (last 30 days)
+    console.log(`📝 Found ${manualEntries.length} manual entries, ${voiceEntries.length} voice entries`);
+
+    // Normalize voice entries to match manual entry format
+    const normalizedVoiceEntries = voiceEntries.map(entry => ({
+      ...entry,
+      emotion: entry.mood, // Map mood to emotion for consistency
+      isVoiceEntry: true,
+      voiceCallId: entry.call_id
+    }));
+
+    // Combine and sort by createdAt
+    const allEntries = [...manualEntries, ...normalizedVoiceEntries]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+
+    console.log(`✅ Returning ${allEntries.length} total entries`);
+    
+    // Use combined entries for calculations
+    const entries = allEntries;
+
+    // Get journal statistics from both collections
+    const [manualStats, voiceStats] = await Promise.all([
+      JournalEntry.aggregate([
+        { $match: { userId } },
+        {
+          $group: {
+            _id: '$emotion',
+            count: { $sum: 1 },
+            avgMood: { $avg: '$mood' },
+            avgConfidence: { $avg: '$emotionConfidence' }
+          }
+        }
+      ]),
+      VoiceJournal.aggregate([
+        { $match: { userId } },
+        {
+          $group: {
+            _id: '$mood', // Voice uses 'mood' field
+            count: { $sum: 1 },
+            avgMood: { $avg: { $toInt: '$mood' } }, // Convert mood string to number if needed
+            avgConfidence: { $avg: '$sentimentConfidence' }
+          }
+        }
+      ])
+    ]);
+
+    // Combine stats from both collections
+    const statsMap = new Map();
+    [...manualStats, ...voiceStats].forEach(stat => {
+      const key = stat._id;
+      if (statsMap.has(key)) {
+        const existing = statsMap.get(key);
+        existing.count += stat.count;
+        existing.avgMood = ((existing.avgMood * existing.count) + (stat.avgMood * stat.count)) / (existing.count + stat.count);
+        if (stat.avgConfidence) {
+          existing.avgConfidence = ((existing.avgConfidence || 0) + stat.avgConfidence) / 2;
+        }
+      } else {
+        statsMap.set(key, stat);
+      }
+    });
+    const stats = Array.from(statsMap.values());
+
+    // Get mood trends (last 30 days) from both collections
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const moodTrends = await JournalEntry.aggregate([
-      {
-        $match: {
-          userId,
-          createdAt: { $gte: thirtyDaysAgo }
+    const [manualTrends, voiceTrends] = await Promise.all([
+      JournalEntry.aggregate([
+        {
+          $match: {
+            userId,
+            createdAt: { $gte: thirtyDaysAgo }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+              emotion: "$emotion"
+            },
+            avgMood: { $avg: "$mood" },
+            avgConfidence: { $avg: "$emotionConfidence" },
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $sort: { "_id.date": 1 }
         }
-      },
-      {
-        $group: {
-          _id: {
-            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-            emotion: "$emotion"
-          },
-          avgMood: { $avg: "$mood" },
-          avgConfidence: { $avg: "$emotionConfidence" },
-          count: { $sum: 1 }
+      ]),
+      VoiceJournal.aggregate([
+        {
+          $match: {
+            userId,
+            createdAt: { $gte: thirtyDaysAgo }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+              emotion: "$mood"
+            },
+            avgMood: { $avg: { $toInt: "$mood" } },
+            avgConfidence: { $avg: "$sentimentConfidence" },
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $sort: { "_id.date": 1 }
         }
-      },
-      {
-        $sort: { "_id.date": 1 }
-      }
+      ])
     ]);
+    
+    const moodTrends = [...manualTrends, ...voiceTrends].sort((a, b) => 
+      a._id.date.localeCompare(b._id.date)
+    );
 
     res.json({
       success: true,
@@ -1181,24 +1301,80 @@ router.get("/voice/status/:callId", async (req, res) => {
   try {
     const { callId } = req.params;
     
-    // Check if entry exists for this call
-    const entry = await JournalEntry.findOne({ voiceCallId: callId });
+    console.log('🔍 Checking voice call status for:', callId);
+    
+    // FIRST: Check if journal already exists
+    const entry = await VoiceJournal.findOne({ call_id: callId }).lean();
     
     if (entry) {
-      res.json({
+      console.log('✅ Found completed journal entry:', entry._id);
+      const response = {
         success: true,
         status: 'completed',
-        entryId: entry._id
-      });
+        entryId: entry._id,
+        emotion: entry.mood,
+        sentiment: entry.sentiment,
+        createdAt: entry.createdAt
+      };
+      console.log('📤 Sending response:', JSON.stringify(response));
+      res.json(response);
+      return;
+    }
+    
+    // SECOND: Check if call report exists (Retell writes directly to DB)
+    const callReport = await CallReport.findOne({ call_id: callId }).lean();
+    
+    if (callReport) {
+      console.log('📞 Found call report, processing now...');
+      
+      // Import the processing function
+      const { createJournalFromCallReport } = await import('../controllers/voiceJournalController.js');
+      
+      try {
+        // Process it immediately
+        await createJournalFromCallReport(callReport._id);
+        
+        // Check if journal was created
+        const newEntry = await VoiceJournal.findOne({ call_id: callId }).lean();
+        if (newEntry) {
+          console.log('✅ Journal created successfully:', newEntry._id);
+          const response = {
+            success: true,
+            status: 'completed',
+            entryId: newEntry._id,
+            emotion: newEntry.mood,
+            sentiment: newEntry.sentiment,
+            createdAt: newEntry.createdAt
+          };
+          console.log('📤 Sending response:', JSON.stringify(response));
+          res.json(response);
+        } else {
+          console.log('⏳ Journal not yet created, returning processing status');
+          res.json({
+            success: true,
+            status: 'processing',
+            message: 'Creating journal entry...'
+          });
+        }
+      } catch (processError) {
+        console.error('❌ Failed to process call report:', processError);
+        res.json({
+          success: true,
+          status: 'pending',
+          message: 'Processing in progress...'
+        });
+      }
     } else {
+      console.log('⏳ Journal entry not yet created for call:', callId);
       res.json({
         success: true,
-        status: 'pending'
+        status: 'pending',
+        message: 'Waiting for transcript processing'
       });
     }
 
   } catch (error) {
-    console.error('Voice status check error:', error);
+    console.error('❌ Voice status check error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to check call status',

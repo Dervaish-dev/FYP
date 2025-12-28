@@ -195,7 +195,7 @@ const TaskColumn = React.memo(({ title, tasks, status, onTaskUpdate, onTaskDelet
       <div className="mb-4">
         <h2 className="text-lg font-semibold flex items-center space-x-2" style={{ color: 'var(--theme-text)' }}>
           <span>{title}</span>
-          <span className="text-sm bg-gray-100 px-2 py-1 rounded-full" style={{ color: 'var(--theme-text)' }}>
+          <span className="text-sm px-2 py-1 rounded-full" style={{ backgroundColor: 'var(--theme-muted-bg)', color: 'var(--theme-text)' }}>
             {tasks.length}
           </span>
         </h2>
@@ -678,8 +678,10 @@ const Tasks = () => {
                   </h2>
                   <button
                     onClick={() => setShowCreateModal(false)}
-                    className="p-1 rounded hover:bg-gray-100 transition-colors"
-                    style={{ color: 'var(--theme-text)' }}
+                    className="p-1 rounded transition-colors"
+                    style={{ color: 'var(--theme-muted-text)' }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--theme-muted-bg)'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                   >
                     <X className="h-5 w-5" />
                   </button>
@@ -729,12 +731,15 @@ const Tasks = () => {
                         Priority
                       </label>
                       <select
-                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                        className="w-full p-3 border rounded-lg transition-colors"
                         style={{
                           backgroundColor: 'var(--theme-background)',
                           borderColor: 'var(--theme-border)',
-                          color: 'var(--theme-text)'
+                          color: 'var(--theme-text)',
+                          outline: 'none'
                         }}
+                        onFocus={(e) => e.target.style.borderColor = 'var(--theme-primary)'}
+                        onBlur={(e) => e.target.style.borderColor = 'var(--theme-border)'}
                         value={newTask.priority}
                         onChange={(e) => setNewTask(prev => ({ ...prev, priority: e.target.value }))}
                       >
@@ -749,12 +754,15 @@ const Tasks = () => {
                         Repeat
                       </label>
                       <select
-                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                        className="w-full p-3 border rounded-lg transition-colors"
                         style={{
                           backgroundColor: 'var(--theme-background)',
                           borderColor: 'var(--theme-border)',
-                          color: 'var(--theme-text)'
+                          color: 'var(--theme-text)',
+                          outline: 'none'
                         }}
+                        onFocus={(e) => e.target.style.borderColor = 'var(--theme-primary)'}
+                        onBlur={(e) => e.target.style.borderColor = 'var(--theme-border)'}
                         value={newTask.repeat}
                         onChange={(e) => setNewTask(prev => ({ ...prev, repeat: e.target.value }))}
                       >

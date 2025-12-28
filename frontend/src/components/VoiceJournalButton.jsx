@@ -91,19 +91,27 @@ const VoiceJournalButton = ({ userId, onCallComplete }) => {
 
   const handleCallEnd = async (callId) => {
     setCallState('saving');
+    console.log('📞 Call ended, checking status for:', callId);
     
     try {
+      // Give backend a moment to start processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       // Poll status endpoint to check if transcript has been processed
       let attempts = 0;
-      const maxAttempts = 30; // 30 seconds max
+      const maxAttempts = 45; // 45 seconds max (increased for webhook processing)
 
       statusCheckIntervalRef.current = setInterval(async () => {
         attempts++;
+        console.log(`🔍 Checking status (attempt ${attempts}/${maxAttempts})...`);
         
         try {
           const statusResponse = await journalAPI.getVoiceCallStatus(callId);
+          console.log('📥 Status response received:', JSON.stringify(statusResponse));
           
           if (statusResponse.success && statusResponse.status === 'completed') {
+            console.log('✅ Journal entry completed!', statusResponse.entryId);
+            console.log('🎉 Setting call state to SUCCESS');
             clearInterval(statusCheckIntervalRef.current);
             setCallState('success');
             
@@ -119,10 +127,14 @@ const VoiceJournalButton = ({ userId, onCallComplete }) => {
               }
             }, 3000);
           } else if (attempts >= maxAttempts) {
+            console.warn('⏱️ Timeout waiting for transcript');
             clearInterval(statusCheckIntervalRef.current);
-            throw new Error('Timeout waiting for transcript');
+            throw new Error('Processing is taking longer than expected. Your entry may still be saved - please check your journal in a moment.');
+          } else if (attempts % 10 === 0) {
+            console.log(`⏳ Still waiting... (${attempts}s elapsed)`);
           }
         } catch (err) {
+          console.error('❌ Status check error:', err);
           clearInterval(statusCheckIntervalRef.current);
           throw err;
         }
@@ -131,12 +143,14 @@ const VoiceJournalButton = ({ userId, onCallComplete }) => {
     } catch (err) {
       console.error('❌ Failed to save voice entry:', err);
       setCallState('error');
-      setError('Failed to save voice journal entry');
+      setError(err.message || 'Failed to save voice journal entry');
       
       setTimeout(() => {
         setCallState('idle');
         setError(null);
-      }, 5000);
+        setCallData(null);
+        setCallDuration(0);
+      }, 6000);
     }
   };
 

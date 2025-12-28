@@ -85,6 +85,7 @@ router.post('/', authenticateCaregiver, async (req, res) => {
     const patientName = String(req.body?.patientName || '').trim();
     const age = req.body?.age !== undefined && req.body?.age !== null && req.body?.age !== '' ? Number(req.body.age) : null;
     const neurotype = req.body?.neurotype !== undefined && req.body?.neurotype !== null && req.body?.neurotype !== '' ? String(req.body.neurotype) : null;
+    const gender = req.body?.gender !== undefined && req.body?.gender !== null && req.body?.gender !== '' ? String(req.body.gender) : null;
 
     if (!patientEmail || !patientName) {
       return res.status(400).json({ success: false, message: 'patientName and patientEmail are required' });
@@ -109,7 +110,8 @@ router.post('/', authenticateCaregiver, async (req, res) => {
       patientDetails: {
         name: patientName,
         age: Number.isFinite(age) ? age : null,
-        neurotype: neurotype || null
+        neurotype: neurotype || null,
+        gender: gender || null
       }
     });
 
@@ -538,6 +540,7 @@ router.post('/claim/finalize', async (req, res) => {
           password,
           age: invite.patientDetails.age ?? null,
           neurotype: invite.patientDetails.neurotype ?? null,
+          gender: invite.patientDetails.gender ?? null,
           assignedCaregiver: invite.caregiver
         }
       ],

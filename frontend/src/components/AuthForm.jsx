@@ -63,8 +63,14 @@ const AuthForm = ({
       errors.password = 'Password is required';
     } else if (formData.password.length < 8) {
       errors.password = 'Password must be at least 8 characters';
-    } else if (!/^(?=.*[A-Za-z])(?=.*\d)/.test(formData.password)) {
-      errors.password = 'Password must check contain both letters and numbers';
+    } else if (!/(?=.*[a-z])/.test(formData.password)) {
+      errors.password = 'Password must contain at least one lowercase letter';
+    } else if (!/(?=.*[A-Z])/.test(formData.password)) {
+      errors.password = 'Password must contain at least one uppercase letter';
+    } else if (!/(?=.*\d)/.test(formData.password)) {
+      errors.password = 'Password must contain at least one number';
+    } else if (!/(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/.test(formData.password)) {
+      errors.password = 'Password must contain at least one special character (!@#$%^&*()_+-=[]{};\':"|,.<>/? etc.)';
     }
 
     setFormErrors(errors);
@@ -168,8 +174,11 @@ const AuthForm = ({
       </div>
 
       {isLogin && (
-        <div className="flex justify-end">
-          <Link to="/forgot-password" class="text-sm font-medium text-primary-600 hover:text-primary-500">
+        <div className="flex justify-between">
+          <Link to="/caregiver/login" className="text-sm font-medium text-primary-600 hover:text-primary-500">
+            Caregiver Portal
+          </Link>
+          <Link to="/forgot-password" className="text-sm font-medium text-primary-600 hover:text-primary-500">
             Forgot your password?
           </Link>
         </div>

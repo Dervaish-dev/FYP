@@ -21,7 +21,11 @@ const ThemeSelector = ({ isOpen, onClose }) => {
       onClick={onClose}
     >
       <motion.div
-        className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
+        className="rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto"
+        style={{
+          backgroundColor: 'var(--theme-card)',
+          color: 'var(--theme-text)'
+        }}
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
@@ -29,12 +33,15 @@ const ThemeSelector = ({ isOpen, onClose }) => {
       >
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-2">
-            <Palette className="h-6 w-6 text-gray-600" />
-            <h2 className="text-xl font-bold text-gray-900">Choose Theme</h2>
+            <Palette className="h-6 w-6" style={{ color: 'var(--theme-primary)' }} />
+            <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text)' }}>Choose Theme</h2>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="transition-colors"
+            style={{ color: 'var(--theme-muted-text)' }}
+            onMouseEnter={(e) => e.target.style.color = 'var(--theme-text)'}
+            onMouseLeave={(e) => e.target.style.color = 'var(--theme-muted-text)'}
           >
             ✕
           </button>
@@ -45,11 +52,11 @@ const ThemeSelector = ({ isOpen, onClose }) => {
             <motion.button
               key={key}
               onClick={() => handleThemeChange(key)}
-              className={`relative p-4 rounded-xl border-2 transition-all duration-300 ${
-                currentThemeKey === key
-                  ? 'border-primary-500 shadow-lg'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
+              className="relative p-4 rounded-xl border-2 transition-all duration-300"
+              style={{
+                borderColor: currentThemeKey === key ? 'var(--theme-primary)' : 'var(--theme-border)',
+                backgroundColor: currentThemeKey === key ? 'rgba(var(--primary-rgb), 0.1)' : 'transparent'
+              }}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
@@ -72,8 +79,8 @@ const ThemeSelector = ({ isOpen, onClose }) => {
                   </div>
                   
                   <div>
-                    <h3 className="font-semibold text-gray-900">{theme.name}</h3>
-                    <p className="text-sm text-gray-500">
+                    <h3 className="font-semibold" style={{ color: 'var(--theme-text)' }}>{theme.name}</h3>
+                    <p className="text-sm" style={{ color: 'var(--theme-muted-text)' }}>
                       {key === 'ocean' && 'Fresh and calming'}
                       {key === 'coral' && 'Warm and energetic'}
                       {key === 'midnight' && 'Professional and focused'}
@@ -87,7 +94,8 @@ const ThemeSelector = ({ isOpen, onClose }) => {
 
                 {currentThemeKey === key && (
                   <motion.div
-                    className="flex items-center justify-center w-6 h-6 bg-primary-500 text-white rounded-full"
+                    className="flex items-center justify-center w-6 h-6 rounded-full"
+                    style={{ backgroundColor: 'var(--theme-primary)', color: 'white' }}
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 30 }}
@@ -108,8 +116,8 @@ const ThemeSelector = ({ isOpen, onClose }) => {
           ))}
         </div>
 
-        <div className="mt-6 pt-4 border-t border-gray-200">
-          <p className="text-sm text-gray-500 text-center">
+        <div className="mt-6 pt-4" style={{ borderTop: '1px solid var(--theme-border)' }}>
+          <p className="text-sm text-center" style={{ color: 'var(--theme-muted-text)' }}>
             Themes will be applied instantly across the entire application
           </p>
         </div>

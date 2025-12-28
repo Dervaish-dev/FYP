@@ -50,7 +50,7 @@ export const ThemeProvider = ({ children }) => {
     const isDark = key === 'midnight';
     
     // More comprehensive theme colors
-    let card, text, border, accent, mutedText;
+    let card, text, border, accent, mutedText, mutedBg;
     
     if (isDark) {
       card = background?.medium || '#1e293b';
@@ -58,6 +58,7 @@ export const ThemeProvider = ({ children }) => {
       border = primaryScale?.[700] || '#334155';
       accent = primaryScale?.[400] || '#7dd3fc';
       mutedText = '#cbd5e1';
+      mutedBg = 'rgba(203, 213, 225, 0.1)';
     } else {
       // For light themes: use theme-specific background for card to create visual distinction
       // Card is slightly different from page background to show depth
@@ -66,6 +67,7 @@ export const ThemeProvider = ({ children }) => {
       border = primaryScale?.[200] || '#e5e7eb';
       accent = primaryScale?.[600] || primary;
       mutedText = primaryScale?.[500] || '#6b7280';
+      mutedBg = primaryScale?.[100] || 'rgba(107, 114, 128, 0.1)';
     }
 
     return {
@@ -78,7 +80,8 @@ export const ThemeProvider = ({ children }) => {
         text,
         border,
         accent,
-        mutedText
+        mutedText,
+        mutedBg
       },
       meta: { isDark }
     };
@@ -102,7 +105,10 @@ export const ThemeProvider = ({ children }) => {
         background: '#fef3c7',
         card: '#ffffff',
         text: '#111827',
-        border: '#fde68a'
+        border: '#fde68a',
+        accent: '#f59e0b',
+        mutedText: '#92400e',
+        mutedBg: '#fef3c7'
       }
     },
     'theme-calm': {
@@ -113,7 +119,10 @@ export const ThemeProvider = ({ children }) => {
         background: '#f3f4f6',
         card: '#ffffff',
         text: '#111827',
-        border: '#e5e7eb'
+        border: '#e5e7eb',
+        accent: '#8b5cf6',
+        mutedText: '#6b7280',
+        mutedBg: '#f3f4f6'
       }
     },
     'theme-neutral': {
@@ -124,7 +133,10 @@ export const ThemeProvider = ({ children }) => {
         background: '#f9fafb',
         card: '#ffffff',
         text: '#111827',
-        border: '#e5e7eb'
+        border: '#e5e7eb',
+        accent: '#6b7280',
+        mutedText: '#6b7280',
+        mutedBg: '#f9fafb'
       }
     },
     'theme-balance': {
@@ -135,7 +147,10 @@ export const ThemeProvider = ({ children }) => {
         background: '#f0fdfa',
         card: '#ffffff',
         text: '#111827',
-        border: '#ccfbf1'
+        border: '#ccfbf1',
+        accent: '#0d9488',
+        mutedText: '#115e59',
+        mutedBg: '#f0fdfa'
       }
     }
   };
@@ -177,6 +192,7 @@ export const ThemeProvider = ({ children }) => {
       root.style.setProperty('--theme-border', currentTheme.colors.border);
       root.style.setProperty('--theme-accent', currentTheme.colors.accent);
       root.style.setProperty('--theme-muted-text', currentTheme.colors.mutedText);
+      root.style.setProperty('--theme-muted-bg', currentTheme.colors.mutedBg);
 
       // Back-compat variables used across older dashboard pages
       root.style.setProperty('--card-bg', currentTheme.colors.card);

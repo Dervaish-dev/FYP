@@ -44,6 +44,9 @@ const emotionHistorySchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Compound index for efficient time-based queries with sorting
+emotionHistorySchema.index({ userId: 1, timestamp: -1 });
+
 // Create model
 const EmotionHistory = mongoose.model('EmotionHistory', emotionHistorySchema);
 
@@ -94,12 +97,13 @@ router.get("/history/:userId", async (req, res) => {
     const { userId } = req.params;
     const { limit = 20, offset = 0 } = req.query;
 
-    // Get emotion history for user
+    // Get emotion history for user - use lean() for read-only performance boost
     const emotions = await EmotionHistory
       .find({ userId })
       .sort({ timestamp: -1 })
       .limit(parseInt(limit))
-      .skip(parseInt(offset));
+      .skip(parseInt(offset))
+      .lean();
 
     // Get emotion statistics
     const stats = await EmotionHistory.aggregate([

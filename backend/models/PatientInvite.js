@@ -55,6 +55,11 @@ const patientInviteSchema = new mongoose.Schema(
         type: String,
         enum: ['ADHD', 'Autism', 'Anxiety', 'Dyslexia', 'Other', null],
         default: null
+      },
+      gender: {
+        type: String,
+        enum: ['Male', 'Female', 'Other', 'Prefer not to say', null],
+        default: null
       }
     },
 

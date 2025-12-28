@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNotifications, NOTIFICATION_TYPES } from './NotificationCenter';
+import { useAuth } from '../context/AuthContext';
 
 // Interactive Emoji Mascot Component
 const EmojiMascot = () => {
   const { addNotification } = useNotifications();
+  const { user } = useAuth();
   const [isVisible, setIsVisible] = useState(true);
   const [currentEmoji, setCurrentEmoji] = useState('😊');
   const [isAnimating, setIsAnimating] = useState(false);
@@ -146,6 +148,11 @@ const EmojiMascot = () => {
       setIsAnimating(false);
     }, 1000);
   };
+  
+  // Only show on patient screens (when user is authenticated)
+  if (!user) {
+    return null;
+  }
 
   return (
     <motion.div

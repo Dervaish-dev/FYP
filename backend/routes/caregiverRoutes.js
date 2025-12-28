@@ -454,8 +454,8 @@ router.get('/patients', authenticateCaregiver, noAudit, async (req, res) => {
   try {
     const caregiverId = req.caregiver.id;
 
-    // Find caregiver with populated patients
-    const caregiver = await Caregiver.findById(caregiverId).populate('patients', 'name email createdAt');
+    // Find caregiver with populated patients - use lean() for performance
+    const caregiver = await Caregiver.findById(caregiverId).populate('patients', 'name email createdAt').lean();
     
     if (!caregiver) {
       return res.status(404).json({
@@ -464,73 +464,96 @@ router.get('/patients', authenticateCaregiver, noAudit, async (req, res) => {
       });
     }
 
-    // Get detailed data for each patient
-    const patientDetails = await Promise.all(
-      caregiver.patients.map(async (patient) => {
-        try {
-          // Since we're using wellness routes, let's fetch from a generic collection
-          // We'll need to check what collections exist
-          const db = mongoose.connection.db;
-          
-          // Get emotions from emotionhistories collection (matches EmotionHistory model)
-          const emotionsCollection = db.collection('emotionhistories');
-          const emotions = await emotionsCollection
-            .find({ userId: patient._id.toString() })
-            .sort({ timestamp: -1 })
-            .limit(30)
-            .toArray();
+    // Extract patient IDs as strings
+    const patientIds = caregiver.patients.map(p => p._id.toString());
 
-          // Get tasks
-          const tasksCollection = db.collection('tasks');
-          const tasks = await tasksCollection
-            .find({ userId: patient._id.toString() })
-            .toArray();
+    // Batch fetch all data in parallel - eliminates N+1 queries
+    const db = mongoose.connection.db;
+    
+    const [emotionsData, tasksData, journalsData, wellnessData] = await Promise.all([
+      db.collection('emotionhistories')
+        .find({ userId: { $in: patientIds } })
+        .sort({ timestamp: -1 })
+        .toArray(),
+      
+      db.collection('tasks')
+        .find({ userId: { $in: patientIds } })
+        .toArray(),
+      
+      db.collection('journalentries')
+        .find({ userId: { $in: patientIds } })
+        .sort({ createdAt: -1 })
+        .toArray(),
+      
+      db.collection('wellness')
+        .find({ userId: { $in: patientIds } })
+        .sort({ date: -1 })
+        .toArray()
+    ]);
 
-          // Get journals
-          const journalsCollection = db.collection('journalentries');
-          const journals = await journalsCollection
-            .find({ userId: patient._id.toString() })
-            .sort({ createdAt: -1 })
-            .limit(10)
-            .toArray();
+    // Group data by userId for O(1) lookup
+    const emotionsByUser = {};
+    const tasksByUser = {};
+    const journalsByUser = {};
+    const wellnessByUser = {};
 
-          // Get wellness data
-          const wellnessCollection = db.collection('wellness');
-          const wellness = await wellnessCollection
-            .find({ userId: patient._id.toString() })
-            .sort({ date: -1 })
-            .limit(30)
-            .toArray();
+    emotionsData.forEach(e => {
+      if (!emotionsByUser[e.userId]) emotionsByUser[e.userId] = [];
+      if (emotionsByUser[e.userId].length < 30) emotionsByUser[e.userId].push(e);
+    });
 
-          const completedTasks = tasks.filter(t => t.status === 'done').length;
-          const moodTrend = calculateMoodTrend(emotions);
-          const wellnessScore = calculateWellnessScore(emotions, tasks, journals, wellness);
+    tasksData.forEach(t => {
+      if (!tasksByUser[t.userId]) tasksByUser[t.userId] = [];
+      tasksByUser[t.userId].push(t);
+    });
 
-          return {
-            id: patient._id,
-            name: patient.name,
-            email: patient.email,
-            joinedDate: patient.createdAt,
-            lastActive: emotions[0]?.timestamp || patient.createdAt || 'N/A',
-            moodTrend,
-            tasksCompleted: completedTasks,
-            totalTasks: tasks.length,
-            wellnessScore,
-            recentEmotions: emotions.slice(0, 7),
-            journalCount: journals.length,
-            activityLevel: emotions.length > 10 ? 'active' : emotions.length > 5 ? 'moderate' : 'low'
-          };
-        } catch (error) {
-          console.error(`Error fetching data for patient ${patient._id}:`, error);
-          return {
-            id: patient._id,
-            name: patient.name,
-            email: patient.email,
-            error: 'Failed to load patient data'
-          };
-        }
-      })
-    );
+    journalsData.forEach(j => {
+      if (!journalsByUser[j.userId]) journalsByUser[j.userId] = [];
+      if (journalsByUser[j.userId].length < 10) journalsByUser[j.userId].push(j);
+    });
+
+    wellnessData.forEach(w => {
+      if (!wellnessByUser[w.userId]) wellnessByUser[w.userId] = [];
+      if (wellnessByUser[w.userId].length < 30) wellnessByUser[w.userId].push(w);
+    });
+
+    // Build patient details - O(n) instead of O(n²)
+    const patientDetails = caregiver.patients.map(patient => {
+      try {
+        const patientId = patient._id.toString();
+        const emotions = emotionsByUser[patientId] || [];
+        const tasks = tasksByUser[patientId] || [];
+        const journals = journalsByUser[patientId] || [];
+        const wellness = wellnessByUser[patientId] || [];
+
+        const completedTasks = tasks.filter(t => t.status === 'done').length;
+        const moodTrend = calculateMoodTrend(emotions);
+        const wellnessScore = calculateWellnessScore(emotions, tasks, journals, wellness);
+
+        return {
+          id: patient._id,
+          name: patient.name,
+          email: patient.email,
+          joinedDate: patient.createdAt,
+          lastActive: emotions[0]?.timestamp || patient.createdAt || 'N/A',
+          moodTrend,
+          tasksCompleted: completedTasks,
+          totalTasks: tasks.length,
+          wellnessScore,
+          recentEmotions: emotions.slice(0, 7),
+          journalCount: journals.length,
+          activityLevel: emotions.length > 10 ? 'active' : emotions.length > 5 ? 'moderate' : 'low'
+        };
+      } catch (error) {
+        console.error(`Error processing data for patient ${patient._id}:`, error);
+        return {
+          id: patient._id,
+          name: patient.name,
+          email: patient.email,
+          error: 'Failed to load patient data'
+        };
+      }
+    });
 
     res.json({
       success: true,
@@ -562,8 +585,8 @@ router.get('/patient/:patientId', authenticateCaregiver, noAudit, async (req, re
       });
     }
 
-    // Get patient details
-    const patient = await User.findById(patientId).select('-password');
+    // Get patient details - use lean() for performance
+    const patient = await User.findById(patientId).select('-password').lean();
     if (!patient) {
       return res.status(404).json({
         success: false,

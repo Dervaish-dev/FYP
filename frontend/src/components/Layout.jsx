@@ -145,7 +145,7 @@ const Layout = ({ children }) => {
       </motion.header>
 
       {/* Main Content */}
-      <main className="flex-1 pb-6">
+      <main className="flex-1 pb-32">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

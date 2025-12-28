@@ -82,7 +82,7 @@ export async function handleCallCompleted(req, res) {
     // Process journal creation after 3-second delay (non-blocking)
     setTimeout(async () => {
       try {
-        await createJournalFromCall(callReport._id);
+        await createJournalFromCallReport(callReport._id);
       } catch (error) {
         console.error('❌ Background journal creation failed:', error);
       }
@@ -100,9 +100,9 @@ export async function handleCallCompleted(req, res) {
 
 /**
  * Create journal entry from call report
- * Called after delay from webhook
+ * Called after delay from webhook OR on-demand from status check
  */
-async function createJournalFromCall(callReportId) {
+export async function createJournalFromCallReport(callReportId) {
   try {
     console.log('📝 Starting journal creation for call:', callReportId);
     
@@ -209,7 +209,7 @@ export async function processLatestCall(req, res) {
     console.log(`✅ Found latest call: ${latestCall.call_id}`);
     
     // Process immediately (no delay)
-    const journal = await createJournalFromCall(latestCall._id);
+    const journal = await createJournalFromCallReport(latestCall._id);
     
     console.log(`✅ Journal created: ${journal._id}`);
     
@@ -260,7 +260,7 @@ export async function processPendingCalls(req, res) {
     const results = [];
     for (const call of pendingCalls) {
       try {
-        const journal = await createJournalFromCall(call._id);
+        const journal = await createJournalFromCallReport(call._id);
         results.push({
           call_id: call.call_id,
           journal_id: journal._id,

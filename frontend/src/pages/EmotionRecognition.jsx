@@ -250,9 +250,9 @@ const EmotionRecognition = () => {
               <div className="flex items-center justify-between mb-6">
                 <h3 style={{ color: 'var(--theme-text)' }} className="text-lg font-semibold">Emotion Analysis</h3>
                 <div className="flex space-x-2">
-                  <button className="px-3 py-1 text-sm bg-gray-100 text-gray-600 rounded-lg">DAILY</button>
-                  <button className="px-3 py-1 text-sm bg-pink-100 text-pink-800 rounded-lg font-medium">WEEKLY</button>
-                  <button className="px-3 py-1 text-sm bg-gray-100 text-gray-600 rounded-lg">MONTHLY</button>
+                  <button className="px-3 py-1 text-sm rounded-lg" style={{ backgroundColor: 'var(--theme-muted-bg)', color: 'var(--theme-text)' }}>DAILY</button>
+                  <button className="px-3 py-1 text-sm rounded-lg" style={{ backgroundColor: 'var(--theme-primary)', color: 'white' }}>WEEKLY</button>
+                  <button className="px-3 py-1 text-sm rounded-lg" style={{ backgroundColor: 'var(--theme-muted-bg)', color: 'var(--theme-text)' }}>MONTHLY</button>
                 </div>
               </div>
               
@@ -265,7 +265,7 @@ const EmotionRecognition = () => {
                     animate={{ opacity: 1, scaleY: 1 }}
                     transition={{ duration: 0.5, delay: index * 0.1 }}
                   >
-                    <div className="text-xs text-gray-500">{day.happy}%</div>
+                    <div className="text-xs" style={{ color: 'var(--theme-muted-text)' }}>{day.happy}%</div>
                     <div className="flex flex-col space-y-1">
                       <div
                         className="w-6 bg-yellow-500 rounded-t"
@@ -300,7 +300,7 @@ const EmotionRecognition = () => {
                         title={`Sad: ${day.sad}%`}
                       />
                     </div>
-                    <div className="text-xs font-medium text-gray-700">{day.day}</div>
+                    <div className="text-xs font-medium" style={{ color: 'var(--theme-text)' }}>{day.day}</div>
                   </motion.div>
                 ))}
               </div>
@@ -308,19 +308,19 @@ const EmotionRecognition = () => {
               <div className="mt-4 flex justify-center space-x-4">
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-yellow-500 rounded-full" />
-                  <span className="text-xs text-gray-600">Happy</span>
+                  <span className="text-xs" style={{ color: 'var(--theme-text)' }}>Happy</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full" />
-                  <span className="text-xs text-gray-600">Calm</span>
+                  <div className="w-3 h-3 bg-purple-400 rounded-full" />
+                  <span className="text-xs" style={{ color: 'var(--theme-text)' }}>Calm</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-red-500 rounded-full" />
-                  <span className="text-xs text-gray-600">Stressed</span>
+                  <span className="text-xs" style={{ color: 'var(--theme-text)' }}>Stressed</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-gray-500 rounded-full" />
-                  <span className="text-xs text-gray-600">Sad</span>
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--theme-muted-text)' }} />
+                  <span className="text-xs" style={{ color: 'var(--theme-text)' }}>Sad</span>
                 </div>
               </div>
             </div>
@@ -328,23 +328,23 @@ const EmotionRecognition = () => {
 
           {/* Emotion Insights */}
           <motion.div variants={itemVariants}>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">AI Emotion Insights</h2>
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <h2 className="text-2xl font-bold mb-6" style={{ color: 'var(--theme-text)' }}>AI Emotion Insights</h2>
+            <div className="rounded-2xl p-6 shadow-lg border" style={{ backgroundColor: 'var(--theme-card)', borderColor: 'var(--theme-border)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">EMOTION ANALYSIS</h3>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--theme-text)' }}>EMOTION ANALYSIS</h3>
                 <div className="px-3 py-1 bg-pink-100 text-pink-800 rounded-full text-sm font-medium">
                   3 New Insights
                 </div>
               </div>
               
               <div className="space-y-4">
-                <div className="p-4 bg-green-50 rounded-xl">
+                <div className="p-4 rounded-xl" style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)' }}>
                   <div className="flex items-start space-x-3">
-                    <div className="h-8 w-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <div className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)' }}>
                       <Smile className="h-4 w-4 text-green-600" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-700">
+                      <p className="text-sm" style={{ color: 'var(--theme-text)' }}>
                         <span className="font-medium">Positive Trend:</span> Your happiness levels have increased by 15% this week. 
                         Your morning routine seems to be working well!
                       </p>
@@ -352,13 +352,13 @@ const EmotionRecognition = () => {
                   </div>
                 </div>
                 
-                <div className="p-4 bg-blue-50 rounded-xl">
+                <div className="p-4 rounded-xl" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)' }}>
                   <div className="flex items-start space-x-3">
-                    <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <div className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)' }}>
                       <Brain className="h-4 w-4 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-700">
+                      <p className="text-sm" style={{ color: 'var(--theme-text)' }}>
                         <span className="font-medium">Calm State:</span> Your meditation sessions are showing great results. 
                         Stress levels are consistently low.
                       </p>
@@ -366,13 +366,13 @@ const EmotionRecognition = () => {
                   </div>
                 </div>
                 
-                <div className="p-4 bg-yellow-50 rounded-xl">
+                <div className="p-4 rounded-xl" style={{ backgroundColor: 'rgba(251, 191, 36, 0.1)' }}>
                   <div className="flex items-start space-x-3">
-                    <div className="h-8 w-8 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <div className="h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(251, 191, 36, 0.2)' }}>
                       <TrendingUp className="h-4 w-4 text-yellow-600" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-700">
+                      <p className="text-sm" style={{ color: 'var(--theme-text)' }}>
                         <span className="font-medium">Recommendation:</span> Consider adding 5 minutes of gratitude journaling 
                         to maintain your positive emotional state.
                       </p>

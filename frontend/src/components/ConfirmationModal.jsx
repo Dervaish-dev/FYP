@@ -50,7 +50,8 @@ const ConfirmationModal = ({
             transition={{ duration: 0.2 }}
           >
             <motion.div
-              className="bg-white rounded-2xl shadow-2xl max-w-md w-full"
+              className="rounded-2xl shadow-2xl max-w-md w-full"
+              style={{ backgroundColor: 'var(--theme-card)' }}
               initial={{ y: 20 }}
               animate={{ y: 0 }}
               onClick={(e) => e.stopPropagation()}
@@ -66,12 +67,15 @@ const ConfirmationModal = ({
                 >
                   <Icon className="w-6 h-6" style={{ color }} />
                 </div>
-                <h2 className="text-lg font-bold text-gray-900 flex-1">
+                <h2 className="text-lg font-bold flex-1" style={{ color: 'var(--theme-text)' }}>
                   {title}
                 </h2>
                 <button
                   onClick={onCancel}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="transition-colors"
+                  style={{ color: 'var(--theme-muted-text)' }}
+                  onMouseEnter={(e) => e.target.style.color = 'var(--theme-text)'}
+                  onMouseLeave={(e) => e.target.style.color = 'var(--theme-muted-text)'}
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -79,16 +83,22 @@ const ConfirmationModal = ({
 
               {/* Message */}
               <div className="px-6 py-4">
-                <p className="text-gray-600 text-sm leading-relaxed">
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--theme-muted-text)' }}>
                   {message}
                 </p>
               </div>
 
               {/* Action buttons */}
-              <div className="px-6 py-4 bg-gray-50 rounded-b-2xl flex gap-3 justify-end">
+              <div className="px-6 py-4 rounded-b-2xl flex gap-3 justify-end" style={{ backgroundColor: 'var(--theme-background)' }}>
                 <button
                   onClick={onCancel}
-                  className="px-4 py-2 rounded-lg text-gray-700 font-medium hover:bg-gray-200 transition-colors"
+                  className="px-4 py-2 rounded-lg font-medium transition-colors"
+                  style={{ 
+                    color: 'var(--theme-text)',
+                    backgroundColor: 'transparent'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--theme-muted-bg)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                 >
                   {cancelText}
                 </button>

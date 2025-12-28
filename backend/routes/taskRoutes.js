@@ -102,6 +102,10 @@ const taskSchema = new mongoose.Schema({
   }
 });
 
+// Compound index for efficient time-based queries with sorting
+taskSchema.index({ userId: 1, dueTime: 1 });
+taskSchema.index({ userId: 1, status: 1 });
+
 // Update the updatedAt field before saving
 taskSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
@@ -176,10 +180,11 @@ router.get("/:userId", async (req, res) => {
     if (status) query.status = status;
     if (priority) query.priority = priority;
 
-    // Get tasks
+    // Get tasks - use lean() for read-only performance boost
     const tasks = await Task
       .find(query)
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     // Group tasks by status
     const groupedTasks = {

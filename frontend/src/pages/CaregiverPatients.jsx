@@ -31,7 +31,8 @@ const CaregiverPatients = () => {
     patientName: '',
     patientEmail: '',
     age: '',
-    neurotype: ''
+    neurotype: '',
+    gender: ''
   });
   const [inviteCreateLoading, setInviteCreateLoading] = useState(false);
   const [inviteCreateError, setInviteCreateError] = useState('');
@@ -138,6 +139,7 @@ const CaregiverPatients = () => {
     const patientEmail = String(inviteForm.patientEmail || '').trim().toLowerCase();
     const age = inviteForm.age === '' ? null : Number(inviteForm.age);
     const neurotype = String(inviteForm.neurotype || '').trim();
+    const gender = String(inviteForm.gender || '').trim();
 
     if (!patientName || !patientEmail) {
       setInviteCreateError('Patient name and email are required');
@@ -158,7 +160,8 @@ const CaregiverPatients = () => {
           patientName,
           patientEmail,
           age: Number.isFinite(age) ? age : null,
-          neurotype: neurotype || null
+          neurotype: neurotype || null,
+          gender: gender || null
         })
       });
 
@@ -355,6 +358,22 @@ const CaregiverPatients = () => {
                       <option value="Anxiety">Anxiety</option>
                       <option value="Dyslexia">Dyslexia</option>
                       <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>Gender (optional)</label>
+                    <select
+                      value={inviteForm.gender}
+                      onChange={(e) => setInviteForm((p) => ({ ...p, gender: e.target.value }))}
+                      className="w-full px-4 py-2 rounded-lg border"
+                      style={{ backgroundColor: 'var(--theme-background)', borderColor: 'var(--border-color)', color: 'var(--text-color)', outline: 'none' }}
+                    >
+                      <option value="">Select…</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                      <option value="Prefer not to say">Prefer not to say</option>
                     </select>
                   </div>
 

@@ -59,6 +59,7 @@ const Settings = () => {
   const [notifications, setNotifications] = useState(getNotificationsEnabled());
   const [loading, setLoading] = useState(false);
   const [logoutConfirmModal, setLogoutConfirmModal] = useState(false);
+  const [twoFactorConfirmModal, setTwoFactorConfirmModal] = useState(false);
   const [prefs, setPrefs] = useState({
     fullName: user?.name || '',
     age: '',
@@ -112,11 +113,27 @@ const Settings = () => {
   };
 
   const handleToggle2FA = async () => {
+    // If 2FA is currently enabled, disable it directly
+    if (user?.twoFactorEnabled) {
+      try {
+        const data = await toggle2FA();
+        toast.success(`Two-factor authentication ${data.twoFactorEnabled ? 'enabled' : 'disabled'}`);
+      } catch (error) {
+        toast.error('Failed to toggle 2FA');
+      }
+    } else {
+      // If 2FA is currently disabled, show confirmation modal before enabling
+      setTwoFactorConfirmModal(true);
+    }
+  };
+
+  const confirm2FAEnable = async () => {
+    setTwoFactorConfirmModal(false);
     try {
       const data = await toggle2FA();
       toast.success(`Two-factor authentication ${data.twoFactorEnabled ? 'enabled' : 'disabled'}`);
     } catch (error) {
-      toast.error('Failed to toggle 2FA');
+      toast.error('Failed to enable 2FA');
     }
   };
 
@@ -146,8 +163,12 @@ const Settings = () => {
                 type="text"
                 value={user?.name || ''}
                 disabled
-                className="w-full p-3 rounded-xl border bg-gray-50 opacity-70 cursor-not-allowed"
-                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
+                className="w-full p-3 rounded-xl border opacity-70 cursor-not-allowed"
+                style={{ 
+                  borderColor: 'var(--theme-border)', 
+                  backgroundColor: 'var(--theme-muted-bg)',
+                  color: 'var(--theme-text)' 
+                }}
               />
             </div>
             <div>
@@ -156,8 +177,12 @@ const Settings = () => {
                 type="email"
                 value={user?.email || ''}
                 disabled
-                className="w-full p-3 rounded-xl border bg-gray-50 opacity-70 cursor-not-allowed"
-                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
+                className="w-full p-3 rounded-xl border opacity-70 cursor-not-allowed"
+                style={{ 
+                  borderColor: 'var(--theme-border)', 
+                  backgroundColor: 'var(--theme-muted-bg)',
+                  color: 'var(--theme-text)' 
+                }}
               />
             </div>
             <div>
@@ -166,8 +191,12 @@ const Settings = () => {
                 type="number"
                 value={prefs.age || ''}
                 disabled
-                className="w-full p-3 rounded-xl border bg-gray-50 opacity-70 cursor-not-allowed"
-                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
+                className="w-full p-3 rounded-xl border opacity-70 cursor-not-allowed"
+                style={{ 
+                  borderColor: 'var(--theme-border)', 
+                  backgroundColor: 'var(--theme-muted-bg)',
+                  color: 'var(--theme-text)' 
+                }}
               />
             </div>
             <div>
@@ -176,8 +205,12 @@ const Settings = () => {
                 type="text"
                 value={prefs.neurotype || ''}
                 disabled
-                className="w-full p-3 rounded-xl border bg-gray-50 opacity-70 cursor-not-allowed"
-                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
+                className="w-full p-3 rounded-xl border opacity-70 cursor-not-allowed"
+                style={{ 
+                  borderColor: 'var(--theme-border)', 
+                  backgroundColor: 'var(--theme-muted-bg)',
+                  color: 'var(--theme-text)' 
+                }}
               />
             </div>
           </div>
@@ -193,8 +226,14 @@ const Settings = () => {
               </div>
               <button 
                 onClick={() => navigate('/forgot-password')}
-                className="px-4 py-2 text-sm font-medium rounded-lg border hover:bg-gray-50 transition-colors" 
-                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}
+                className="px-4 py-2 text-sm font-medium rounded-lg border transition-colors" 
+                style={{ 
+                  borderColor: 'var(--theme-border)', 
+                  color: 'var(--theme-text)',
+                  backgroundColor: 'transparent'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--theme-muted-bg)'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
               >
                 Reset Password
               </button>
@@ -206,14 +245,18 @@ const Settings = () => {
               </div>
               <button
                 onClick={handleToggle2FA}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                  user?.twoFactorEnabled ? 'bg-green-500' : 'bg-gray-300'
-                }`}
+                className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
+                style={{
+                  backgroundColor: user?.twoFactorEnabled ? '#10b981' : 'var(--theme-border)',
+                  '--tw-ring-color': 'var(--theme-primary)'
+                }}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    user?.twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
+                  className="inline-block h-4 w-4 transform rounded-full transition-transform"
+                  style={{
+                    backgroundColor: 'var(--theme-card)',
+                    transform: user?.twoFactorEnabled ? 'translateX(1.5rem)' : 'translateX(0.25rem)'
+                  }}
                 />
               </button>
             </div>
@@ -362,6 +405,18 @@ const Settings = () => {
         onConfirm={confirmLogout}
         onCancel={() => setLogoutConfirmModal(false)}
         type="warning"
+        isDangerous={false}
+      />
+
+      <ConfirmationModal
+        isOpen={twoFactorConfirmModal}
+        title="Enable Two-Factor Authentication"
+        message="When you enable 2FA, you'll need to enter a verification code sent to your email every time you log in. This adds an extra layer of security to protect your account. Do you want to continue?"
+        confirmText="Enable 2FA"
+        cancelText="Cancel"
+        onConfirm={confirm2FAEnable}
+        onCancel={() => setTwoFactorConfirmModal(false)}
+        type="info"
         isDangerous={false}
       />
     </div>

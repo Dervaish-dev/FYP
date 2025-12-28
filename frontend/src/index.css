@@ -71,10 +71,47 @@
     transition: all 0.2s;
   }
   
+  .input-field::placeholder {
+    color: var(--theme-muted-text, #9ca3af);
+    opacity: 0.7;
+  }
+  
   .input-field:focus {
     outline: none;
     border-color: var(--theme-primary, #3b82f6);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  /* Textarea styling */
+  textarea {
+    color: var(--theme-text, #111827);
+  }
+  
+  textarea::placeholder {
+    color: var(--theme-muted-text, #9ca3af);
+    opacity: 0.7;
+  }
+  
+  /* Select dropdown styling */
+  select {
+    background-color: var(--theme-background, #f8fafc);
+    color: var(--theme-text, #111827);
+    border-color: var(--theme-border, #d1d5db);
+  }
+  
+  select option {
+    background-color: var(--theme-card, #ffffff);
+    color: var(--theme-text, #111827);
+  }
+  
+  /* Input disabled state */
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    background-color: var(--theme-muted-bg, rgba(107, 114, 128, 0.1));
+    color: var(--theme-muted-text, #6b7280);
+    opacity: 0.7;
+    cursor: not-allowed;
   }
   
   .card {
@@ -83,5 +120,32 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     border: 1px solid var(--theme-border, #e5e7eb);
     transition: all 0.3s ease;
+  }
+  
+  /* Modal and overlay styling */
+  .modal-overlay {
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+  }
+  
+  .modal-content {
+    background-color: var(--theme-card, #ffffff);
+    color: var(--theme-text, #111827);
+    border-color: var(--theme-border, #e5e7eb);
+  }
+  
+  /* Progress bar */
+  .progress-bar-bg {
+    background-color: var(--theme-border, #e5e7eb);
+  }
+  
+  .progress-bar-fill {
+    background-color: var(--theme-primary, #3b82f6);
+  }
+  
+  /* Focus rings should use theme color */
+  *:focus-visible {
+    outline: 2px solid var(--theme-primary, #3b82f6);
+    outline-offset: 2px;
   }
 }

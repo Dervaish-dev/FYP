@@ -737,6 +737,17 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
         ? dayEntries.reduce((sum, entry) => {
           // If mood is already a number (from DB), use it. otherwise map emotion string to score.
           if (typeof entry.mood === 'number') return sum + entry.mood;
+          
+          // For voice entries, mood might be a string like 'happy', 'sad', etc.
+          if (typeof entry.mood === 'string') {
+            const moodScores = {
+              happy: 5, excited: 5, grateful: 5, hopeful: 5, peaceful: 5, content: 5, optimistic: 5,
+              calm: 4, neutral: 3,
+              sad: 2, anxious: 2, worried: 2, confused: 2, lonely: 2, nervous: 2, pessimistic: 2,
+              angry: 1, stressed: 1, depressed: 1, frustrated: 1, overwhelmed: 1
+            };
+            return sum + (moodScores[entry.mood.toLowerCase()] || 3);
+          }
 
           const moodScores = {
             happy: 5, excited: 5, grateful: 5, hopeful: 5, peaceful: 5, content: 5, optimistic: 5,
@@ -1278,9 +1289,11 @@ Respond in ${userLanguage} language only. Be warm and supportive.`;
                         <span className={`font-medium ${getMoodColor(entry.emotion || 'neutral')}`}>
                           {(entry.emotion || 'neutral').charAt(0).toUpperCase() + (entry.emotion || 'neutral').slice(1)}
                         </span>
-                        <span className="text-xs opacity-50">
-                          ({(entry.emotionConfidence * 100).toFixed(0)}% confidence)
-                        </span>
+                        {entry.emotionConfidence !== undefined && entry.emotionConfidence !== null && (
+                          <span className="text-xs opacity-50">
+                            ({(entry.emotionConfidence * 100).toFixed(0)}% confidence)
+                          </span>
+                        )}
                       </div>
                     </div>
                   </motion.div>
