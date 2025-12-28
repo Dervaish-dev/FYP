@@ -1,6 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { InferenceClient } from '@huggingface/inference';
 import dotenv from 'dotenv';
 import CallReport from '../models/CallReport.js';
 
@@ -42,11 +43,127 @@ const genAI = new GoogleGenerativeAI(API_KEY);
 // Use gemini-2.0-flash - latest, stable, lowest tier
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
+// Initialize Hugging Face Inference Client
+const HF_TOKEN = process.env.HF_TOKEN || '';
+console.log('🤗 Hugging Face Token configured:', HF_TOKEN ? '✅ YES' : '❌ NO');
+const hfClient = HF_TOKEN ? new InferenceClient(HF_TOKEN) : null;
+
+// Helper function to analyze emotion with Hugging Face
+async function analyzeEmotionWithHF(content) {
+  if (!hfClient) {
+    console.log('⚠️ HF client not configured, skipping HF analysis');
+    return null;
+  }
+
+  try {
+    console.log('🤗 Analyzing emotion with Hugging Face...');
+    const output = await hfClient.textClassification({
+      model: "j-hartmann/emotion-english-distilroberta-base",
+      inputs: content.substring(0, 512), // Model has 512 token limit
+    });
+
+    console.log('✅ HF emotion results:', output);
+
+    // output is array like: [{ label: 'joy', score: 0.9845 }, ...]
+    if (output && output.length > 0) {
+      const topEmotion = output[0];
+      
+      // Map HF emotions to our system
+      const emotionMap = {
+        'joy': { mood: 'happy', sentiment: 'positive', intensity: 8 },
+        'sadness': { mood: 'sad', sentiment: 'negative', intensity: 7 },
+        'anger': { mood: 'angry', sentiment: 'negative', intensity: 9 },
+        'fear': { mood: 'anxious', sentiment: 'negative', intensity: 8 },
+        'surprise': { mood: 'excited', sentiment: 'positive', intensity: 7 },
+        'disgust': { mood: 'angry', sentiment: 'negative', intensity: 6 },
+        'neutral': { mood: 'neutral', sentiment: 'neutral', intensity: 5 }
+      };
+
+      const mapped = emotionMap[topEmotion.label] || emotionMap['neutral'];
+      
+      return {
+        emotion: topEmotion.label,
+        confidence: topEmotion.score,
+        mood: mapped.mood,
+        sentiment: mapped.sentiment,
+        emotionalIntensity: mapped.intensity,
+        sentimentConfidence: topEmotion.score
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('❌ HF emotion analysis error:', error.message);
+    return null;
+  }
+}
+
 // Helper function to analyze journal entry with AI - SINGLE REQUEST ONLY
 async function analyzeEntryWithAI(content) {
   try {
     console.log('🤖 Starting AI emotion analysis...');
     console.log('📝 Content length:', content.length, 'characters');
+
+    // Try Hugging Face first (faster, more reliable for emotions)
+    const hfResult = await analyzeEmotionWithHF(content);
+    if (hfResult) {
+      console.log('✅ Using HF emotion analysis');
+      
+      // Use Gemini only for topics, keywords, summary
+      try {
+        const geminiPrompt = `Analyze this journal entry and provide analysis.
+
+Journal Entry: "${content}"
+
+Return ONLY this JSON (no other text):
+{
+  "topics": ["topic1", "topic2"],
+  "keywords": ["keyword1", "keyword2"],
+  "summary": "Brief summary",
+  "stressLevel": "low" | "medium" | "high",
+  "stressScore": 0-10
+}`;
+
+        const result = await model.generateContent(geminiPrompt);
+        const response = await result.response;
+        const text = response.text();
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        
+        if (jsonMatch) {
+          const geminiData = JSON.parse(jsonMatch[0]);
+          
+          // Combine HF emotion + Gemini context
+          return {
+            sentiment: hfResult.sentiment,
+            sentimentConfidence: hfResult.confidence,
+            mood: hfResult.mood,
+            stressLevel: geminiData.stressLevel || 'medium',
+            stressScore: geminiData.stressScore || 5,
+            emotionalIntensity: hfResult.emotionalIntensity,
+            topics: geminiData.topics || [],
+            keywords: geminiData.keywords || [],
+            summary: geminiData.summary || ''
+          };
+        }
+      } catch (geminiError) {
+        console.log('⚠️ Gemini failed, using HF emotion with defaults');
+      }
+      
+      // If Gemini fails, return HF emotion with defaults
+      return {
+        sentiment: hfResult.sentiment,
+        sentimentConfidence: hfResult.confidence,
+        mood: hfResult.mood,
+        stressLevel: 'medium',
+        stressScore: 5,
+        emotionalIntensity: hfResult.emotionalIntensity,
+        topics: [],
+        keywords: [],
+        summary: ''
+      };
+    }
+
+    // Fallback to full Gemini analysis if HF unavailable
 
     const prompt = `Analyze this journal entry and provide emotional analysis.
 
