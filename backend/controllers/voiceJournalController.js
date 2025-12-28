@@ -1,6 +1,62 @@
 import mongoose from 'mongoose';
 import CallReport from '../models/CallReport.js';
 import { convertTranscriptToJournal } from '../utils/journalConverter.js';
+import { InferenceClient } from '@huggingface/inference';
+
+// Initialize HuggingFace client
+const hfClient = (process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN)
+  ? new InferenceClient(process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN)
+  : null;
+
+// Helper function to analyze emotion with HuggingFace
+async function analyzeEmotionWithHF(content) {
+  if (!hfClient) {
+    console.log('⚠️ HF client not configured, skipping HF analysis');
+    return null;
+  }
+
+  try {
+    console.log('🤗 Analyzing emotion with Hugging Face...');
+    const output = await hfClient.textClassification({
+      model: "j-hartmann/emotion-english-distilroberta-base",
+      inputs: content.substring(0, 512), // Model has 512 token limit
+    });
+
+    console.log('✅ HF emotion results:', output);
+
+    if (output && output.length > 0) {
+      const topEmotion = output[0];
+      
+      // Map HF emotions to our system
+      const emotionMap = {
+        'joy': { mood: 'happy', sentiment: 'positive', intensity: 8, stress: 'low' },
+        'sadness': { mood: 'sad', sentiment: 'negative', intensity: 7, stress: 'medium' },
+        'anger': { mood: 'angry', sentiment: 'negative', intensity: 9, stress: 'high' },
+        'fear': { mood: 'anxious', sentiment: 'negative', intensity: 8, stress: 'high' },
+        'surprise': { mood: 'excited', sentiment: 'positive', intensity: 7, stress: 'medium' },
+        'disgust': { mood: 'angry', sentiment: 'negative', intensity: 6, stress: 'medium' },
+        'neutral': { mood: 'neutral', sentiment: 'neutral', intensity: 5, stress: 'medium' }
+      };
+
+      const mapped = emotionMap[topEmotion.label] || emotionMap['neutral'];
+      
+      return {
+        emotion: topEmotion.label,
+        confidence: topEmotion.score,
+        mood: mapped.mood,
+        sentiment: mapped.sentiment,
+        emotionalIntensity: mapped.intensity,
+        stressLevel: mapped.stress,
+        sentimentConfidence: topEmotion.score
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('❌ HF emotion analysis error:', error.message);
+    return null;
+  }
+}
 
 // Define Journal schema inline (or import if separate file)
 const journalSchema = new mongoose.Schema({
@@ -116,16 +172,28 @@ export async function createJournalFromCallReport(callReportId) {
       return;
     }
     
-    // Convert transcript to journal format with AI
-    console.log('🤖 Converting transcript to journal...');
-    const { content, emotion } = await convertTranscriptToJournal(
-      callReport.transcript,
-      callReport.summary
-    );
+    // Use the summary from call report directly (skip Gemini processing)
+    console.log('📝 Using call report summary directly');
+    console.log('📝 Summary length:', callReport.summary?.length || 0);
     
-    console.log('✅ Conversion complete');
-    console.log('📝 Journal content length:', content.length);
-    console.log('😊 Detected emotion:', emotion.mood);
+    // Use HuggingFace emotion detection on summary
+    let mood = 'neutral';
+    let sentiment = 'neutral';
+    let stressLevel = 'medium';
+    let emotionalIntensity = 5;
+    let sentimentConfidence = 0.5;
+    
+    const hfResult = await analyzeEmotionWithHF(callReport.summary || '');
+    if (hfResult) {
+      mood = hfResult.mood;
+      sentiment = hfResult.sentiment;
+      emotionalIntensity = hfResult.emotionalIntensity;
+      stressLevel = hfResult.stressLevel;
+      sentimentConfidence = hfResult.sentimentConfidence;
+      console.log('😊 Detected emotion:', mood, 'with confidence:', sentimentConfidence);
+    } else {
+      console.log('⚠️ Using neutral emotion fallback');
+    }
     
     // Create journal entry
     const journalDate = new Date(callReport.created_at);
@@ -140,16 +208,16 @@ export async function createJournalFromCallReport(callReportId) {
     const journal = await Journal.create({
       userId: new mongoose.Types.ObjectId(callReport.user_id),
       title,
-      content,
+      content: callReport.summary, // Use summary as content
       summary: callReport.summary,
-      mood: emotion.mood,
-      sentiment: emotion.sentiment,
-      sentimentConfidence: 0.85, // AI-generated, high confidence
-      stressLevel: emotion.stressLevel,
-      stressScore: emotion.stressLevel === 'high' ? 8 : emotion.stressLevel === 'medium' ? 5 : 2,
-      emotionalIntensity: emotion.intensity,
-      topics: emotion.topics || [],
-      keywords: emotion.keywords || [],
+      mood: mood,
+      sentiment: sentiment,
+      sentimentConfidence: sentimentConfidence,
+      stressLevel: stressLevel,
+      stressScore: stressLevel === 'high' ? 8 : stressLevel === 'medium' ? 5 : 2,
+      emotionalIntensity: emotionalIntensity,
+      topics: [],
+      keywords: [],
       source: 'voice_call',
       call_id: callReport.call_id,
       createdAt: callReport.created_at

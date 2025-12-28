@@ -16,10 +16,7 @@ const CaregiverSettings = () => {
   const [profile, setProfile] = useState({
     name: '',
     email: '',
-    specialization: '',
-    organization: '',
     phone: '',
-    licenseNumber: '',
     twoFactorEnabled: false,
   });
 
@@ -37,10 +34,7 @@ const CaregiverSettings = () => {
         setProfile({
           name: caregiver?.name || '',
           email: caregiver?.email || '',
-          specialization: caregiver?.specialization || '',
-          organization: caregiver?.organization || '',
           phone: caregiver?.phone || '',
-          licenseNumber: caregiver?.licenseNumber || '',
           twoFactorEnabled: caregiver?.twoFactorEnabled || false,
         });
       } catch (e) {
@@ -79,10 +73,7 @@ const CaregiverSettings = () => {
 
       const payload = {
         name: profile.name,
-        specialization: profile.specialization,
-        organization: profile.organization,
         phone: profile.phone,
-        licenseNumber: profile.licenseNumber,
       };
 
       const data = await caregiverApi('/api/caregiver/me', {
@@ -188,28 +179,6 @@ const CaregiverSettings = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>Specialization</label>
-                  <input
-                    value={profile.specialization}
-                    onChange={(e) => setProfile((p) => ({ ...p, specialization: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-lg border"
-                    style={inputStyle}
-                    placeholder="Therapist"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>Organization</label>
-                  <input
-                    value={profile.organization}
-                    onChange={(e) => setProfile((p) => ({ ...p, organization: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-lg border"
-                    style={inputStyle}
-                    placeholder="Clinic / Hospital"
-                  />
-                </div>
-
-                <div>
                   <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>Phone</label>
                   <input
                     value={profile.phone}
@@ -217,17 +186,6 @@ const CaregiverSettings = () => {
                     className="w-full px-4 py-3 rounded-lg border"
                     style={inputStyle}
                     placeholder="+1 555 123 4567"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>License Number</label>
-                  <input
-                    value={profile.licenseNumber}
-                    onChange={(e) => setProfile((p) => ({ ...p, licenseNumber: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-lg border"
-                    style={inputStyle}
-                    placeholder="Optional"
                   />
                 </div>
               </div>

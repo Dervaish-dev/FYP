@@ -106,10 +106,10 @@ const calculateWellnessScore = (emotions, tasks, journals, sleepData) => {
   return Math.min(100, Math.round(score));
 };
 
-// POST /api/caregiver/register - Register new caregiver
+// POST /api/caregiver/register - Register new caregiver (with OTP verification)
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, licenseNumber, specialization, phone, organization } = req.body;
+    const { name, email, password, phone } = req.body;
     
     // Validation
     if (!name || !email || !password) {
@@ -131,17 +131,104 @@ router.post('/register', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new caregiver
+    // Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    // Create new caregiver (inactive until OTP verified)
     const caregiver = new Caregiver({
       name,
       email: email.toLowerCase(),
       password: hashedPassword,
-      licenseNumber,
-      specialization,
       phone,
-      organization
+      isActive: false,
+      loginOTP: otp,
+      loginOTPExpires: otpExpires
     });
 
+    await caregiver.save();
+
+    // Send OTP email
+    try {
+      await sendOtpEmail({ to: caregiver.email, otp, expiresMinutes: 10 });
+      
+      res.status(201).json({
+        success: true,
+        message: 'Registration successful. Please verify your email with the OTP sent.',
+        requiresOTP: true,
+        caregiverId: caregiver._id,
+        email: caregiver.email
+      });
+    } catch (emailError) {
+      console.error('Failed to send OTP email:', emailError);
+      // Delete the caregiver if email fails
+      await Caregiver.findByIdAndDelete(caregiver._id);
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send verification email. Please try again.'
+      });
+    }
+  } catch (error) {
+    console.error('Caregiver registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during registration',
+      error: error.message
+    });
+  }
+});
+
+// POST /api/caregiver/verify-otp - Verify OTP and activate account
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and OTP are required.'
+      });
+    }
+
+    // Find caregiver
+    const caregiver = await Caregiver.findOne({ email: email.toLowerCase() })
+      .select('+loginOTP +loginOTPExpires');
+    if (!caregiver) {
+      return res.status(404).json({
+        success: false,
+        message: 'Caregiver not found.'
+      });
+    }
+
+    // Check if already active
+    if (caregiver.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Account is already verified.'
+      });
+    }
+
+    // Check OTP expiry
+    if (!caregiver.loginOTPExpires || caregiver.loginOTPExpires < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP has expired. Please request a new one.'
+      });
+    }
+
+    // Verify OTP
+    if (caregiver.loginOTP !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP.'
+      });
+    }
+
+    // Activate account
+    caregiver.isActive = true;
+    caregiver.loginOTP = undefined;
+    caregiver.loginOTPExpires = undefined;
     await caregiver.save();
 
     // Generate token
@@ -151,23 +238,75 @@ router.post('/register', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    res.status(201).json({
+    res.status(200).json({
       success: true,
-      message: 'Caregiver registered successfully',
+      message: 'Account verified successfully!',
       token,
       caregiver: {
         id: caregiver._id,
         name: caregiver.name,
         email: caregiver.email,
-        role: caregiver.role,
-        specialization: caregiver.specialization
+        role: caregiver.role
       }
     });
   } catch (error) {
-    console.error('Caregiver registration error:', error);
+    console.error('OTP verification error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error during registration',
+      message: 'Server error during verification',
+      error: error.message
+    });
+  }
+});
+
+// POST /api/caregiver/resend-otp - Resend OTP
+router.post('/resend-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required.'
+      });
+    }
+
+    const caregiver = await Caregiver.findOne({ email: email.toLowerCase() })
+      .select('+loginOTP +loginOTPExpires');
+    if (!caregiver) {
+      return res.status(404).json({
+        success: false,
+        message: 'Caregiver not found.'
+      });
+    }
+
+    if (caregiver.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Account is already verified.'
+      });
+    }
+
+    // Generate new OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = Date.now() + 10 * 60 * 1000;
+
+    caregiver.loginOTP = otp;
+    caregiver.loginOTPExpires = otpExpires;
+    await caregiver.save();
+
+    // Send OTP email
+    await sendOtpEmail({ to: caregiver.email, otp, expiresMinutes: 10 });
+
+    res.status(200).json({
+      success: true,
+      message: 'New OTP sent to your email.'
+    });
+  } catch (error) {
+    console.error('Resend OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to resend OTP',
       error: error.message
     });
   }
@@ -252,8 +391,6 @@ router.post('/login', async (req, res) => {
         name: caregiver.name,
         email: caregiver.email,
         role: caregiver.role,
-        specialization: caregiver.specialization,
-        organization: caregiver.organization,
         twoFactorEnabled: caregiver.twoFactorEnabled
       }
     });
@@ -353,7 +490,7 @@ router.get('/me', authenticateCaregiver, async (req, res) => {
 // PUT /api/caregiver/me - Update caregiver profile (safe fields only)
 router.put('/me', authenticateCaregiver, async (req, res) => {
   try {
-    const { name, phone, organization, specialization, licenseNumber } = req.body;
+    const { name, phone } = req.body;
 
     const caregiver = await Caregiver.findById(req.caregiver.id);
     if (!caregiver) {
@@ -363,7 +500,7 @@ router.put('/me', authenticateCaregiver, async (req, res) => {
       });
     }
 
-    const updates = { name, phone, organization, specialization, licenseNumber };
+    const updates = { name, phone };
     const allowedKeys = Object.keys(updates);
     const hasAnyUpdate = allowedKeys.some((key) => updates[key] !== undefined);
     if (!hasAnyUpdate) {
@@ -375,9 +512,6 @@ router.put('/me', authenticateCaregiver, async (req, res) => {
 
     if (name !== undefined) caregiver.name = name;
     if (phone !== undefined) caregiver.phone = phone;
-    if (organization !== undefined) caregiver.organization = organization;
-    if (specialization !== undefined) caregiver.specialization = specialization;
-    if (licenseNumber !== undefined) caregiver.licenseNumber = licenseNumber;
 
     await caregiver.save();
 

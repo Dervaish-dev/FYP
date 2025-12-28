@@ -12,15 +12,12 @@ const CaregiverLogin = () => {
   const [error, setError] = useState('');
   const [showOTP, setShowOTP] = useState(false);
   const [otp, setOtp] = useState('');
-  const [caregiverId, setCaregiverId] = useState(null);
+  const [userEmail, setUserEmail] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    licenseNumber: '',
-    specialization: '',
-    phone: '',
-    organization: ''
+    phone: ''
   });
 
   const handleChange = (e) => {
@@ -57,9 +54,9 @@ const CaregiverLogin = () => {
       }
 
       if (data.success) {
-        if (data.requires2FA) {
+        if (data.requires2FA || data.requiresOTP) {
           setShowOTP(true);
-          setCaregiverId(data.caregiverId);
+          setUserEmail(formData.email);
           setLoading(false);
           return;
         }
@@ -84,12 +81,12 @@ const CaregiverLogin = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/caregiver/verify-2fa', {
+      const response = await fetch('/api/caregiver/verify-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ caregiverId, otp }),
+        body: JSON.stringify({ email: userEmail, otp }),
       });
 
       const data = await response.json();
@@ -266,6 +263,34 @@ const CaregiverLogin = () => {
               </button>
               <button
                 type="button"
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    const response = await fetch('/api/caregiver/resend-otp', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ email: userEmail })
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                      setError('New OTP sent to your email!');
+                      setTimeout(() => setError(''), 3000);
+                    } else {
+                      setError(data.message);
+                    }
+                  } catch (err) {
+                    setError('Failed to resend OTP');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="w-full py-2 text-sm opacity-70 hover:opacity-100"
+                style={{ color: 'var(--text-color)' }}
+              >
+                Resend Code
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowOTP(false)}
                 className="w-full py-2 text-sm opacity-70 hover:opacity-100"
                 style={{ color: 'var(--text-color)' }}
@@ -349,55 +374,14 @@ const CaregiverLogin = () => {
 
             {!isLogin && (
               <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>
-                      License Number
-                    </label>
-                    <input
-                      type="text"
-                      name="licenseNumber"
-                      value={formData.licenseNumber}
-                      onChange={handleChange}
-                      className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-opacity-50 transition-all"
-                      style={{
-                        backgroundColor: 'var(--theme-background)',
-                        borderColor: 'var(--border-color)',
-                        color: 'var(--text-color)',
-                        outline: 'none'
-                      }}
-                      placeholder="LIC-12345"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>
-                      Phone
-                    </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-opacity-50 transition-all"
-                      style={{
-                        backgroundColor: 'var(--theme-background)',
-                        borderColor: 'var(--border-color)',
-                        color: 'var(--text-color)',
-                        outline: 'none'
-                      }}
-                      placeholder="+1 234 567 8900"
-                    />
-                  </div>
-                </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>
-                    Specialization
+                    Phone
                   </label>
                   <input
-                    type="text"
-                    name="specialization"
-                    value={formData.specialization}
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
                     onChange={handleChange}
                     className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-opacity-50 transition-all"
                     style={{
@@ -406,27 +390,7 @@ const CaregiverLogin = () => {
                       color: 'var(--text-color)',
                       outline: 'none'
                     }}
-                    placeholder="Clinical Psychology"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-color)' }}>
-                    Organization
-                  </label>
-                  <input
-                    type="text"
-                    name="organization"
-                    value={formData.organization}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-opacity-50 transition-all"
-                    style={{
-                      backgroundColor: 'var(--theme-background)',
-                      borderColor: 'var(--border-color)',
-                      color: 'var(--text-color)',
-                      outline: 'none'
-                    }}
-                    placeholder="City Mental Health Center"
+                    placeholder="+1 234 567 8900"
                   />
                 </div>
               </>
@@ -459,10 +423,7 @@ const CaregiverLogin = () => {
                   name: '',
                   email: '',
                   password: '',
-                  licenseNumber: '',
-                  specialization: '',
-                  phone: '',
-                  organization: ''
+                  phone: ''
                 });
               }}
               className="text-sm opacity-70 hover:opacity-100 transition-opacity"

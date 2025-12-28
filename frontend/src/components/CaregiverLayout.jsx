@@ -17,7 +17,10 @@ const CaregiverLayout = ({ children }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Get caregiver info from localStorage since AuthContext is for patients
-  const caregiverInfo = JSON.parse(localStorage.getItem('caregiverInfo') || '{}');
+  const caregiverInfoStr = localStorage.getItem('caregiverInfo');
+  const caregiverInfo = caregiverInfoStr && caregiverInfoStr !== 'undefined' 
+    ? JSON.parse(caregiverInfoStr) 
+    : {};
   const user = caregiverInfo;
 
   const navItems = [

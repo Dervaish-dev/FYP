@@ -25,7 +25,6 @@ import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import CaregiverProtectedRoute from './components/CaregiverProtectedRoute';
 import NotificationCenter from './components/NotificationCenter';
-import EmojiMascot from './components/EmojiMascot';
 import WellnessNotificationCenter from './components/WellnessNotificationCenter';
 
 // Main App Routes
@@ -187,7 +186,6 @@ const AppRoutes = () => {
 
       {/* Global Components */}
       <NotificationCenter />
-      <EmojiMascot />
       <WellnessNotificationCenter />
     </>
   );

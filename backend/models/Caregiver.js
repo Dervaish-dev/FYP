@@ -24,23 +24,11 @@ const caregiverSchema = new mongoose.Schema({
     default: 'caregiver',
     enum: ['caregiver', 'therapist', 'admin']
   },
-  licenseNumber: {
-    type: String,
-    trim: true
-  },
-  specialization: {
-    type: String,
-    trim: true
-  },
   patients: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
   phone: {
-    type: String,
-    trim: true
-  },
-  organization: {
     type: String,
     trim: true
   },
