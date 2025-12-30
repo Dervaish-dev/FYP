@@ -280,10 +280,11 @@ router.post('/resend-otp', async (req, res) => {
       });
     }
 
-    if (caregiver.isActive) {
+    // Allow resend if inactive (registration) OR if active and 2FA enabled (login)
+    if (caregiver.isActive && !caregiver.twoFactorEnabled) {
       return res.status(400).json({
         success: false,
-        message: 'Account is already verified.'
+        message: 'Account is already verified and 2FA is not enabled.'
       });
     }
 
