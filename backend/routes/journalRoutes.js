@@ -4,36 +4,39 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { InferenceClient } from '@huggingface/inference';
 import dotenv from 'dotenv';
 import CallReport from '../models/CallReport.js';
+import User from '../models/User.js';
+import VoiceJournal from '../models/Journal.js';
+import { generateJournalPDF } from '../utils/pdfGenerator.js';
 
 dotenv.config();
 
 const router = express.Router();
 
-// Import Journal model from voiceJournalController for voice status checks
-// Define it here to avoid circular dependency
-const voiceJournalSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-  title: { type: String, required: true },
-  content: { type: String, required: true },
-  summary: { type: String, default: '' },
-  mood: { type: String, default: 'neutral' },
-  sentiment: { type: String, enum: ['positive', 'negative', 'neutral'], default: 'neutral' },
-  sentimentConfidence: { type: Number, default: 0.5 },
-  stressLevel: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
-  stressScore: { type: Number, default: 5 },
-  emotionalIntensity: { type: Number, default: 5, min: 1, max: 10 },
-  topics: [{ type: String }],
-  keywords: [{ type: String }],
-  source: { type: String, enum: ['manual', 'voice_call'], default: 'manual' },
-  call_id: { type: String, default: null },
-  createdAt: { type: Date, default: Date.now }
-}, { timestamps: true });
+// GET /api/journal/:id/download
+router.get('/:id/download', async (req, res) => {
+  try {
+    const journal = await VoiceJournal.findById(req.params.id);
+    if (!journal) {
+      return res.status(404).json({ success: false, message: 'Journal not found' });
+    }
+    
+    const user = await User.findById(journal.userId);
+    
+    const doc = generateJournalPDF(journal, user);
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=journal-${journal._id}.pdf`);
+    
+    doc.pipe(res);
+    doc.end();
+    
+  } catch (error) {
+    console.error('PDF Generation Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate PDF' });
+  }
+});
 
-// Add index for fast call_id lookups
-voiceJournalSchema.index({ call_id: 1 });
-voiceJournalSchema.index({ userId: 1, createdAt: -1 });
-
-const VoiceJournal = mongoose.models.Journal || mongoose.model('Journal', voiceJournalSchema);
+// VoiceJournal model imported from ../models/Journal.js
 
 // Initialize Gemini AI
 const API_KEY = process.env.GEMINI_API_KEY || '';

@@ -12,7 +12,7 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }) => {
-  const BASE_THEMES = ['ocean', 'coral', 'midnight', 'mint', 'lavender', 'golden'];
+  const BASE_THEMES = ['ocean', 'coral', 'midnight', 'mint', 'lavender'];
   const isBaseTheme = (key) => BASE_THEMES.includes(key);
 
   const [theme, setTheme] = useState(() => {
@@ -66,7 +66,7 @@ export const ThemeProvider = ({ children }) => {
       text = primaryScale?.[900] || '#111827';
       border = primaryScale?.[200] || '#e5e7eb';
       accent = primaryScale?.[600] || primary;
-      mutedText = primaryScale?.[500] || '#6b7280';
+      mutedText = primaryScale?.[700] || '#4b5563';
       mutedBg = primaryScale?.[100] || 'rgba(107, 114, 128, 0.1)';
     }
 
@@ -94,7 +94,6 @@ export const ThemeProvider = ({ children }) => {
     midnight: buildThemeFromDefinition('midnight', themeDefinitions?.midnight),
     mint: buildThemeFromDefinition('mint', themeDefinitions?.mint),
     lavender: buildThemeFromDefinition('lavender', themeDefinitions?.lavender),
-    golden: buildThemeFromDefinition('golden', themeDefinitions?.golden),
 
     // Emotion-based themes (kept for adaptive mode)
     'theme-happy': {

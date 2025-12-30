@@ -86,7 +86,6 @@ const ThemeSelector = ({ isOpen, onClose }) => {
                       {key === 'midnight' && 'Professional and focused'}
                       {key === 'mint' && 'Natural and refreshing'}
                       {key === 'lavender' && 'Creative and peaceful'}
-                      {key === 'golden' && 'Cozy and inviting'}
                       {key.startsWith('theme-') && 'Emotion-based theme'}
                     </p>
                   </div>

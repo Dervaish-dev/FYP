@@ -50,6 +50,14 @@ const caregiverSchema = new mongoose.Schema({
     type: Date,
     select: false
   },
+  resetPasswordOTP: {
+    type: String,
+    select: false
+  },
+  resetPasswordOTPExpires: {
+    type: Date,
+    select: false
+  },
 
   createdAt: {
     type: Date,

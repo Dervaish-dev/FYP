@@ -1,7 +1,12 @@
 import mongoose from 'mongoose';
 import CallReport from '../models/CallReport.js';
+import User from '../models/User.js';
+import Caregiver from '../models/Caregiver.js';
+import Journal from '../models/Journal.js';
 import { convertTranscriptToJournal } from '../utils/journalConverter.js';
 import { InferenceClient } from '@huggingface/inference';
+import { generateJournalPDF } from '../utils/pdfGenerator.js';
+import { sendEmail } from '../utils/mailer.js';
 
 // Initialize HuggingFace client
 const hfClient = (process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN)
@@ -58,26 +63,7 @@ async function analyzeEmotionWithHF(content) {
   }
 }
 
-// Define Journal schema inline (or import if separate file)
-const journalSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-  title: { type: String, required: true },
-  content: { type: String, required: true },
-  summary: { type: String, default: '' },
-  mood: { type: String, default: 'neutral' },
-  sentiment: { type: String, enum: ['positive', 'negative', 'neutral'], default: 'neutral' },
-  sentimentConfidence: { type: Number, default: 0.5 },
-  stressLevel: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
-  stressScore: { type: Number, default: 5 },
-  emotionalIntensity: { type: Number, default: 5, min: 1, max: 10 },
-  topics: [{ type: String }],
-  keywords: [{ type: String }],
-  source: { type: String, enum: ['manual', 'voice_call'], default: 'manual' },
-  call_id: { type: String, default: null },
-  createdAt: { type: Date, default: Date.now }
-}, { timestamps: true });
-
-const Journal = mongoose.models.Journal || mongoose.model('Journal', journalSchema);
+// Journal model imported from ../models/Journal.js
 
 /**
  * Webhook handler for Retell AI call completion
@@ -232,8 +218,39 @@ export async function createJournalFromCallReport(callReportId) {
     
     console.log('✅ Call report marked as processed');
     
-    // TODO: Send notification to user
-    // await notifyUser(callReport.user_id, journal._id);
+    // Send email to caregiver if assigned
+    try {
+      const user = await User.findById(callReport.user_id);
+      if (user && user.assignedCaregiver) {
+        const caregiver = await Caregiver.findById(user.assignedCaregiver);
+        if (caregiver && caregiver.email) {
+          console.log(`📧 Sending report to caregiver: ${caregiver.email}`);
+          
+          const doc = generateJournalPDF(journal, user);
+          const buffers = [];
+          doc.on('data', buffers.push.bind(buffers));
+          doc.on('end', async () => {
+            const pdfBuffer = Buffer.concat(buffers);
+            
+            await sendEmail({
+              to: caregiver.email,
+              subject: `New Voice Journal Entry from ${user.name}`,
+              text: `Hello ${caregiver.name},\n\n${user.name} has just completed a voice journal entry.\n\nMood: ${journal.mood}\nSentiment: ${journal.sentiment}\n\nPlease find the detailed report attached.\n\nBest regards,\nNeuroCompanion Team`,
+              attachments: [
+                {
+                  filename: `journal-${journal._id}.pdf`,
+                  content: pdfBuffer
+                }
+              ]
+            });
+          });
+          doc.end();
+        }
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send caregiver email:', emailError);
+      // Don't fail the whole process if email fails
+    }
     
     return journal;
   } catch (error) {

@@ -461,6 +461,97 @@ router.post('/toggle-2fa', authenticateCaregiver, async (req, res) => {
   }
 });
 
+// POST /api/caregiver/forgot-password
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const caregiver = await Caregiver.findOne({ email: email.toLowerCase() });
+
+    if (!caregiver) {
+      // Return success even if not found to prevent enumeration
+      return res.status(200).json({
+        success: true,
+        message: 'If an account with that email exists, a reset code has been sent.'
+      });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    caregiver.resetPasswordOTP = otp;
+    caregiver.resetPasswordOTPExpires = Date.now() + 10 * 60 * 1000; // 10 mins
+    await caregiver.save();
+
+    try {
+      await sendOtpEmail({ to: caregiver.email, otp, expiresMinutes: 10 });
+    } catch (err) {
+      console.error('Reset Password Email Error:', err);
+      return res.status(500).json({ success: false, message: 'Failed to send reset code' });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'If an account with that email exists, a reset code has been sent.'
+    });
+
+  } catch (error) {
+    console.error('Forgot Password error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// POST /api/caregiver/verify-reset-otp
+router.post('/verify-reset-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    const caregiver = await Caregiver.findOne({ 
+      email: email.toLowerCase(), 
+      resetPasswordOTP: otp,
+      resetPasswordOTPExpires: { $gt: Date.now() }
+    });
+
+    if (!caregiver) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+    }
+
+    res.status(200).json({ success: true, message: 'OTP verified' });
+
+  } catch (error) {
+    console.error('Verify Reset OTP error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// POST /api/caregiver/reset-password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    
+    if (!newPassword || newPassword.length < 6) {
+       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    }
+
+    const caregiver = await Caregiver.findOne({ 
+      email: email.toLowerCase(), 
+      resetPasswordOTP: otp,
+      resetPasswordOTPExpires: { $gt: Date.now() }
+    });
+
+    if (!caregiver) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+    }
+
+    caregiver.password = await bcrypt.hash(newPassword, 10);
+    caregiver.resetPasswordOTP = undefined;
+    caregiver.resetPasswordOTPExpires = undefined;
+    await caregiver.save();
+
+    res.status(200).json({ success: true, message: 'Password reset successfully' });
+
+  } catch (error) {
+    console.error('Reset Password error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 // GET /api/caregiver/me - Get caregiver profile
 router.get('/me', authenticateCaregiver, async (req, res) => {
   try {

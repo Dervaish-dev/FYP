@@ -101,6 +101,36 @@ export const sendOtpEmail = async ({ to, otp, expiresMinutes }) => {
   }
 };
 
+export const sendEmail = async ({ to, subject, text, attachments }) => {
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  if (!from) {
+    throw new MailerConfigError('SMTP is not configured. Missing: SMTP_FROM (or SMTP_USER)');
+  }
+
+  const transport = getTransport();
+
+  try {
+    const sendPromise = transport.sendMail({
+      from,
+      to,
+      subject,
+      text,
+      attachments
+    });
+
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Email send timeout')), 20000);
+    });
+
+    await Promise.race([sendPromise, timeoutPromise]);
+    console.log(`✓ Email sent successfully to ${to}`);
+  } catch (error) {
+    console.error('Failed to send email:', error.message);
+    cachedTransport = null;
+    throw error;
+  }
+};
+
 export const isMailerConfigError = (error) => {
   return Boolean(error && (error.code === 'MAILER_NOT_CONFIGURED' || error.name === 'MailerConfigError'));
 };

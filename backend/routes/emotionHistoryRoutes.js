@@ -1,54 +1,10 @@
 import express from "express";
 import mongoose from "mongoose";
+import EmotionHistory from "../models/Emotion.js";
 
 const router = express.Router();
 
-// Emotion History Schema
-const emotionHistorySchema = new mongoose.Schema({
-  userId: {
-    type: String,
-    required: true,
-    index: true
-  },
-  emotion: {
-    type: String,
-    required: true,
-    enum: ['happy', 'sad', 'calm', 'stressed', 'angry', 'neutral', 'excited', 'worried', 'confused', 'surprised']
-  },
-  intensity: {
-    type: Number,
-    required: true,
-    min: 1,
-    max: 10
-  },
-  confidence: {
-    type: Number,
-    required: true,
-    min: 0,
-    max: 1
-  },
-  note: {
-    type: String,
-    default: ''
-  },
-  source: {
-    type: String,
-    enum: ['manual', 'ai-analysis', 'ai-facial-analysis', 'ai-webcam-analysis'],
-    default: 'manual'
-  },
-  timestamp: {
-    type: Date,
-    default: Date.now
-  }
-}, {
-  timestamps: true
-});
-
-// Compound index for efficient time-based queries with sorting
-emotionHistorySchema.index({ userId: 1, timestamp: -1 });
-
-// Create model
-const EmotionHistory = mongoose.model('EmotionHistory', emotionHistorySchema);
+// EmotionHistory model imported from ../models/Emotion.js
 
 // POST /api/emotions/history - Log new emotion
 router.post("/history", async (req, res) => {

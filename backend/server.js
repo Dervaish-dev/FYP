@@ -16,6 +16,7 @@ import connectionRoutes from './routes/connectionRoutes.js';
 import inviteRoutes from './routes/inviteRoutes.js';
 // import voiceRoutes from './routes/voiceRoutes.js'; // Removed - replaced with breathing exercises
 import voiceJournalRoutes from './routes/voiceJournalRoutes.js';
+import { initCronJobs } from './services/cronService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -83,5 +84,8 @@ if (isEntrypoint) {
   app.listen(PORT, () => {
     console.log(`🚀 NeuroCompanion API server running on port ${PORT}`);
     console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+    
+    // Initialize scheduled tasks
+    initCronJobs();
   });
 }
