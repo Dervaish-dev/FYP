@@ -61,16 +61,17 @@ const AuthForm = ({
 
     if (!formData.password) {
       errors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
-    } else if (!/(?=.*[a-z])/.test(formData.password)) {
-      errors.password = 'Password must contain at least one lowercase letter';
-    } else if (!/(?=.*[A-Z])/.test(formData.password)) {
-      errors.password = 'Password must contain at least one uppercase letter';
-    } else if (!/(?=.*\d)/.test(formData.password)) {
-      errors.password = 'Password must contain at least one number';
-    } else if (!/(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/.test(formData.password)) {
-      errors.password = 'Password must contain at least one special character (!@#$%^&*()_+-=[]{};\':"|,.<>/? etc.)';
+    } else if (!isLogin) {
+      // Complexity checks only for registration
+      if (formData.password.length < 8) {
+        errors.password = 'Password must be at least 8 characters';
+      } else if (!/(?=.*[a-z])/.test(formData.password)) {
+        errors.password = 'Password must contain at least one lowercase letter';
+      } else if (!/(?=.*[A-Z])/.test(formData.password)) {
+        errors.password = 'Password must contain at least one uppercase letter';
+      } else if (!/(?=.*\d)/.test(formData.password)) {
+        errors.password = 'Password must contain at least one number';
+      }
     }
 
     setFormErrors(errors);
@@ -108,7 +109,7 @@ const AuthForm = ({
             placeholder="Enter your full name"
             required
           />
-          
+
           <div className="grid grid-cols-2 gap-4">
             <InputField
               label="Age"
@@ -121,7 +122,7 @@ const AuthForm = ({
               min="13"
               max="120"
             />
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Neurotype</label>
               <select
