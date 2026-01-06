@@ -35,8 +35,14 @@ const userPreferencesSchema = new mongoose.Schema({
   }],
   defaultTheme: {
     type: String,
-    enum: ['ocean', 'coral', 'dark', 'mint', 'lavender', 'golden'],
+    enum: ['ocean', 'coral', 'midnight', 'mint', 'lavender'],
     default: 'ocean'
+  },
+  fontSize: {
+    type: Number,
+    min: 12,
+    max: 20,
+    default: 16
   },
   personalGoals: {
     type: String,
@@ -152,6 +158,7 @@ router.post("/", async (req, res) => {
       neurotype, 
       preferredNotificationTimes, 
       defaultTheme, 
+      fontSize,
       personalGoals, 
       notificationsEnabled, 
       adaptiveMode, 
@@ -177,6 +184,7 @@ router.post("/", async (req, res) => {
       preferences.neurotype = neurotype || preferences.neurotype;
       preferences.preferredNotificationTimes = preferredNotificationTimes || preferences.preferredNotificationTimes;
       preferences.defaultTheme = defaultTheme || preferences.defaultTheme;
+      preferences.fontSize = fontSize !== undefined ? fontSize : preferences.fontSize;
       preferences.personalGoals = personalGoals || preferences.personalGoals;
       preferences.notificationsEnabled = notificationsEnabled !== undefined ? notificationsEnabled : preferences.notificationsEnabled;
       preferences.adaptiveMode = adaptiveMode !== undefined ? adaptiveMode : preferences.adaptiveMode;
@@ -193,6 +201,7 @@ router.post("/", async (req, res) => {
         neurotype: neurotype || 'None',
         preferredNotificationTimes: preferredNotificationTimes || [],
         defaultTheme: defaultTheme || 'ocean',
+        fontSize: fontSize || 16,
         personalGoals: personalGoals || '',
         notificationsEnabled: notificationsEnabled !== false,
         adaptiveMode: adaptiveMode !== false,

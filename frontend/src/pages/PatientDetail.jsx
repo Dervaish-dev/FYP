@@ -4,8 +4,10 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft, Heart, BookOpen, CheckSquare, Activity, TrendingUp,
   TrendingDown, Minus, Calendar, Clock, Brain, AlertCircle, Mail,
-  Target, BarChart3, MessageSquare, Star, Zap
+  Target, BarChart3, MessageSquare, Star, Zap, Download
 } from 'lucide-react';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import CaregiverLayout from '../components/CaregiverLayout';
 import {
   LineChart, BarChart, PieChart, XAxis, YAxis, CartesianGrid,
@@ -113,6 +115,35 @@ const PatientDetail = () => {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadReport = async () => {
+    try {
+      const token = localStorage.getItem('caregiverToken');
+      const response = await fetch(`/api/caregiver/patient/${patientId}/report`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate report');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Weekly-Report-${patient.name.replace(/\s+/g, '-')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Report downloaded successfully');
+    } catch (err) {
+      console.error('Error downloading report:', err);
+      toast.error(err.message || 'Failed to download report');
     }
   };
 
@@ -522,14 +553,23 @@ const PatientDetail = () => {
                 </div>
               </div>
 
-              <div className="text-right">
+              <div className="text-right flex flex-col items-end gap-2">
                 <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${getTrendColor(patient.moodTrend)}`}>
                   {getTrendIcon(patient.moodTrend)}
                   <span className="text-sm font-medium capitalize">{patient.moodTrend}</span>
                 </div>
                 
+                <button
+                  onClick={downloadReport}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium transition-all hover:opacity-90 active:scale-95 shadow-sm"
+                  style={{ backgroundColor: 'var(--theme-primary)' }}
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download Report</span>
+                </button>
+                
                 {/* Timeframe selector */}
-                <div className="flex gap-2 mt-3">
+                <div className="flex gap-2 mt-1">
                   {['week', 'month', 'quarter'].map((timeframe) => (
                     <button
                       key={timeframe}
@@ -895,6 +935,7 @@ const PatientDetail = () => {
             </motion.div>
           )}
         </motion.div>
+        <ToastContainer position="bottom-right" />
     </CaregiverLayout>
   );
 };

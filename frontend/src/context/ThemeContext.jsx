@@ -1,7 +1,12 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { themes as themeDefinitions } from '../utils/themes';
+import { useAuth } from './AuthContext';
+import { preferencesAPI } from '../utils/api';
 
 const ThemeContext = createContext();
+
+const BASE_THEMES = ['ocean', 'coral', 'midnight', 'mint', 'lavender'];
+const isBaseTheme = (key) => BASE_THEMES.includes(key);
 
 export const useTheme = () => {
   const context = useContext(ThemeContext);
@@ -12,20 +17,26 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }) => {
-  const BASE_THEMES = ['ocean', 'coral', 'midnight', 'mint', 'lavender'];
-  const isBaseTheme = (key) => BASE_THEMES.includes(key);
+  const { user } = useAuth();
+
+  // Helper to get initial selected theme from storage
+  const getInitialSelectedTheme = () => {
+    const saved = localStorage.getItem('neurocompanion-selectedTheme');
+    return saved || 'ocean';
+  };
+
+  const [selectedTheme, setSelectedTheme] = useState(getInitialSelectedTheme);
 
   const [theme, setTheme] = useState(() => {
-    const savedAdaptive = localStorage.getItem('neurocompanion-adaptiveMode') === 'true';
-    const savedSelected = localStorage.getItem('neurocompanion-selectedTheme');
+    const rawAdaptive = localStorage.getItem('neurocompanion-adaptiveMode');
+    const savedAdaptive = rawAdaptive === null ? true : rawAdaptive === 'true';
+    
+    const initialBase = getInitialSelectedTheme();
     const savedLastTheme = localStorage.getItem('neurocompanion-theme');
 
-    const selectedTheme = savedSelected || (savedLastTheme && isBaseTheme(savedLastTheme) ? savedLastTheme : null) || 'ocean';
-    const lastTheme = savedLastTheme || selectedTheme;
+    const lastTheme = savedLastTheme || initialBase;
 
-    // If adaptive mode is ON, resume the last applied theme (could be emotion-based).
-    // If adaptive mode is OFF, resume the user's selected base theme.
-    return savedAdaptive ? lastTheme : selectedTheme;
+    return savedAdaptive ? lastTheme : initialBase;
   });
   
   const [fontSize, setFontSize] = useState(() => {
@@ -35,8 +46,38 @@ export const ThemeProvider = ({ children }) => {
   
   const [adaptiveMode, setAdaptiveMode] = useState(() => {
     const saved = localStorage.getItem('neurocompanion-adaptiveMode');
-    return saved === 'true';
+    return saved === null ? true : saved === 'true';
   });
+
+  // Sync preferences from database on login
+  useEffect(() => {
+    const syncPreferences = async () => {
+      if (!user?.id) return;
+      try {
+        const prefs = await preferencesAPI.fetch(user.id);
+        if (prefs) {
+          if (prefs.defaultTheme && isBaseTheme(prefs.defaultTheme)) {
+            setSelectedTheme(prefs.defaultTheme);
+            if (!adaptiveMode || !localStorage.getItem('neurocompanion-theme')) {
+              setTheme(prefs.defaultTheme);
+            }
+            localStorage.setItem('neurocompanion-selectedTheme', prefs.defaultTheme);
+          }
+          if (prefs.adaptiveMode !== undefined) {
+            setAdaptiveMode(prefs.adaptiveMode);
+            localStorage.setItem('neurocompanion-adaptiveMode', prefs.adaptiveMode);
+          }
+          if (prefs.fontSize) {
+            setFontSize(prefs.fontSize);
+            localStorage.setItem('neurocompanion-fontSize', prefs.fontSize);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not sync preferences from server', err);
+      }
+    };
+    syncPreferences();
+  }, [user?.id]);
 
   const buildThemeFromDefinition = (key, def) => {
     const primaryScale = def?.colors?.primary;
@@ -178,59 +219,54 @@ export const ThemeProvider = ({ children }) => {
     if (currentTheme) {
       const root = document.documentElement;
 
-      const baseThemeDefinition = themeDefinitions?.[theme];
-      const primaryScale = baseThemeDefinition?.colors?.primary;
-      const secondaryScale = baseThemeDefinition?.colors?.secondary;
+      const activeThemeDef = themes[theme];
+      const primaryScale = activeThemeDef?.colors?.primary;
+      const secondaryScale = activeThemeDef?.colors?.secondary;
       
       // Set CSS custom properties - Comprehensive theme coverage
-      root.style.setProperty('--theme-primary', currentTheme.colors.primary);
-      root.style.setProperty('--theme-secondary', currentTheme.colors.secondary);
-      root.style.setProperty('--theme-background', currentTheme.colors.background);
-      root.style.setProperty('--theme-card', currentTheme.colors.card);
-      root.style.setProperty('--theme-text', currentTheme.colors.text);
-      root.style.setProperty('--theme-border', currentTheme.colors.border);
-      root.style.setProperty('--theme-accent', currentTheme.colors.accent);
-      root.style.setProperty('--theme-muted-text', currentTheme.colors.mutedText);
-      root.style.setProperty('--theme-muted-bg', currentTheme.colors.mutedBg);
+      root.style.setProperty('--theme-primary', activeThemeDef.colors.primary);
+      root.style.setProperty('--theme-secondary', activeThemeDef.colors.secondary);
+      root.style.setProperty('--theme-background', activeThemeDef.colors.background);
+      root.style.setProperty('--theme-card', activeThemeDef.colors.card);
+      root.style.setProperty('--theme-text', activeThemeDef.colors.text);
+      root.style.setProperty('--theme-border', activeThemeDef.colors.border);
+      root.style.setProperty('--theme-accent', activeThemeDef.colors.accent);
+      root.style.setProperty('--theme-muted-text', activeThemeDef.colors.mutedText);
+      root.style.setProperty('--theme-muted-bg', activeThemeDef.colors.mutedBg);
 
-      // Back-compat variables used across older dashboard pages
-      root.style.setProperty('--card-bg', currentTheme.colors.card);
-      root.style.setProperty('--text-color', currentTheme.colors.text);
-      root.style.setProperty('--border-color', currentTheme.colors.border);
+      // Back-compat variables
+      root.style.setProperty('--card-bg', activeThemeDef.colors.card);
+      root.style.setProperty('--text-color', activeThemeDef.colors.text);
+      root.style.setProperty('--border-color', activeThemeDef.colors.border);
 
-      const primary500 = primaryScale?.[500] || currentTheme.colors.primary;
-      const primary600 = primaryScale?.[600] || currentTheme.colors.secondary;
-      const primary100 =
-        primaryScale?.[100] ||
-        rgbaFromHex(primary500, 0.12) ||
-        currentTheme.colors.background;
-
-      const secondary500 = secondaryScale?.[500] || currentTheme.colors.border;
-      const secondary600 = secondaryScale?.[600] || currentTheme.colors.border;
-      const secondary100 =
-        secondaryScale?.[100] ||
-        rgbaFromHex(primary500, 0.08) ||
-        currentTheme.colors.background;
-
-      const primaryRgb = hexToRgb(primary500);
+      // Determine colors for derived scales
+      const p500 = typeof primaryScale === 'string' ? primaryScale : (primaryScale?.[500] || activeThemeDef.colors.primary);
+      const p600 = typeof primaryScale === 'string' ? primaryScale : (primaryScale?.[600] || activeThemeDef.colors.secondary);
+      const p100 = typeof primaryScale === 'object' && primaryScale?.[100] ? primaryScale[100] : rgbaFromHex(p500, 0.12);
+      
+      const primaryRgb = hexToRgb(p500);
       if (primaryRgb) {
         root.style.setProperty('--primary-rgb', `${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}`);
       }
 
-      root.style.setProperty('--primary-500', primary500);
-      root.style.setProperty('--primary-600', primary600);
-      root.style.setProperty('--primary-100', primary100);
-
-      root.style.setProperty('--secondary-500', secondary500);
-      root.style.setProperty('--secondary-600', secondary600);
-      root.style.setProperty('--secondary-100', secondary100);
-
-      // Optional full scale if available (improves consistency across pages)
-      if (primaryScale) {
+      root.style.setProperty('--primary-500', p500);
+      root.style.setProperty('--primary-600', p600);
+      root.style.setProperty('--primary-100', p100);
+      
+      // Handle the 50-900 scale
+      if (typeof primaryScale === 'object' && primaryScale !== null) {
         for (const step of [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]) {
-          const value = primaryScale?.[step];
+          const value = primaryScale[step];
           if (value) root.style.setProperty(`--primary-${step}`, value);
         }
+      } else {
+        // Fallback for adaptive themes without scales
+        for (const step of [50, 200, 300, 400, 700, 800, 900]) {
+          root.style.setProperty(`--primary-${step}`, p500);
+        }
+        // Special case for light/dark steps if we want some contrast
+        root.style.setProperty('--primary-50', rgbaFromHex(p500, 0.05));
+        root.style.setProperty('--primary-100', rgbaFromHex(p500, 0.12));
       }
       
       // Set font size
@@ -248,20 +284,11 @@ export const ThemeProvider = ({ children }) => {
   // Save to localStorage
   useEffect(() => {
     localStorage.setItem('neurocompanion-theme', theme);
-    // Only persist user selection when it's a base theme. Adaptive emotion themes shouldn't overwrite it.
-    if (isBaseTheme(theme)) {
-      localStorage.setItem('neurocompanion-selectedTheme', theme);
-    }
   }, [theme]);
 
-  // When adaptive mode is turned OFF, revert to the user's selected base theme.
   useEffect(() => {
-    if (adaptiveMode) return;
-    const selected = localStorage.getItem('neurocompanion-selectedTheme');
-    if (selected && isBaseTheme(selected) && theme !== selected) {
-      setTheme(selected);
-    }
-  }, [adaptiveMode]);
+    localStorage.setItem('neurocompanion-selectedTheme', selectedTheme);
+  }, [selectedTheme]);
 
   useEffect(() => {
     localStorage.setItem('neurocompanion-fontSize', fontSize.toString());
@@ -269,7 +296,10 @@ export const ThemeProvider = ({ children }) => {
 
   useEffect(() => {
     localStorage.setItem('neurocompanion-adaptiveMode', adaptiveMode.toString());
-  }, [adaptiveMode]);
+    if (!adaptiveMode) {
+      setTheme(selectedTheme);
+    }
+  }, [adaptiveMode, selectedTheme]);
 
   // Adaptive UI function with emotion-based theme mapping
   const applyAdaptiveTheme = (emotion) => {
@@ -309,6 +339,8 @@ export const ThemeProvider = ({ children }) => {
   const value = {
     theme,
     setTheme,
+    selectedTheme,
+    setSelectedTheme,
     fontSize,
     setFontSize,
     adaptiveMode,

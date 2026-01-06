@@ -22,6 +22,6 @@ const journalSchema = new mongoose.Schema({
 journalSchema.index({ call_id: 1 });
 journalSchema.index({ userId: 1, createdAt: -1 });
 
-const Journal = mongoose.models.Journal || mongoose.model('Journal', journalSchema);
+const Journal = mongoose.models.Journal || mongoose.model('Journal', journalSchema, 'journalentries');
 
 export default Journal;

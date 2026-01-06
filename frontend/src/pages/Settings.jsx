@@ -49,6 +49,8 @@ const Settings = () => {
   const {
     theme,
     setTheme,
+    selectedTheme,
+    setSelectedTheme,
     themes,
     fontSize,
     setFontSize,
@@ -77,14 +79,10 @@ const Settings = () => {
         const savedPrefs = await preferencesAPI.fetch(user.id);
         if (savedPrefs) {
           setPrefs(prev => ({ ...prev, ...savedPrefs }));
-          // Apply saved theme if exists
-          if (savedPrefs.defaultTheme && savedPrefs.defaultTheme !== theme) {
-            setTheme(savedPrefs.defaultTheme);
-          }
-          // Apply adaptive mode
-          if (savedPrefs.adaptiveMode !== undefined && savedPrefs.adaptiveMode !== adaptiveMode) {
-            setAdaptiveMode(savedPrefs.adaptiveMode);
-          }
+          // We don't call setTheme or setAdaptiveMode here anymore because
+          // ThemeContext now handles synchronization from the database
+          // when the user logs in. This prevents the Settings page from
+          // reverting session themes during navigations.
         }
       } catch (error) {
         console.error('Error loading preferences:', error);
@@ -99,6 +97,8 @@ const Settings = () => {
     try {
       await preferencesAPI.save(user.id, {
         ...prefs,
+        defaultTheme: selectedTheme, // Use user's preference, not the current adaptive theme
+        fontSize: fontSize,
         notificationsEnabled: notifications,
         adaptiveMode: adaptiveMode
       });
@@ -269,23 +269,29 @@ const Settings = () => {
             <div>
               <label className="block text-sm font-medium mb-3" style={{ color: 'var(--theme-text)' }}>Theme</label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {Object.entries(themes).map(([key, themeData]) => (
-                  <button
-                    key={key}
-                    onClick={() => setTheme(key)}
-                    className="p-3 rounded-xl border-2 transition-all"
-                    style={{
-                      borderColor: theme === key ? 'var(--theme-primary)' : 'var(--theme-border)',
-                      backgroundColor: theme === key ? 'rgba(var(--primary-rgb), 0.10)' : 'transparent',
-                      boxShadow: theme === key ? `0 0 0 2px rgba(var(--primary-rgb), 0.25)` : 'none'
-                    }}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 rounded-full" style={{ backgroundColor: themeData.colors.primary }} />
-                      <span className="text-sm font-medium" style={{ color: 'var(--theme-text)' }}>{themeData.name}</span>
-                    </div>
-                  </button>
-                ))}
+                {Object.entries(themes)
+                  .filter(([key]) => !key.startsWith('theme-')) // Filter out emotion themes
+                  .map(([key, themeData]) => (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setTheme(key);
+                        setSelectedTheme(key);
+                        setPrefs(prev => ({ ...prev, defaultTheme: key }));
+                      }}
+                      className="p-3 rounded-xl border-2 transition-all"
+                      style={{
+                        borderColor: selectedTheme === key ? 'var(--theme-primary)' : 'var(--theme-border)',
+                        backgroundColor: selectedTheme === key ? 'rgba(var(--primary-rgb), 0.10)' : 'transparent',
+                        boxShadow: selectedTheme === key ? `0 0 0 2px rgba(var(--primary-rgb), 0.25)` : 'none'
+                      }}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: themeData.colors.primary }} />
+                        <span className="text-sm font-medium" style={{ color: 'var(--theme-text)' }}>{themeData.name}</span>
+                      </div>
+                    </button>
+                  ))}
               </div>
             </div>
 
@@ -298,7 +304,11 @@ const Settings = () => {
                 </div>
               </div>
                   <button
-                    onClick={() => setAdaptiveMode(!adaptiveMode)}
+                    onClick={() => {
+                      const newValue = !adaptiveMode;
+                      setAdaptiveMode(newValue);
+                      setPrefs(prev => ({ ...prev, adaptiveMode: newValue }));
+                    }}
                     className="relative w-12 h-6 rounded-full transition-colors"
                     style={{
                       backgroundColor: adaptiveMode ? 'var(--theme-primary)' : 'var(--theme-border)'
@@ -322,7 +332,11 @@ const Settings = () => {
                    min="12"
                    max="20"
                    value={fontSize}
-                   onChange={(e) => setFontSize(parseInt(e.target.value))}
+                   onChange={(e) => {
+                     const val = parseInt(e.target.value);
+                     setFontSize(val);
+                     setPrefs(prev => ({ ...prev, fontSize: val }));
+                   }}
                    className="w-full h-2 rounded-lg appearance-none cursor-pointer"
                    style={{ backgroundColor: 'var(--theme-border)' }}
                  />

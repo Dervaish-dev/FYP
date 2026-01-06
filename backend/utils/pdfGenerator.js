@@ -152,7 +152,7 @@ export const generateWeeklyReportPDF = (caregiver, patient, data) => {
   if (data.emotions && data.emotions.length > 0) {
     doc.font('Helvetica').fontSize(10).fillColor(secondaryColor);
     data.emotions.forEach((e, i) => {
-      const date = new Date(e.createdAt).toLocaleDateString();
+      const date = new Date(e.timestamp || e.createdAt).toLocaleDateString();
       doc.text(`• ${date}: ${e.emotion} (Intensity: ${e.intensity || 'N/A'})`, { indent: 10 });
     });
   } else {

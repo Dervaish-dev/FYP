@@ -8,7 +8,11 @@ import { useTheme } from '../context/ThemeContext';
 
 const Login = () => {
   const { login, verify2FA, isLoading, error, clearError } = useAuth();
-  const { theme, setTheme, themes } = useTheme();
+  const { 
+    theme, setTheme, 
+    selectedTheme, setSelectedTheme, 
+    themes 
+  } = useTheme();
   const [showThemeSelector, setShowThemeSelector] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
   const [otp, setOtp] = useState('');
@@ -200,12 +204,13 @@ const Login = () => {
                     key={key}
                     onClick={() => {
                       setTheme(key);
+                      setSelectedTheme(key);
                       setShowThemeSelector(false);
                     }}
                     className="p-3 rounded-lg border-2 transition-all flex flex-col items-center space-y-2"
                     style={{
-                      borderColor: theme === key ? 'var(--theme-primary)' : '#e5e7eb',
-                      backgroundColor: theme === key ? 'rgba(var(--primary-rgb), 0.05)' : 'transparent'
+                      borderColor: selectedTheme === key ? 'var(--theme-primary)' : '#e5e7eb',
+                      backgroundColor: selectedTheme === key ? 'rgba(var(--primary-rgb), 0.05)' : 'transparent'
                     }}
                   >
                     <div className="flex space-x-1">

@@ -5,8 +5,12 @@ import Caregiver from '../models/Caregiver.js';
 import User from '../models/User.js';
 import Message from '../models/Message.js';
 import Appointment from '../models/Appointment.js';
+import Journal from '../models/Journal.js';
+import Task from '../models/Task.js';
+import Emotion from '../models/Emotion.js';
 import mongoose from 'mongoose';
 import { sendOtpEmail } from '../utils/mailer.js';
+import { generateWeeklyReportPDF } from '../utils/pdfGenerator.js';
 
 const noAudit = (req, res, next) => next();
 
@@ -1070,6 +1074,95 @@ router.get('/appointments', authenticateCaregiver, noAudit, async (req, res) => 
     res.status(500).json({
       success: false,
       message: 'Server error fetching appointments',
+      error: error.message
+    });
+  }
+});
+
+// GET /api/caregiver/patient/:patientId/report - Download patient report
+router.get('/patient/:patientId/report', authenticateCaregiver, noAudit, async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const caregiverId = req.caregiver.id;
+
+    // Verify access
+    const caregiver = await Caregiver.findById(caregiverId);
+    if (!caregiver.patients.some(p => p.toString() === patientId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    const patient = await User.findById(patientId);
+    if (!patient) {
+      return res.status(404).json({
+        success: false,
+        message: 'Patient not found'
+      });
+    }
+
+    // Gather data for the last 7 days
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7);
+
+    const journals = await Journal.find({
+      userId: patientId,
+      createdAt: { $gte: startDate }
+    }).sort({ createdAt: -1 });
+
+    const tasks = await Task.find({
+      userId: patientId,
+      createdAt: { $gte: startDate }
+    });
+
+    const emotions = await Emotion.find({
+      userId: patientId,
+      timestamp: { $gte: startDate }
+    }).sort({ timestamp: -1 });
+
+    // Calculate Stats
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(t => t.status === 'done' || t.completed).length;
+    const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    
+    let avgStress = 'N/A';
+    const stressMap = { 'low': 1, 'medium': 2, 'high': 3 };
+    const stressScores = journals
+      .map(j => stressMap[j.stressLevel?.toLowerCase()] || 0)
+      .filter(s => s > 0);
+    
+    if (stressScores.length > 0) {
+      const avg = stressScores.reduce((a, b) => a + b, 0) / stressScores.length;
+      avgStress = avg < 1.5 ? 'Low' : avg < 2.5 ? 'Medium' : 'High';
+    }
+
+    const reportData = {
+      startDate: startDate.toLocaleDateString(),
+      endDate: new Date().toLocaleDateString(),
+      journalCount: journals.length,
+      totalTasks,
+      completedTasks,
+      taskCompletionRate,
+      avgStress,
+      journals,
+      emotions
+    };
+
+    // Generate PDF
+    const doc = generateWeeklyReportPDF(caregiver, patient, reportData);
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=Report-${patient.name.replace(/\s+/g, '-')}.pdf`);
+    
+    doc.pipe(res);
+    doc.end();
+
+  } catch (error) {
+    console.error('Report generation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error generating report',
       error: error.message
     });
   }
