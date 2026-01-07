@@ -13,6 +13,8 @@ const CaregiverLogin = () => {
   const [showOTP, setShowOTP] = useState(false);
   const [otp, setOtp] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [caregiverId, setCaregiverId] = useState('');
+  const [is2FA, setIs2FA] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -57,6 +59,12 @@ const CaregiverLogin = () => {
         if (data.requires2FA || data.requiresOTP) {
           setShowOTP(true);
           setUserEmail(formData.email);
+          if (data.requires2FA) {
+            setCaregiverId(data.caregiverId);
+            setIs2FA(true);
+          } else {
+            setIs2FA(false);
+          }
           setLoading(false);
           return;
         }
@@ -81,12 +89,15 @@ const CaregiverLogin = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/caregiver/verify-otp', {
+      const endpoint = is2FA ? '/api/caregiver/verify-2fa' : '/api/caregiver/verify-otp';
+      const payload = is2FA ? { caregiverId, otp } : { email: userEmail, otp };
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: userEmail, otp }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
